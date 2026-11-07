@@ -1,19 +1,12 @@
 export const REDACTED = '[REDACTED]';
 
-/** Keys whose values never reach a log (OWASP Logging Cheat Sheet: tokens, credentials, personal data). */
-const SENSITIVE_KEYS = new Set([
-  'cookie',
-  'set-cookie',
-  'authorization',
-  'password',
-  'token',
-  'qrtoken',
-  'phone',
-  'guestname',
-  'guestphone',
-  'email',
-  'secret',
-]);
+/**
+ * Key patterns whose values never reach a log (OWASP Logging Cheat Sheet: credentials, tokens,
+ * personal data). Matched case-insensitively anywhere in the key: `accessToken`, `x-table-token`,
+ * `guest_phone` are all covered.
+ */
+const SENSITIVE_KEY =
+  /token|secret|password|passwd|cookie|authorization|phone|guest_?name|email|params/i;
 
 const redactValue = (value: unknown, seen: WeakSet<object>): unknown => {
   if (value === null || typeof value !== 'object') {
@@ -28,7 +21,7 @@ const redactValue = (value: unknown, seen: WeakSet<object>): unknown => {
   }
   const out: Record<string, unknown> = {};
   for (const [key, inner] of Object.entries(value)) {
-    out[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redactValue(inner, seen);
+    out[key] = SENSITIVE_KEY.test(key) ? REDACTED : redactValue(inner, seen);
   }
   return out;
 };

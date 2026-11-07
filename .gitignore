@@ -47,3 +47,6 @@ data/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# benchmark run output (baseline.json is committed)
+benchmarks/results/

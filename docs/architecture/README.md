@@ -30,7 +30,7 @@ that take the tenant id first. Details and data model:
 - Tenancy: tenant id only from the authenticated principal (ADR 0003).
 - Auth: cookie sessions on one origin (ADR 0002).
 - Errors: RFC 9457 problem details with a stable `code`; mapped once at the boundary.
-- Observability: structured JSON logs with request id, PII redacted; `/health` checks the database.
+- Observability: structured JSON logs with request id, PII redacted; `/api/health` checks the database.
 
 ## Decisions
 

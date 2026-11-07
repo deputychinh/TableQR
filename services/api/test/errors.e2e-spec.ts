@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, ConflictException, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { DomainError } from '../src/common/errors/domain.error.js';
 import request from 'supertest';
 import { createTestApp, type TestApp } from './support/app.js';
 
@@ -7,6 +8,33 @@ class ThrowingController {
   @Get('boom')
   boom(): never {
     throw new Error('secret internal detail: connection string postgres://u:p@h/db');
+  }
+
+  @Get('driver')
+  driver(): never {
+    const pg = Object.assign(new Error('duplicate key'), { code: '23505', constraint: 'x_key' });
+    const error = new Error('Failed query: insert …\nparams: Lan,0901234567', { cause: pg });
+    error.name = 'DrizzleQueryError';
+    throw error;
+  }
+
+  @Get('domain')
+  domain(): never {
+    throw new DomainError('EMAIL_TAKEN', 409, {
+      detail: 'Email đã được dùng',
+      extensions: { field: 'email' },
+    });
+  }
+
+  @Get('http-code')
+  httpCode(): never {
+    throw new ConflictException({ code: 'SESSION_CLOSED' });
+  }
+
+  @Post('echo')
+  @HttpCode(200)
+  echo(@Body() body: { text?: string }): { length: number } {
+    return { length: body.text?.length ?? 0 };
   }
 }
 
@@ -38,13 +66,70 @@ describe('problem details and request logs (e2e)', () => {
     expect(JSON.stringify(response.body)).not.toContain('secret internal detail');
     expect(response.headers['x-request-id']).toBe('req-abc-123');
     const errorLog = t.logs.find((l) => l.msg === 'unhandled_error');
-    expect(errorLog).toMatchObject({ level: 'error', reqId: 'req-abc-123' });
+    expect(errorLog).toMatchObject({ level: 'error', reqId: 'req-abc-123', error: 'Error' });
+    expect(response.body.instance).toBe('urn:tableqr:request:req-abc-123');
+    expect(JSON.stringify(t.logs)).not.toContain('postgres://');
+  });
+
+  it('logs a failed query by name, driver code and constraint, never its SQL or params', async () => {
+    t.logs.length = 0;
+    await request(t.app.getHttpServer()).get('/api/test-errors/driver').expect(500);
+    expect(t.logs.find((l) => l.msg === 'unhandled_error')).toMatchObject({
+      error: 'DrizzleQueryError',
+      dbCode: '23505',
+      constraint: 'x_key',
+    });
+    expect(JSON.stringify(t.logs)).not.toMatch(/0901234567|Failed query/);
+  });
+
+  it('maps a DomainError to its status, code, detail and extensions', async () => {
+    const response = await request(t.app.getHttpServer())
+      .get('/api/test-errors/domain')
+      .expect(409);
+    expect(response.body).toMatchObject({
+      status: 409,
+      code: 'EMAIL_TAKEN',
+      detail: 'Email đã được dùng',
+      field: 'email',
+      title: 'Conflict',
+    });
+  });
+
+  it('keeps a custom code carried by a Nest HttpException', async () => {
+    const response = await request(t.app.getHttpServer())
+      .get('/api/test-errors/http-code')
+      .expect(409);
+    expect(response.body).toMatchObject({ status: 409, code: 'SESSION_CLOSED' });
+  });
+
+  it('answers a wrong method on a known route with a problem, not an HTML page', async () => {
+    const response = await request(t.app.getHttpServer()).delete('/api/health').expect(404);
+    expect(response.headers['content-type']).toMatch(/^application\/problem\+json/);
+  });
+
+  it('accepts a JSON body just under 32 kB', async () => {
+    const text = 'x'.repeat(31 * 1024);
+    const response = await request(t.app.getHttpServer())
+      .post('/api/test-errors/echo')
+      .send({ text })
+      .expect(200);
+    expect(response.body).toEqual({ length: text.length });
   });
 
   it('rejects a JSON body above 32 kB with 413 PAYLOAD_TOO_LARGE', async () => {
     const big = { text: 'x'.repeat(33 * 1024) };
     const response = await request(t.app.getHttpServer()).post('/api/health').send(big).expect(413);
     expect(response.body).toMatchObject({ status: 413, code: 'PAYLOAD_TOO_LARGE' });
+  });
+
+  it('answers an unsupported content encoding with 415', async () => {
+    const response = await request(t.app.getHttpServer())
+      .post('/api/test-errors/echo')
+      .set('content-type', 'application/json')
+      .set('content-encoding', 'br-unknown')
+      .send('{}')
+      .expect(415);
+    expect(response.body).toMatchObject({ status: 415, code: 'UNSUPPORTED_MEDIA_TYPE' });
   });
 
   it('answers a malformed JSON body with 400 INVALID_JSON', async () => {

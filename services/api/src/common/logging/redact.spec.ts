@@ -16,6 +16,18 @@ describe('redact', () => {
     });
   });
 
+  it.each([
+    'accessToken',
+    'x-table-token',
+    'refresh_token',
+    'guest_phone',
+    'GuestName',
+    'userEmail',
+    'params',
+  ])('redacts the key %s by pattern', (key) => {
+    expect(redact({ [key]: 'v', keep: 1 })).toEqual({ [key]: REDACTED, keep: 1 });
+  });
+
   it('does not mutate its input', () => {
     const input = { password: 'p', nested: { phone: '1' } };
     redact(input);

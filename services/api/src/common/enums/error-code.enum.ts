@@ -6,6 +6,8 @@ export enum ErrorCode {
   Unauthorized = 'UNAUTHORIZED',
   Forbidden = 'FORBIDDEN',
   NotFound = 'NOT_FOUND',
+  MethodNotAllowed = 'METHOD_NOT_ALLOWED',
+  UnsupportedMediaType = 'UNSUPPORTED_MEDIA_TYPE',
   Conflict = 'CONFLICT',
   PayloadTooLarge = 'PAYLOAD_TOO_LARGE',
   TooManyRequests = 'TOO_MANY_REQUESTS',

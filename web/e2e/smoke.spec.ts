@@ -2,6 +2,15 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 test.describe('home skeleton', () => {
+  test('reaches the API through the same-origin /api proxy (no mocks)', async ({ page }) => {
+    const apiResponse = page.waitForResponse((r) => r.url().endsWith('/api/health'));
+    await page.goto('/');
+    const response = await apiResponse;
+    expect(new URL(response.url()).origin).toBe(new URL(page.url()).origin);
+    expect(response.headers()['x-stub']).toBe('yes');
+    await expect(page.getByText('Máy chủ và cơ sở dữ liệu đang hoạt động')).toBeVisible();
+  });
+
   test('shows the API as up when /health answers ok', async ({ page }) => {
     await page.route('**/api/health', (route) =>
       route.fulfill({ json: { status: 'ok', db: 'up' } }),

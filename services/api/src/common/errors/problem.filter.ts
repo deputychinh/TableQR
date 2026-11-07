@@ -1,10 +1,11 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { ErrorCode } from '../enums/error-code.enum.js';
 import { AppLogger } from '../logging/app-logger.js';
+import { errorFields } from '../logging/error-fields.js';
 import { requestIdOf } from '../logging/request-id.js';
 import { DomainError } from './domain.error.js';
-import { ErrorCode } from './error-code.enum.js';
-import { PROBLEM_CONTENT_TYPE, toProblem, type Problem } from './problem.js';
+import { sendProblem, toProblem, type Problem } from './problem.js';
 
 const INTERNAL_STATUS = 500;
 
@@ -25,25 +26,26 @@ export class ProblemFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
+    const requestId = requestIdOf(request);
     let problem: Problem;
     if (exception instanceof DomainError) {
-      problem = toProblem(exception.status, exception.code, exception.detail);
+      problem = toProblem(exception.status, {
+        code: exception.code,
+        detail: exception.detail,
+        extensions: exception.extensions,
+        requestId,
+      });
     } else if (exception instanceof HttpException) {
-      problem = toProblem(exception.getStatus(), codeFromHttpException(exception));
+      problem = toProblem(exception.getStatus(), {
+        code: codeFromHttpException(exception),
+        requestId,
+      });
     } else {
-      problem = toProblem(INTERNAL_STATUS, ErrorCode.Internal);
+      problem = toProblem(INTERNAL_STATUS, { code: ErrorCode.Internal, requestId });
     }
     if (problem.status >= INTERNAL_STATUS) {
-      this.logger.error('unhandled_error', {
-        reqId: requestIdOf(request),
-        error: exception instanceof Error ? exception.name : typeof exception,
-        message: exception instanceof Error ? exception.message : undefined,
-        cause:
-          exception instanceof Error && exception.cause instanceof Error
-            ? exception.cause.message
-            : undefined,
-      });
+      this.logger.error('unhandled_error', { reqId: requestId, ...errorFields(exception) });
     }
-    response.status(problem.status).type(PROBLEM_CONTENT_TYPE).send(JSON.stringify(problem));
+    sendProblem(response, problem);
   }
 }
