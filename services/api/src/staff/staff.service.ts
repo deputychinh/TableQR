@@ -8,6 +8,7 @@ import { DB, type Database } from '../db/database.module.js';
 import { isUniqueViolation } from '../db/pg-error.js';
 import { authSessions, restaurants, users } from '../db/schema.js';
 import { hashPasswordLimited } from '../identity/domain/password-slots.js';
+import { publishRevocation } from '../realtime/publisher.js';
 import { EMAIL_UNIQUE_INDEX, emailTakenError } from '../identity/identity.errors.js';
 import {
   MAX_STAFF_PER_RESTAURANT_LIST,
@@ -183,6 +184,10 @@ export class StaffService {
       if (!row) throw notFound();
       if (endsSessions(change)) {
         await tx.delete(authSessions).where(eq(authSessions.userId, target.id));
+      }
+      // D4: open streams close on commit; a new role reconnects under the new role's rights.
+      if (endsSessions(change) || (change.role !== undefined && change.role !== target.role)) {
+        await publishRevocation(tx, { restaurantId: tenant, userId: target.id });
       }
       return toMember(row);
     });

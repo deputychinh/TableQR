@@ -182,6 +182,30 @@ export class AuthService {
     };
   }
 
+  /**
+   * True while the session behind an open stream still grants access: present, not expired, the
+   * person enabled and the restaurant active. Read-only: a stream does not extend the session.
+   */
+  async isSessionActive(tokenHash: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({
+        expiresAt: authSessions.expiresAt,
+        disabledAt: users.disabledAt,
+        status: restaurants.status,
+      })
+      .from(authSessions)
+      .innerJoin(users, eq(users.id, authSessions.userId))
+      .leftJoin(restaurants, eq(restaurants.id, users.restaurantId))
+      .where(eq(authSessions.tokenHash, tokenHash))
+      .limit(1);
+    return (
+      row !== undefined &&
+      row.expiresAt > this.clock.now() &&
+      row.disabledAt === null &&
+      row.status !== 'suspended'
+    );
+  }
+
   async me(principal: Principal): Promise<Me> {
     const [user] = await this.db
       .select()

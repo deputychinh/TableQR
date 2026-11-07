@@ -20,5 +20,6 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Fixed
 
+- Open live streams end when the person is disabled, gets a new password or role, or the restaurant is suspended (`tqr_revoke` NOTIFY in the same transaction, plus a session re-check on every heartbeat); streams are capped at 10 per person and 300 per restaurant per process (429 `TOO_MANY_STREAMS`); snapshot failures and dropped malformed NOTIFY payloads are logged without content (TQR-010).
 - Sign-in throttle (AC4) holds under parallel requests: each attempt is reserved under a per-email advisory lock before the password check; unknown and disabled accounts are checked against a dummy scrypt hash so timing does not reveal which emails exist; a failed sign-in no longer signs the caller out (rotation only on success); sign-up and sign-in are limited to 20 requests / minute per client address (`TQR_AUTH_RATE_LIMIT_PER_MINUTE`, 429 `TOO_MANY_REQUESTS`) and at most 4 scrypt computations run at once (TQR-004).
 - A session cookie with malformed percent-encoding is treated as absent (401) instead of a 500 (TQR-004).

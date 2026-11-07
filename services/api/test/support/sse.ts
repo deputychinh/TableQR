@@ -8,6 +8,8 @@ export interface SseClient {
   messages: SseMessage[];
   waitFor: (predicate: (m: SseMessage) => boolean, timeoutMs?: number) => Promise<SseMessage>;
   close: () => void;
+  /** Resolves when the server ends the stream (not when the test aborts it). */
+  ended: Promise<void>;
 }
 
 /** Minimal SSE reader over fetch streaming, for e2e tests against a listening app. */
@@ -19,11 +21,18 @@ export const openSse = async (url: string, cookie: string): Promise<SseClient> =
   const waiters = new Set<() => void>();
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let buffer = '';
+  let markEnded: () => void = () => undefined;
+  const ended = new Promise<void>((resolve) => {
+    markEnded = resolve;
+  });
   void (async () => {
     try {
       for (;;) {
         const { value, done } = await reader.read();
-        if (done) return;
+        if (done) {
+          markEnded();
+          return;
+        }
         buffer += value;
         let index: number;
         while ((index = buffer.indexOf('\n\n')) >= 0) {
@@ -62,5 +71,5 @@ export const openSse = async (url: string, cookie: string): Promise<SseClient> =
       waiters.add(check);
       check();
     });
-  return { messages, waitFor, close: () => controller.abort() };
+  return { messages, waitFor, close: () => controller.abort(), ended };
 };
