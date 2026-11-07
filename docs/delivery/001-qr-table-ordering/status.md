@@ -44,6 +44,7 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 ## Progress log (one line per item or slice)
 
 - 2026-11-08 triage — repo created, owner answered triage questions
+- 2026-11-08 discover — brief go (appetite 6 days), product benchmark A — ed71312
 
 ## Rulings (decisions taken without asking)
 
