@@ -154,4 +154,4 @@ Roles: owner, cashier, waiter, kitchen.
 
 ## Changes after build started
 
-- none yet
+- 2026-11-08 (architect) Release time for pay-before-cooking orders = payment confirmation time — the kitchen cannot start earlier; ADR 0005.
