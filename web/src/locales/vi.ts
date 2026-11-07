@@ -4,12 +4,18 @@ import { core } from './vi/core';
 import { menu } from '@/features/menu/locale';
 import { settings } from '@/features/settings/locale';
 import { tables } from '@/features/tables/locale';
+import { rolesLocale } from '@/features/roles/locale';
+import { staffLocale } from '@/features/staff/locale';
+import { adminLocale } from '@/features/admin/locale';
 
 export const vi = {
   ...core,
   ...menu,
   ...settings,
   ...tables,
+  ...rolesLocale,
+  ...staffLocale,
+  ...adminLocale,
 } as const;
 
 export type Messages = typeof vi;

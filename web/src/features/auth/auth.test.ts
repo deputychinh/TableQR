@@ -12,6 +12,10 @@ describe('describeAuthError', () => {
       { fields: {}, form: 'auth.errors.invalidCredentials' },
     ],
     [new ApiError(429, 'LOGIN_BLOCKED'), { fields: {}, form: 'auth.errors.loginBlocked' }],
+    [
+      new ApiError(403, 'RESTAURANT_SUSPENDED'),
+      { fields: {}, form: 'auth.errors.restaurantSuspended' },
+    ],
     [new ApiError(0, 'NETWORK'), { fields: {}, form: 'errors.network' }],
     [new ApiError(500, 'INTERNAL'), { fields: {}, form: 'errors.unexpected' }],
     [new Error('boom'), { fields: {}, form: 'errors.unexpected' }],

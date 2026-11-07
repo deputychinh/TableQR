@@ -17,6 +17,20 @@ export class ApiError extends Error {
   }
 }
 
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | undefined;
+
+/**
+ * Called when a signed-in call answers 401 (session ended: signed out elsewhere, account disabled,
+ * restaurant suspended). The router registers one that sends the user to sign-in (AC16).
+ * Sign-in, sign-up and `/me` handle 401 themselves and do not trigger it.
+ */
+export const setUnauthorizedHandler = (handler: UnauthorizedHandler | undefined): void => {
+  unauthorizedHandler = handler;
+};
+
+const SELF_HANDLED_401 = ['/auth/', '/me'];
+
 const toApiError = async (response: Response): Promise<ApiError> => {
   try {
     const body: unknown = await response.json();
@@ -53,7 +67,13 @@ const request = async <T>(
   } catch (error: unknown) {
     throw new ApiError(0, 'NETWORK', [], { cause: error });
   }
-  if (!response.ok) throw await toApiError(response);
+  if (!response.ok) {
+    const error = await toApiError(response);
+    if (error.status === 401 && !SELF_HANDLED_401.some((prefix) => path.startsWith(prefix))) {
+      unauthorizedHandler?.();
+    }
+    throw error;
+  }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 };

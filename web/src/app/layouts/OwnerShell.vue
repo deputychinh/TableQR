@@ -101,6 +101,7 @@ const signOut = async () => {
 .owner-shell__nav {
   position: sticky;
   inset-block-end: 0;
+  z-index: var(--z-header);
   display: grid;
   grid-area: nav;
   grid-template-columns: repeat(5, 1fr);

@@ -1,4 +1,4 @@
-import { ApiError, getJson } from './client';
+import { ApiError, getJson, sendJson, setUnauthorizedHandler } from './client';
 
 const respond = (body: string, status = 200) =>
   (() => Promise.resolve(new Response(body, { status }))) as typeof fetch;
@@ -32,5 +32,29 @@ describe('getJson', () => {
   it('maps a network failure to status 0 NETWORK', async () => {
     const offline = (() => Promise.reject(new TypeError('offline'))) as typeof fetch;
     await expect(getJson('/x', offline)).rejects.toMatchObject({ status: 0, code: 'NETWORK' });
+  });
+});
+
+describe('unauthorized handler (AC16: a session ended elsewhere)', () => {
+  afterEach(() => setUnauthorizedHandler(undefined));
+
+  it('is called when a signed-in call answers 401, and the error still reaches the caller', async () => {
+    const handler = vi.fn<() => void>();
+    setUnauthorizedHandler(handler);
+    await expect(
+      sendJson('PATCH', '/staff/1', {}, respond('{"code":"UNAUTHORIZED"}', 401)),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('is not called for sign-in, /me or other errors', async () => {
+    const handler = vi.fn<() => void>();
+    setUnauthorizedHandler(handler);
+    await getJson('/me', respond('{"code":"UNAUTHORIZED"}', 401)).catch(() => undefined);
+    await sendJson('POST', '/auth/login', {}, respond('{"code":"INVALID_CREDENTIALS"}', 401)).catch(
+      () => undefined,
+    );
+    await getJson('/staff', respond('{"code":"FORBIDDEN"}', 403)).catch(() => undefined);
+    expect(handler).not.toHaveBeenCalled();
   });
 });

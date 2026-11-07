@@ -8,11 +8,11 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-002 | Same-origin `/api`, RFC 9457 errors, redacted request logs   | done   |
 | TQR-003 | Benchmark harness + baseline                                 | doing  |
 | TQR-004 | Restaurant sign-up, staff sign-in/out, sessions, throttling  | doing  |
-| TQR-005 | Staff accounts and role guard                                | todo   |
+| TQR-005 | Staff accounts and role guard                                | review |
 | TQR-006 | Menu: stations, categories, items, availability              | review |
 | TQR-007 | Tables, QR tokens, printable QR sheet, rotation              | review |
 | TQR-008 | House rules and bank account settings                        | review |
-| TQR-009 | ~ Platform admin suspend / reactivate                        | todo   |
+| TQR-009 | ~ Platform admin suspend / reactivate                        | review |
 | TQR-010 | Realtime hub: SSE + pg_notify + resync (spike first)         | review |
 | TQR-011 | Guest check-in / join table session                          | todo   |
 | TQR-012 | Guest menu and ordering (idempotent, price check)            | todo   |

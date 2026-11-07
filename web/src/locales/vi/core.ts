@@ -10,6 +10,9 @@ export const core = {
     signUp: 'Đăng ký nhà hàng',
     signIn: 'Đăng nhập',
   },
+  sheet: {
+    cancel: 'Huỷ',
+  },
   form: {
     showPassword: 'Hiện mật khẩu',
     hidePassword: 'Ẩn mật khẩu',
@@ -37,6 +40,8 @@ export const core = {
       emailTaken: 'Email đã được dùng. Hãy đăng nhập hoặc dùng email khác.',
       invalidCredentials: 'Email hoặc mật khẩu không đúng.',
       loginBlocked: 'Bạn đã nhập sai quá nhiều lần. Thử lại sau 15 phút.',
+      restaurantSuspended:
+        'Nhà hàng tạm ngưng. Liên hệ chủ quán hoặc bộ phận hỗ trợ TableQR để mở lại.',
     },
   },
   nav: {

@@ -7,6 +7,8 @@ import { MenuModule } from './menu/menu.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { TablesModule } from './tables/tables.module.js';
+import { StaffModule } from './staff/staff.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { AppLogger } from './common/logging/app-logger.js';
 import { LOG_SINK, stdoutSink } from './common/logging/log-sink.js';
 
@@ -29,6 +31,8 @@ const FEATURE_MODULES = [
   SettingsModule,
   TablesModule,
   MenuModule,
+  StaffModule,
+  AdminModule,
 ];
 
 @Module({

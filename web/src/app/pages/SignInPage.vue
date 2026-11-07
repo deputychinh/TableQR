@@ -9,6 +9,7 @@ import FormField from '@/components/FormField.vue';
 import { describeAuthError } from '@/features/auth/errors';
 import { useSessionStore } from '@/stores/session';
 import { safeNextPath } from '@/features/auth/next-path';
+import { roleHome } from '@/features/roles/role-home';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -22,8 +23,8 @@ const submit = async () => {
   busy.value = true;
   formError.value = undefined;
   try {
-    await session.signIn({ ...form });
-    await router.push(safeNextPath(route.query.next));
+    const me = await session.signIn({ ...form });
+    await router.push(safeNextPath(route.query.next, roleHome(me.user.role)));
   } catch (error: unknown) {
     const described = describeAuthError(error, {});
     formError.value = described.form ?? 'auth.errors.invalidCredentials';
