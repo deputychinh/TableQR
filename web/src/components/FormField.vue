@@ -8,11 +8,19 @@ const props = withDefaults(
     label: string;
     type?: 'text' | 'email' | 'password';
     autocomplete?: string;
+    inputmode?: 'text' | 'numeric' | 'decimal' | 'email';
     hint?: string;
     error?: string;
     required?: boolean;
   }>(),
-  { type: 'text', autocomplete: 'off', hint: undefined, error: undefined, required: false },
+  {
+    type: 'text',
+    autocomplete: 'off',
+    inputmode: undefined,
+    hint: undefined,
+    error: undefined,
+    required: false,
+  },
 );
 const model = defineModel<string>({ required: true });
 const { t } = useI18n();
@@ -39,6 +47,7 @@ defineExpose({ focus: () => input.value?.focus() });
         class="form-field__input"
         :type="inputType"
         :autocomplete="autocomplete"
+        :inputmode="inputmode"
         :required="required"
         :aria-invalid="error ? 'true' : undefined"
         :aria-describedby="describedBy"
