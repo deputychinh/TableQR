@@ -187,6 +187,11 @@ describe('restaurant sign-up and staff sessions (e2e)', () => {
     await http().get('/api/me').set('cookie', cookie).expect(401);
   });
 
+  it('D3 treats a cookie with malformed percent-encoding as absent (401, not 500)', async () => {
+    const response = await http().get('/api/me').set('cookie', 'tqr_staff=%E0%A4%A').expect(401);
+    expect(response.body.code).toBe('UNAUTHORIZED');
+  });
+
   it('never logs the email or password of a sign-in', async () => {
     t.logs.length = 0;
     const body = newOwner();
