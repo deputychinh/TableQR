@@ -10,6 +10,8 @@ const proxy = { '/api': { target: apiTarget, changeOrigin: false } };
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  // The manifest lets scripts/bundle-budget.mjs find the initial chunks.
+  build: { manifest: true },
   // Loopback only; both localhost and 127.0.0.1 reach it.
   server: { host: '127.0.0.1', proxy },
   preview: { host: '127.0.0.1', proxy },

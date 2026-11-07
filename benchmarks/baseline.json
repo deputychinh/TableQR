@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-11-07T19:11:18.479Z",
+  "commit": "3b22661",
+  "machine": "Apple M4 Pro × 14, 48 GB, Darwin 27.0.0",
+  "workloads": {
+    "api-health": {
+      "workload": "api-health",
+      "vus": 30,
+      "p95_ms": 18.22,
+      "p99_ms": 40.24,
+      "rps": 3673.8,
+      "error_rate": 0
+    },
+    "guest-menu-cold-load": {
+      "workload": "guest-menu-cold-load",
+      "lcp_ms": 1869,
+      "performance_score": 1
+    },
+    "guest-initial-js": {
+      "workload": "guest-initial-js",
+      "js_gzip_kb": 52.6,
+      "budget_kb": 150
+    }
+  }
+}

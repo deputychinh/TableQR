@@ -1,5 +1,5 @@
 // Fails when the JavaScript a guest downloads before first render exceeds the budget (benchmarks/plan.md).
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
@@ -25,6 +25,17 @@ visit(entryKey);
 const gzipKb = [...initial]
   .map((key) => gzipSync(readFileSync(join(dist, manifest[key].file))).length / 1024)
   .reduce((sum, kb) => sum + kb, 0);
+
+const results = new URL('../../benchmarks/results/', import.meta.url).pathname;
+mkdirSync(results, { recursive: true });
+writeFileSync(
+  `${results}bundle.json`,
+  JSON.stringify(
+    { workload: 'guest-initial-js', js_gzip_kb: Number(gzipKb.toFixed(1)), budget_kb: BUDGET_KB },
+    null,
+    2,
+  ),
+);
 
 const line = `initial JS ${gzipKb.toFixed(1)} kB gzip (budget ${BUDGET_KB} kB, ${initial.size} chunk(s))`;
 if (gzipKb > BUDGET_KB) {
