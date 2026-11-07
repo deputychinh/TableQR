@@ -213,7 +213,8 @@ describe('problem details and request logs (e2e)', () => {
 
   it('logs unmatched routes without their path', async () => {
     t.logs.length = 0;
-    await request(t.app.getHttpServer()).get('/api/g/t/SECRET-QR-TOKEN').expect(404);
+    // /api/g/t/:qrToken is a real route since TQR-007; this path matches nothing.
+    await request(t.app.getHttpServer()).get('/api/g/nothing/SECRET-QR-TOKEN').expect(404);
     expect(JSON.stringify(t.logs)).not.toContain('SECRET-QR-TOKEN');
     expect(t.logs.find((l) => l.msg === 'request')).toMatchObject({ route: '(unmatched)' });
   });
