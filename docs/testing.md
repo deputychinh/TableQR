@@ -6,7 +6,7 @@
 | --------------------------------------------------------- | --------------------------------- | ----------------------------------- | ------------------------------------ |
 | Domain (pure logic)                                       | `services/api/src/**/*.spec.ts`   | `make test`                         | part of ≥ 90 %                       |
 | API (HTTP layer, real database, fakes for external ports) | `services/api/test/*.e2e-spec.ts` | `make e2e`                          | as above                             |
-| Web unit/component                                        | `web/src/**/*.test.ts(x)`         | `cd web && npm test`                | lines ≥ 80 %                         |
+| Web unit/component                                        | `web/src/**/*.test.ts`            | `make test`                         | lines ≥ 80 %                         |
 | Browser journeys                                          | `web/e2e` (Playwright)            | `make e2e` after a production build | smoke + the main journey per feature |
 | Accessibility                                             | `web/e2e/a11y.spec.ts` (axe-core) | `make e2e`                          | serious/critical = 0                 |
 

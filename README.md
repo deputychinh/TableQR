@@ -8,32 +8,32 @@
 
 ## Quick start
 
-Requires: Node ≥ 24, Docker (for local infrastructure), and for a Python backend Python 3.12 + [uv](https://docs.astral.sh/uv/).
+Requires: Node ≥ 24 and Docker (Postgres runs in a container on port 55432).
 
 ```sh
 make install   # dependencies
 make dev       # infrastructure, migrations, API and web together
 ```
 
-`make help` lists every command.
+Open http://localhost:5310 (web); the API listens on http://127.0.0.1:3310. Optional: `cp .env.example .env` to override settings. `make help` lists every command.
 
 ## Features
 
-- …
+Planned in [docs/delivery/001-qr-table-ordering/spec.md](docs/delivery/001-qr-table-ordering/spec.md): restaurant self-signup with house rules, menu and stations, one QR per table, guest ordering with party size and anomaly check, FIFO kitchen queue, waiter serve list, live dish status, VietQR bill with cashier confirmation, table booking.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  web[Web app] -->|HTTP /api/v1| api[API]
-  api --> db[(Database)]
+  web[Vue web app<br/>guest · kitchen · waiter · cashier · owner] -->|HTTP JSON| api[NestJS API]
+  api --> db[(PostgreSQL)]
 ```
 
 Details: [docs/architecture/README.md](docs/architecture/README.md) · decisions: [docs/adr](docs/adr) · conventions: [docs/conventions.md](docs/conventions.md) · tests: [docs/testing.md](docs/testing.md).
 
 ## Quality
 
-`make ci` = lint + typecheck + test for every part (thresholds in `docs/testing.md`); GitHub Actions runs the same. Commits follow Conventional Commits (scopes in `commitlint.config.mjs`), enforced by husky + commitlint.
+`make ci` = lint + typecheck + unit tests + e2e (real Postgres via Testcontainers, Playwright on iPhone and iPad) for every part (thresholds in `docs/testing.md`); GitHub Actions runs the same. Commits follow Conventional Commits (scopes in `commitlint.config.mjs`), enforced by husky + commitlint.
 
 ## Structure
 

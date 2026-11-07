@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { defineConfig, devices } from '@playwright/test';
 
-const PREVIEW_URL = 'http://localhost:4173';
+const PREVIEW_URL = 'http://localhost:4310';
 
 /** Journeys run against the production build (vite preview), on the two devices the product targets. */
 export default defineConfig({
@@ -18,7 +18,7 @@ export default defineConfig({
     { name: 'ipad', use: { ...devices['iPad (gen 7)'] } },
   ],
   webServer: {
-    command: 'npm run build-only && npm run preview -- --port 4173 --strictPort',
+    command: 'npm run build-only && npm run preview -- --port 4310 --strictPort',
     url: PREVIEW_URL,
     reuseExistingServer: !process.env.CI,
   },

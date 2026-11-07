@@ -9,7 +9,7 @@ describe('loadSettings', () => {
   it('applies defaults and splits web origins', () => {
     const settings = loadSettings({ ...validEnv, TQR_WEB_ORIGINS: 'http://a, http://b' });
     expect(settings.TQR_WEB_ORIGINS).toEqual(['http://a', 'http://b']);
-    expect(settings.PORT).toBe(3000);
+    expect(settings.PORT).toBe(3310);
     expect(settings.TQR_LOG_LEVEL).toBe('info');
   });
 

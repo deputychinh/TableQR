@@ -8,14 +8,14 @@ const settingsSchema = z.object({
   TQR_SESSION_SECRET: z.string().min(MIN_SECRET_LENGTH),
   TQR_WEB_ORIGINS: z
     .string()
-    .default('http://localhost:5173,http://127.0.0.1:5173')
+    .default('http://localhost:5310,http://127.0.0.1:5310')
     .transform((value) =>
       value
         .split(',')
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0),
     ),
-  PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z.coerce.number().int().positive().default(3310),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
