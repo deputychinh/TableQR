@@ -2,10 +2,10 @@
 
 Request (verbatim): "Tôi muốn làm 1 website chạy chủ yếu trên ipad và mobile mục đích chính là cung cấp QR để dán lên các bàn ăn trong quán ăn xong r khách hàng có thể nhanh chóng đặt bàn và thanh toán luôn khi thanh toán thì sẽ là hình thức quét mã QR ở ngay bàn thông qua hình thức chuyển khoản hoặc có thể thanh toán sau khi ăn tuỳ nhưng nhìn chung là như vậy có timeline ra đồ ăn và quy trình rõ ràng để tránh trường hợp khách vào sau mà lại nhận món trước khách vào hay quy trình ví dụ bàn đi 5 người mà ra đồ ăn sai hay bàn đi 1 ngừoi mà lại order nhiều kiểu vậy hiểu ý tôi rồi chứ" + "mỗi nhà hàng nên có 1 tài khoản riêng" + "và quy cách vận hành riêng nhé"
 Path: Full — because new product, several features (multi-tenant, ordering, kitchen queue, payment, booking)
-Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 1.0 of 6 days**
+Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 2.0 of 6 days**
 Status: doing
 
-**Next action:** Merge the 4 agent branches (TQR-005+009, 006, 007, 008) one by one into main, regenerate Drizzle migrations after each, `make ci`, push; then one batch review of slice 1 (TQR-003…009); meanwhile build TQR-010 realtime hub.
+**Next action:** Act on the slice-1 batch review (fix → scores into stories); merge the 4 slice-2–4 agent branches one by one (regenerate Drizzle migrations, carry booking's hand-written EXCLUDE SQL), `make ci`, push; then TQR-017 isolation matrix, verify-app, demo, release v0.5.0.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
