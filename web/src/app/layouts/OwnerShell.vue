@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { LayoutDashboard, LogOut, QrCode, Settings, Users, UtensilsCrossed } from 'lucide-vue-next';
+import {
+  CalendarDays,
+  LayoutDashboard,
+  LogOut,
+  QrCode,
+  Settings,
+  Users,
+  UtensilsCrossed,
+} from 'lucide-vue-next';
 import BrandMark from '@/components/BrandMark.vue';
 import { useSessionStore } from '@/stores/session';
 
@@ -13,6 +21,7 @@ const nav = [
   { to: '/quan-ly', label: 'nav.overview', icon: LayoutDashboard, exact: true },
   { to: '/quan-ly/thuc-don', label: 'nav.menu', icon: UtensilsCrossed, exact: false },
   { to: '/quan-ly/ban', label: 'nav.tables', icon: QrCode, exact: false },
+  { to: '/dat-ban', label: 'booking.nav', icon: CalendarDays, exact: false },
   { to: '/quan-ly/nhan-vien', label: 'nav.staff', icon: Users, exact: false },
   { to: '/quan-ly/cai-dat', label: 'nav.settings', icon: Settings, exact: false },
 ] as const;
@@ -104,7 +113,8 @@ const signOut = async () => {
   z-index: var(--z-header);
   display: grid;
   grid-area: nav;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   border-block-start: 1px solid var(--color-border);
   background: var(--color-surface);
 }
@@ -141,6 +151,7 @@ const signOut = async () => {
 
   .owner-shell__nav {
     inset-block: 4rem auto;
+    grid-auto-flow: row;
     grid-template-columns: 1fr;
     align-content: start;
     gap: var(--space-2);

@@ -23,5 +23,5 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-017 | Tenant isolation and role e2e matrix                         | todo   |
 | TQR-018 | Bill with VietQR payload                                     | todo   |
 | TQR-019 | Cashier confirm, close session, pay-before-cooking           | todo   |
-| TQR-020 | Guest table booking (exclusion constraint)                   | todo   |
-| TQR-021 | Staff booking list: confirm, seat, cancel, late              | todo   |
+| TQR-020 | Guest table booking (exclusion constraint)                   | review |
+| TQR-021 | Staff booking list: confirm, seat, cancel, late              | review |

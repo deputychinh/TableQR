@@ -7,7 +7,7 @@ import { useSessionStore } from '@/stores/session';
 describe('OwnerShell', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows the restaurant, the five sections and signs out to the sign-in page', async () => {
+  it('shows the restaurant, the six sections and signs out to the sign-in page', async () => {
     const { router } = await renderWithApp(OwnerShell, {
       paths: [
         '/quan-ly',
@@ -16,6 +16,7 @@ describe('OwnerShell', () => {
         '/quan-ly/ban',
         '/quan-ly/nhan-vien',
         '/quan-ly/cai-dat',
+        '/dat-ban',
       ],
       at: '/quan-ly',
       slots: { default: 'Nội dung' },
@@ -26,7 +27,7 @@ describe('OwnerShell', () => {
     };
     expect(await screen.findByText('Quán Ngon')).toBeTruthy();
     const nav = screen.getByRole('navigation', { name: 'Quản lý nhà hàng' });
-    expect(nav.querySelectorAll('a')).toHaveLength(5);
+    expect(nav.querySelectorAll('a')).toHaveLength(6);
     expect(screen.getByRole('link', { name: 'Tổng quan' }).className).toContain(
       'owner-shell__link--active',
     );
