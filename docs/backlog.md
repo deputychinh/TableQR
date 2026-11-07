@@ -9,7 +9,7 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-003 | Benchmark harness + baseline                                 | doing  |
 | TQR-004 | Restaurant sign-up, staff sign-in/out, sessions, throttling  | doing  |
 | TQR-005 | Staff accounts and role guard                                | todo   |
-| TQR-006 | Menu: stations, categories, items, availability              | todo   |
+| TQR-006 | Menu: stations, categories, items, availability              | review |
 | TQR-007 | Tables, QR tokens, printable QR sheet, rotation              | todo   |
 | TQR-008 | House rules and bank account settings                        | todo   |
 | TQR-009 | ~ Platform admin suspend / reactivate                        | todo   |

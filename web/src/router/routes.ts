@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router';
+import { menuRoutes } from '@/features/menu/routes';
 
 // Each feature exports its routes from its own file and adds one spread line here.
 export const coreRoutes: RouteRecordRaw[] = [
@@ -28,4 +29,4 @@ export const coreRoutes: RouteRecordRaw[] = [
   },
 ];
 
-export const featureRoutes: RouteRecordRaw[] = [];
+export const featureRoutes: RouteRecordRaw[] = [...menuRoutes];
