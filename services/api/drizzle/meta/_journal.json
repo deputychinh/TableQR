@@ -29,6 +29,13 @@
       "when": 1794092545479,
       "tag": "0003_menu",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794093403156,
+      "tag": "0004_service",
+      "breakpoints": true
     }
   ]
 }
