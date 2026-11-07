@@ -21,6 +21,8 @@ export interface MatrixFixture {
   tableId: string;
   /** A table the owner's DELETE row may remove. */
   spareTableId: string;
+  /** A pending booking of the fixture restaurant (confirm is safe to repeat). */
+  bookingId: string;
 }
 
 export interface MatrixRow {
@@ -98,6 +100,14 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
   },
   { method: 'post', path: (f) => `/api/tables/${f.tableId}/rotate-qr`, allowed: OWNER },
   { method: 'delete', path: (f) => `/api/tables/${f.spareTableId}`, allowed: OWNER },
+  // bookings (TQR-021); seat / cancel / no-show are one-way, covered in booking.e2e-spec.ts
+  { method: 'get', path: () => '/api/bookings', allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/bookings/${f.bookingId}/confirm`,
+    allowed: FLOOR,
+    body: () => ({}),
+  },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {
