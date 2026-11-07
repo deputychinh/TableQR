@@ -6,6 +6,11 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Added
 
+- Guest check-in: scanning `/t/<qrToken>` asks the party size (1 … seats + 4) and opens the table, or joins its open session; "Vui lòng chờ nhân viên mở bàn" when staff open tables; `tqr_guest` device cookie (only its SHA-256 stored); staff `POST /api/sessions` and `PATCH /api/sessions/:id` (a new party size re-checks held orders) (TQR-011).
+- Guest menu and cart with a sticky "Gửi món" bar and a note per dish; `POST /api/g/orders` with `Idempotency-Key`, server-side prices (`MENU_CHANGED` lists the reasons), a rules snapshot per order, released / held / pay-before statuses and kitchen events per station (TQR-012).
+- Anomaly check (`service/domain/anomaly.ts`): "Chờ xác nhận" holds and "Có thể thiếu món" flags; waiter screen `/phuc-vu/duyet` to confirm (keeping the original queue time) or reject (TQR-013).
+- Guest live dish status on "Món đã gọi" over `GET /api/g/stream`, with a fresh snapshot on every reconnect (TQR-016).
+
 - Menu: kitchen stations (default "Bếp", late-after minutes), categories with the main-dish flag and ordering, items with whole-VND prices (1 000–100 000 000) and a "hết món" switch the kitchen may also use; public guest menu `GET /api/g/r/:slug/menu` with the owner's "Xem như khách" preview; shared `ToggleSwitch`, `StatusChip`, `TextAreaField`, `NumberField`; owner content now scrolls between the header and bottom bar (TQR-006).
 - Platform admin: `npm run admin:create` CLI (no sign-up screen), `/api/admin/restaurants` list with suspend / reactivate, `/quan-tri` screen; a suspended restaurant's staff are signed out at once and refused at sign-in ("Nhà hàng tạm ngưng"); reusable `assertRestaurantActive` for guest pages (TQR-009).
 - Staff accounts: owner adds cashier / waiter / kitchen people, changes roles, disables (sessions end at once), re-enables and sets a new password; no self lock-out, always one active owner; role homes `/thu-ngan`, `/phuc-vu`, `/bep` with sign-in landing per role; AC15 role matrix e2e covering staff, settings, tables and admin endpoints; staff pages respect `meta.roles` (tables list also for cashier / waiter); shared `StatusChip`; `make e2e` honours the database name in `E2E_DATABASE_URL` (TQR-005).
