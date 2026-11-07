@@ -5,7 +5,7 @@ Path: Full — because new product, several features (multi-tenant, ordering, ki
 Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 0.4 of 6 days**
 Status: doing
 
-**Next action:** Plan — run `shape-plan`: skeleton exists; benchmark harness second; slices for setup → ordering + kitchen → payment → booking; write plan.md and backlog items TQR-xxx.
+**Next action:** Build — run `deliver-loop` on TQR-002 (then TQR-003, TQR-004 …) per plan.md; slice 1 ends at v0.2.0.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -47,6 +47,7 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 - 2026-11-08 discover — brief go (appetite 6 days), product benchmark A — ed71312
 - 2026-11-08 spec — 16 stories, 54 ACs, 6 quality targets; booking kept in release 1 as last slice (cuttable)
 - 2026-11-08 set up — node-vue preset (NestJS 12 + Drizzle + Postgres 17, Vite + Vue 3), make ci green, user path proven on localhost and 127.0.0.1
+- 2026-11-08 plan — 21 items in 5 slices, estimate 4.5–7 d (60 %), circuit breaker written
 - 2026-11-08 architect — design.md, ADRs 0002–0007 (same-origin cookies, tenant scoping, SSE+NOTIFY, queue order, VietQR, booking exclusion), threat model
 
 ## Rulings (decisions taken without asking)
