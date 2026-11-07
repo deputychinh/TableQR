@@ -86,3 +86,4 @@ Reply in the language of the delivery profile (default: the language the user wr
 - Every query is scoped by `restaurantId` from the authenticated staff session or the table token — never from the request body. Cross-tenant access answers 404.
 - Kitchen queue order is by release time (spec glossary); never reorder silently.
 - Current delivery ledger: `docs/delivery/001-qr-table-ordering/status.md`.
+- UI must be easy and friendly, built from one set of patterns (`docs/design-system.md`): same app shell per role, same buttons, lists, forms, status chips and empty/error states everywhere; large touch targets for phones and kitchen iPads; plain Vietnamese copy that tells people what to do next. A new screen reuses these patterns before inventing one.
