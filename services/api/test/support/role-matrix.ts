@@ -21,6 +21,8 @@ export interface MatrixFixture {
   tableId: string;
   /** A table the owner's DELETE row may remove. */
   spareTableId: string;
+  /** An open table session of the fixture restaurant (party size rows, TQR-011). */
+  sessionId: string;
 }
 
 export interface MatrixRow {
@@ -98,6 +100,14 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
   },
   { method: 'post', path: (f) => `/api/tables/${f.tableId}/rotate-qr`, allowed: OWNER },
   { method: 'delete', path: (f) => `/api/tables/${f.spareTableId}`, allowed: OWNER },
+  // service floor (TQR-011, TQR-013); confirm/reject are one-shot, covered in ordering.e2e-spec.ts
+  {
+    method: 'patch',
+    path: (f) => `/api/sessions/${f.sessionId}`,
+    allowed: FLOOR,
+    body: () => ({ partySize: 2 }),
+  },
+  { method: 'get', path: () => '/api/orders/review', allowed: FLOOR },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {
