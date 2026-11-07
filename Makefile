@@ -54,7 +54,7 @@ test: ## Unit and component tests with coverage (Vitest)
 	$(API) npm run test:cov
 	$(WEB) npm test
 
-e2e: ## API e2e on a real Postgres (Testcontainers) and browser journeys (Playwright, iPhone + iPad)
+e2e: up migrate ## API e2e on a real Postgres (Testcontainers) and browser journeys (Playwright, iPhone + iPad, real API)
 	$(API) npm run test:e2e
 	$(WEB) npm run test:e2e
 

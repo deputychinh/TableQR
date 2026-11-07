@@ -1,8 +1,10 @@
 import process from 'node:process';
 import { defineConfig, devices } from '@playwright/test';
 
-const PREVIEW_URL = 'http://localhost:4310';
-const STUB_API_PORT = '3399';
+// Ports are configurable so several worktrees can run e2e at once.
+const PREVIEW_PORT = process.env.E2E_PREVIEW_PORT ?? '4310';
+const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`;
+const E2E_API_PORT = process.env.E2E_API_PORT ?? '3399';
 
 /** Journeys run against the production build (vite preview), on the two devices the product targets. */
 export default defineConfig({
@@ -20,16 +22,23 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // Stub API behind the preview proxy, so e2e proves the same-origin /api path (ADR 0002).
-      command: `node e2e/stub-api.mjs`,
-      url: `http://127.0.0.1:${STUB_API_PORT}/api/health`,
-      env: { STUB_API_PORT },
+      // The real API (built) on its own port against the local Postgres, behind the preview proxy.
+      command: 'cd ../services/api && npm run build && node dist/main.js',
+      url: `http://127.0.0.1:${E2E_API_PORT}/api/health`,
+      env: {
+        PORT: E2E_API_PORT,
+        TQR_DATABASE_URL:
+          process.env.TQR_DATABASE_URL ?? 'postgresql://tableqr:tableqr@127.0.0.1:55432/tableqr',
+        TQR_SESSION_SECRET: 'e2e-secret-e2e-secret-e2e-secret-e2e',
+        TQR_WEB_ORIGINS: PREVIEW_URL,
+      },
       reuseExistingServer: false,
+      timeout: 120_000,
     },
     {
-      command: 'npm run build-only && npm run preview -- --port 4310 --strictPort',
+      command: `npm run build-only && npm run preview -- --port ${PREVIEW_PORT} --strictPort`,
       url: PREVIEW_URL,
-      env: { TQR_API_PORT: STUB_API_PORT },
+      env: { TQR_API_PORT: E2E_API_PORT },
       reuseExistingServer: false,
     },
   ],

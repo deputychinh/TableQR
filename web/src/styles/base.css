@@ -21,3 +21,22 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+a {
+  color: var(--color-primary);
+  text-underline-offset: 0.2em;
+}

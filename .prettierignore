@@ -8,3 +8,4 @@ coverage
 *.min.*
 package-lock.json
 benchmarks/results
+services/api/drizzle/meta

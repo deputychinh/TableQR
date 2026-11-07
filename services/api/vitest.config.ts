@@ -10,7 +10,6 @@ export default defineConfig({
       provider: 'v8',
       include: [
         'src/**/domain/**/*.ts',
-        'src/**/*.service.ts',
         'src/config/**/*.ts',
         'src/common/errors/problem.ts',
         'src/common/logging/redact.ts',

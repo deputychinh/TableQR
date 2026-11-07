@@ -19,6 +19,7 @@ export default mergeConfig(
           'src/router/**',
           'src/app/pages/**',
           'src/App.vue',
+          'src/test/**',
         ],
         thresholds: { lines: 80, functions: 80, branches: 75, statements: 80 },
       },

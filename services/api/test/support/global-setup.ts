@@ -1,3 +1,4 @@
+import { runMigrations } from '../../src/db/migrate.js';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 let container: StartedPostgreSqlContainer | undefined;
@@ -7,6 +8,7 @@ export const setup = async (): Promise<void> => {
   container = await new PostgreSqlContainer('postgres:17').start();
   process.env.TQR_DATABASE_URL = container.getConnectionUri();
   process.env.TQR_SESSION_SECRET = 'e2e-secret-e2e-secret-e2e-secret-e2e';
+  await runMigrations(container.getConnectionUri());
 };
 
 export const teardown = async (): Promise<void> => {
