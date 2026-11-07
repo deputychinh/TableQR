@@ -9,3 +9,4 @@ coverage
 package-lock.json
 benchmarks/results
 services/api/drizzle/meta
+.claude/worktrees

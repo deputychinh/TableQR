@@ -310,17 +310,20 @@ const remove = async () => {
       @close="close"
     />
     <ConfirmSheet
-      v-else-if="sheet?.kind === 'confirm'"
+      :open="sheet?.kind === 'confirm'"
       :title="confirmText.title"
-      :message="confirmText.body"
       :confirm-label="t('menu.delete')"
       :cancel-label="t('menu.cancel')"
-      danger
+      variant="danger"
       :busy="confirmBusy"
-      :error="confirmError"
       @confirm="remove"
       @cancel="close"
-    />
+    >
+      <div class="menu-page__confirm">
+        <p class="menu-page__confirm-text">{{ confirmText.body }}</p>
+        <FormAlert v-if="confirmError" :message="confirmError" />
+      </div>
+    </ConfirmSheet>
   </OwnerShell>
 </template>
 
@@ -451,6 +454,15 @@ const remove = async () => {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.menu-page__confirm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.menu-page__confirm-text {
+  margin: 0;
 }
 
 .menu-page__category-empty {

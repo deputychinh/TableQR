@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseSheet from '@/components/BaseSheet.vue';
@@ -22,6 +22,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ saved: [item: MenuItem]; remove: [item: MenuItem]; close: [] }>();
 const { t } = useI18n();
+const formId = useId();
 
 const form = reactive({
   name: props.item?.name ?? '',
@@ -84,11 +85,11 @@ const submit = async () => {
 
 <template>
   <BaseSheet
+    open
     :title="item ? t('menu.item.editTitle') : t('menu.item.newTitle')"
-    :close-label="t('menu.close')"
-    @close="emit('close')"
+    @close="!busy && emit('close')"
   >
-    <form class="item-sheet" novalidate @submit.prevent="submit">
+    <form :id="formId" class="item-sheet" novalidate @submit.prevent="submit">
       <FormAlert v-if="formError" :message="t(formError.key, formError.params ?? {})" />
       <FormField
         v-model="form.name"
@@ -125,18 +126,22 @@ const submit = async () => {
         :maxlength="MAX_ITEM_DESCRIPTION"
         :error="errorFor('description')"
       />
-      <div class="item-sheet__actions">
-        <BaseButton
-          v-if="item"
-          variant="ghost"
-          class="item-sheet__remove"
-          @click="emit('remove', item)"
-        >
-          {{ t('menu.item.remove') }}
-        </BaseButton>
-        <BaseButton type="submit" size="lg" :loading="busy">{{ t('menu.save') }}</BaseButton>
-      </div>
     </form>
+    <template #actions>
+      <BaseButton
+        v-if="item"
+        variant="ghost"
+        class="item-sheet__remove"
+        :disabled="busy"
+        @click="emit('remove', item)"
+      >
+        {{ t('menu.item.remove') }}
+      </BaseButton>
+      <BaseButton variant="secondary" :disabled="busy" @click="emit('close')">
+        {{ t('menu.cancel') }}
+      </BaseButton>
+      <BaseButton type="submit" :form="formId" :loading="busy">{{ t('menu.save') }}</BaseButton>
+    </template>
   </BaseSheet>
 </template>
 
@@ -157,24 +162,7 @@ const submit = async () => {
   }
 }
 
-.item-sheet__actions {
-  display: flex;
-  gap: var(--space-2);
-  justify-content: flex-end;
-  margin-block-start: var(--space-2);
-}
-
-.item-sheet__actions > :last-child {
-  flex: 1;
-}
-
 .item-sheet__remove {
   color: var(--color-danger);
-}
-
-@media (width >= 600px) {
-  .item-sheet__actions > :last-child {
-    flex: 0 1 12rem;
-  }
 }
 </style>

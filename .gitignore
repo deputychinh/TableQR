@@ -51,3 +51,4 @@ data/
 # benchmark run output (baseline.json is committed)
 benchmarks/results/
 coverage-e2e/
+.claude/worktrees/

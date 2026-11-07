@@ -37,7 +37,7 @@ Owner rule (2026-11-08): "giao diện dễ dùng, có pattern và thân thiện"
 | `ErrorState`                                  | load failed — plain cause + "Thử lại"                                                | —                                                         |
 | `LoadingState`                                | skeleton rows, never a blank screen                                                  | —                                                         |
 | `Toast`                                       | outcome of an action, polite live region, queued                                     | success, error                                            |
-| `BaseSheet`                                   | forms over a list: bottom sheet on phones, dialog on iPad                            | open (focus on first field, Escape closes)                |
+| `BaseSheet`                                   | forms over a list: bottom sheet on phones, dialog on iPad                            | open (Escape or backdrop closes), actions slot            |
 | `ToggleSwitch`                                | on/off with a visible state word (e.g. Còn món / Hết món)                            | on, off, disabled                                         |
 | `SelectField`, `TextAreaField`, `NumberField` | same anatomy as `FormField`; `NumberField` opens the numeric keypad and shows a unit | empty, filled, error                                      |
 

@@ -1,62 +1,53 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue';
-import { X } from 'lucide-vue-next';
+import { onMounted, ref, useId, watch } from 'vue';
 
 /**
- * A modal sheet: slides up from the bottom on phones, centred on wider screens. The parent
- * mounts it with `v-if`; Escape, the close button or the parent's own buttons emit `close`.
- * Built on <dialog> so the browser traps focus and restores it on close.
+ * Modal sheet on a native <dialog>: bottom sheet on phones, centred panel on iPad and wider.
+ * The parent owns `open`; Esc and a tap on the backdrop ask it to close.
  */
-withDefaults(defineProps<{ title: string; closeLabel: string; closable?: boolean }>(), {
-  closable: true,
-});
+const props = defineProps<{ open: boolean; title: string }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLDialogElement | null>(null);
 const titleId = useId();
 
-const focusFirstField = () => {
-  const field = dialog.value?.querySelector<HTMLElement>(
-    '.base-sheet__body input, .base-sheet__body select, .base-sheet__body textarea',
-  );
-  field?.focus();
-};
-
-onMounted(async () => {
+const sync = (open: boolean) => {
   const element = dialog.value;
   if (!element) return;
-  if (typeof element.showModal === 'function') element.showModal();
-  else element.setAttribute('open', ''); // jsdom has no showModal
-  await nextTick();
-  focusFirstField();
-});
+  const isOpen = element.hasAttribute('open');
+  if (open && !isOpen) {
+    // jsdom and very old browsers lack showModal; the attribute still shows the content.
+    if (typeof element.showModal === 'function') element.showModal();
+    else element.setAttribute('open', '');
+  } else if (!open && isOpen) {
+    if (typeof element.close === 'function') element.close();
+    else element.removeAttribute('open');
+  }
+};
 
-onBeforeUnmount(() => {
-  const element = dialog.value;
-  if (element?.open && typeof element.close === 'function') element.close();
-});
+watch(() => props.open, sync, { flush: 'post' });
+onMounted(() => sync(props.open));
 
-const onCancel = (event: Event) => {
-  event.preventDefault();
-  emit('close');
+const onBackdrop = (event: MouseEvent) => {
+  if (event.target === dialog.value) emit('close');
 };
 </script>
 
 <template>
-  <dialog ref="dialog" class="base-sheet" :aria-labelledby="titleId" @cancel="onCancel">
-    <div class="base-sheet__panel">
-      <header class="base-sheet__header">
-        <h2 :id="titleId" class="base-sheet__title">{{ title }}</h2>
-        <button
-          v-if="closable"
-          type="button"
-          class="base-sheet__close"
-          :aria-label="closeLabel"
-          @click="emit('close')"
-        >
-          <X :size="22" aria-hidden="true" />
-        </button>
-      </header>
-      <div class="base-sheet__body"><slot /></div>
+  <dialog
+    ref="dialog"
+    class="base-sheet"
+    :aria-labelledby="titleId"
+    @cancel.prevent="emit('close')"
+    @click="onBackdrop"
+  >
+    <div v-if="open" class="base-sheet__panel">
+      <h2 :id="titleId" class="base-sheet__title">{{ title }}</h2>
+      <div class="base-sheet__body">
+        <slot />
+      </div>
+      <div v-if="$slots.actions" class="base-sheet__actions">
+        <slot name="actions" />
+      </div>
     </div>
   </dialog>
 </template>
@@ -65,7 +56,6 @@ const onCancel = (event: Event) => {
 .base-sheet {
   inline-size: 100%;
   max-inline-size: 100%;
-  max-block-size: 92dvh;
   margin: auto auto 0;
   padding: 0;
   border: 0;
@@ -82,14 +72,7 @@ const onCancel = (event: Event) => {
 .base-sheet__panel {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-3) var(--space-4);
-}
-
-.base-sheet__header {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: space-between;
+  padding: var(--space-4) var(--space-3) var(--space-4);
 }
 
 .base-sheet__title {
@@ -97,28 +80,31 @@ const onCancel = (event: Event) => {
   font-size: var(--font-size-lead);
 }
 
-.base-sheet__close {
+.base-sheet__body {
   display: grid;
-  flex: none;
-  place-items: center;
-  inline-size: var(--target-min);
-  block-size: var(--target-min);
-  border: 0;
-  border-radius: 50%;
-  color: var(--color-text-muted);
-  background: var(--color-surface-muted);
-  cursor: pointer;
+  gap: var(--space-3);
+}
+
+.base-sheet__actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-2);
 }
 
 @media (width >= 600px) {
   .base-sheet {
-    max-inline-size: 34rem;
+    max-inline-size: 30rem;
     margin: auto;
     border-radius: var(--radius-3);
   }
 
   .base-sheet__panel {
-    padding: var(--space-4);
+    padding: var(--space-5);
+  }
+
+  .base-sheet__actions {
+    flex-direction: row;
+    justify-content: flex-end;
   }
 }
 </style>

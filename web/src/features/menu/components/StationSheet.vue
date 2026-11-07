@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseSheet from '@/components/BaseSheet.vue';
@@ -14,6 +14,7 @@ import type { Station } from '../types';
 const props = defineProps<{ station?: Station }>();
 const emit = defineEmits<{ saved: [station: Station]; close: [] }>();
 const { t } = useI18n();
+const formId = useId();
 
 const form = reactive({
   name: props.station?.name ?? '',
@@ -55,11 +56,11 @@ const submit = async () => {
 
 <template>
   <BaseSheet
+    open
     :title="station ? t('menu.station.editTitle') : t('menu.station.newTitle')"
-    :close-label="t('menu.close')"
-    @close="emit('close')"
+    @close="!busy && emit('close')"
   >
-    <form class="station-sheet" novalidate @submit.prevent="submit">
+    <form :id="formId" class="station-sheet" novalidate @submit.prevent="submit">
       <FormAlert v-if="formError" :message="t(formError.key, formError.params ?? {})" />
       <FormField
         v-model="form.name"
@@ -75,8 +76,13 @@ const submit = async () => {
         :hint="t('menu.station.lateHint')"
         :error="errorFor('lateAfterMinutes')"
       />
-      <BaseButton type="submit" size="lg" block :loading="busy">{{ t('menu.save') }}</BaseButton>
     </form>
+    <template #actions>
+      <BaseButton variant="secondary" :disabled="busy" @click="emit('close')">
+        {{ t('menu.cancel') }}
+      </BaseButton>
+      <BaseButton type="submit" :form="formId" :loading="busy">{{ t('menu.save') }}</BaseButton>
+    </template>
   </BaseSheet>
 </template>
 

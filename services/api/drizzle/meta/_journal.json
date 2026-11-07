@@ -12,8 +12,22 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1794080448751,
-      "tag": "0001_menu",
+      "when": 1794080421395,
+      "tag": "0001_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794092186100,
+      "tag": "0002_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794092545479,
+      "tag": "0003_menu",
       "breakpoints": true
     }
   ]

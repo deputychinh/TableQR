@@ -1,15 +1,22 @@
 <script setup lang="ts">
-/** No data yet: says why and offers the next action (slot `action`). */
-defineProps<{ title: string; body?: string }>();
+/** "Nothing here yet": says why and offers the next action (slot `action`); icon in slot `icon`. */
+withDefaults(defineProps<{ title: string; body?: string; headingLevel?: 1 | 2 }>(), {
+  body: undefined,
+  headingLevel: 2,
+});
 </script>
 
 <template>
-  <div class="empty-state">
-    <span v-if="$slots.icon" class="empty-state__icon"><slot name="icon" /></span>
-    <p class="empty-state__title">{{ title }}</p>
+  <section class="empty-state">
+    <span v-if="$slots.icon" class="empty-state__icon" aria-hidden="true">
+      <slot name="icon" />
+    </span>
+    <component :is="`h${headingLevel}`" class="empty-state__title">{{ title }}</component>
     <p v-if="body" class="empty-state__body">{{ body }}</p>
-    <div v-if="$slots.action" class="empty-state__action"><slot name="action" /></div>
-  </div>
+    <div v-if="$slots.action" class="empty-state__action">
+      <slot name="action" />
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -27,8 +34,8 @@ defineProps<{ title: string; body?: string }>();
 .empty-state__icon {
   display: grid;
   place-items: center;
-  inline-size: 3.5rem;
-  block-size: 3.5rem;
+  inline-size: 4rem;
+  block-size: 4rem;
   border-radius: 50%;
   color: var(--color-primary);
   background: var(--color-primary-soft);
@@ -37,7 +44,6 @@ defineProps<{ title: string; body?: string }>();
 .empty-state__title {
   margin: 0;
   font-size: var(--font-size-lead);
-  font-weight: var(--font-weight-bold);
 }
 
 .empty-state__body {

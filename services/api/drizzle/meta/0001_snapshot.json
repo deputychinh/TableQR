@@ -1,5 +1,5 @@
 {
-  "id": "835d2f48-d390-42e1-9a7d-b63bc7d1cc88",
+  "id": "11b675b4-1c9a-4e4c-b90d-a1a8bad1ab83",
   "prevId": "6758b589-2d72-464a-8540-aa651c22c6c8",
   "version": "7",
   "dialect": "postgresql",
@@ -175,6 +175,36 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
+        "rules_updated_at": {
+          "name": "rules_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_bin": {
+          "name": "bank_bin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_account": {
+          "name": "bank_account",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_account_name": {
+          "name": "bank_account_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bank_changed_at": {
+          "name": "bank_changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -196,7 +226,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "restaurants_bank_all_or_none": {
+          "name": "restaurants_bank_all_or_none",
+          "value": "(\"restaurants\".\"bank_bin\" is null) = (\"restaurants\".\"bank_account\" is null) and (\"restaurants\".\"bank_account\" is null) = (\"restaurants\".\"bank_account_name\" is null)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.users": {
@@ -291,398 +326,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.categories": {
-      "name": "categories",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "restaurant_id": {
-          "name": "restaurant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_main": {
-          "name": "is_main",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "categories_tenant_name_key": {
-          "name": "categories_tenant_name_key",
-          "columns": [
-            {
-              "expression": "restaurant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "lower(\"name\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "categories_tenant_sort_idx": {
-          "name": "categories_tenant_sort_idx",
-          "columns": [
-            {
-              "expression": "restaurant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sort_order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "categories_restaurant_id_restaurants_id_fk": {
-          "name": "categories_restaurant_id_restaurants_id_fk",
-          "tableFrom": "categories",
-          "tableTo": "restaurants",
-          "columnsFrom": [
-            "restaurant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "categories_tenant_id_key": {
-          "name": "categories_tenant_id_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "restaurant_id",
-            "id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.menu_items": {
-      "name": "menu_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "restaurant_id": {
-          "name": "restaurant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "category_id": {
-          "name": "category_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "station_id": {
-          "name": "station_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "price_vnd": {
-          "name": "price_vnd",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "available": {
-          "name": "available",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "menu_items_tenant_category_idx": {
-          "name": "menu_items_tenant_category_idx",
-          "columns": [
-            {
-              "expression": "restaurant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "category_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "menu_items_tenant_station_idx": {
-          "name": "menu_items_tenant_station_idx",
-          "columns": [
-            {
-              "expression": "restaurant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "station_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "menu_items_restaurant_id_restaurants_id_fk": {
-          "name": "menu_items_restaurant_id_restaurants_id_fk",
-          "tableFrom": "menu_items",
-          "tableTo": "restaurants",
-          "columnsFrom": [
-            "restaurant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "menu_items_category_fk": {
-          "name": "menu_items_category_fk",
-          "tableFrom": "menu_items",
-          "tableTo": "categories",
-          "columnsFrom": [
-            "restaurant_id",
-            "category_id"
-          ],
-          "columnsTo": [
-            "restaurant_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "menu_items_station_fk": {
-          "name": "menu_items_station_fk",
-          "tableFrom": "menu_items",
-          "tableTo": "stations",
-          "columnsFrom": [
-            "restaurant_id",
-            "station_id"
-          ],
-          "columnsTo": [
-            "restaurant_id",
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "menu_items_tenant_id_key": {
-          "name": "menu_items_tenant_id_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "restaurant_id",
-            "id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "menu_items_price_vnd_check": {
-          "name": "menu_items_price_vnd_check",
-          "value": "\"menu_items\".\"price_vnd\" between 1000 and 100000000"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.stations": {
-      "name": "stations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "restaurant_id": {
-          "name": "restaurant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "late_after_minutes": {
-          "name": "late_after_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 15
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "stations_tenant_name_key": {
-          "name": "stations_tenant_name_key",
-          "columns": [
-            {
-              "expression": "restaurant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "lower(\"name\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "stations_restaurant_id_restaurants_id_fk": {
-          "name": "stations_restaurant_id_restaurants_id_fk",
-          "tableFrom": "stations",
-          "tableTo": "restaurants",
-          "columnsFrom": [
-            "restaurant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "stations_tenant_id_key": {
-          "name": "stations_tenant_id_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "restaurant_id",
-            "id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "stations_late_after_minutes_check": {
-          "name": "stations_late_after_minutes_check",
-          "value": "\"stations\".\"late_after_minutes\" between 1 and 120"
-        }
-      },
       "isRLSEnabled": false
     }
   },

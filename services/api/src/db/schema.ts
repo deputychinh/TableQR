@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   jsonb,
   pgTable,
@@ -12,18 +13,34 @@ import {
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
-export const restaurants = pgTable('restaurants', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull().unique(),
-  status: text('status', { enum: ['active', 'suspended'] })
-    .notNull()
-    .default('active'),
-  rules: jsonb('rules')
-    .notNull()
-    .default(sql`'{}'::jsonb`),
-  createdAt: createdAt(),
-});
+export const restaurants = pgTable(
+  'restaurants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull().unique(),
+    status: text('status', { enum: ['active', 'suspended'] })
+      .notNull()
+      .default('active'),
+    rules: jsonb('rules')
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    /** Version of `rules` (AC12); null = defaults since sign-up. */
+    rulesUpdatedAt: timestamp('rules_updated_at', { withTimezone: true }),
+    /** VietQR receiving account (ADR 0006); all three null = pay at the counter (AC41). */
+    bankBin: text('bank_bin'),
+    bankAccount: text('bank_account'),
+    bankAccountName: text('bank_account_name'),
+    bankChangedAt: timestamp('bank_changed_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check(
+      'restaurants_bank_all_or_none',
+      sql`(${t.bankBin} is null) = (${t.bankAccount} is null) and (${t.bankAccount} is null) = (${t.bankAccountName} is null)`,
+    ),
+  ],
+);
 
 export const users = pgTable(
   'users',
@@ -68,3 +85,4 @@ export const loginAttempts = pgTable(
 );
 
 export * from '../menu/menu.schema.js';
+export * from '../tables/tables.schema.js';

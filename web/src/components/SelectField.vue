@@ -2,11 +2,11 @@
 import { computed, ref, useId } from 'vue';
 import { ChevronDown } from 'lucide-vue-next';
 
-/** A labelled native select (same anatomy as FormField: label, control, hint, error). */
+/** A native select laid out like FormField: label above, hint and error below. */
 const props = withDefaults(
   defineProps<{
     label: string;
-    options: { value: string; label: string }[];
+    options: readonly { value: string; label: string }[];
     hint?: string;
     error?: string;
   }>(),
@@ -31,7 +31,7 @@ defineExpose({ focus: () => select.value?.focus() });
         :id="id"
         ref="select"
         v-model="model"
-        class="select-field__input"
+        class="select-field__select"
         :aria-invalid="error ? 'true' : undefined"
         :aria-describedby="describedBy"
       >
@@ -60,16 +60,21 @@ defineExpose({ focus: () => select.value?.focus() });
   position: relative;
 }
 
-.select-field__input {
+.select-field__select {
   inline-size: 100%;
   min-block-size: var(--target-min);
-  padding-inline: var(--space-3) var(--space-6);
+  padding-inline: var(--space-3) calc(var(--space-3) + 1.5rem);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-1);
   font: inherit;
   color: var(--color-text);
   background: var(--color-surface);
   appearance: none;
+}
+
+.select-field--invalid .select-field__select {
+  border-color: var(--color-danger);
+  border-width: 2px;
 }
 
 .select-field__chevron {
@@ -79,11 +84,6 @@ defineExpose({ focus: () => select.value?.focus() });
   color: var(--color-text-muted);
   transform: translateY(-50%);
   pointer-events: none;
-}
-
-.select-field--invalid .select-field__input {
-  border-color: var(--color-danger);
-  border-width: 2px;
 }
 
 .select-field__hint {

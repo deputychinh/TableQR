@@ -271,7 +271,7 @@ describe('MenuPage', () => {
     const sheet = screen.getByRole('dialog', { name: 'Sửa nhóm món' });
     await userEvent.click(within(sheet).getByRole('button', { name: 'Lưu' }));
     expect(await within(sheet).findByText('Tên này đã có. Hãy chọn tên khác.')).toBeTruthy();
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Đóng' }));
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Huỷ' }));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 

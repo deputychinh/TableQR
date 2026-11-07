@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseSheet from '@/components/BaseSheet.vue';
@@ -13,6 +13,7 @@ import type { Category } from '../types';
 const props = defineProps<{ category?: Category; hint?: string }>();
 const emit = defineEmits<{ saved: [category: Category]; close: [] }>();
 const { t } = useI18n();
+const formId = useId();
 
 const form = reactive({
   name: props.category?.name ?? '',
@@ -44,11 +45,11 @@ const submit = async () => {
 
 <template>
   <BaseSheet
+    open
     :title="category ? t('menu.category.editTitle') : t('menu.category.newTitle')"
-    :close-label="t('menu.close')"
-    @close="emit('close')"
+    @close="!busy && emit('close')"
   >
-    <form class="category-sheet" novalidate @submit.prevent="submit">
+    <form :id="formId" class="category-sheet" novalidate @submit.prevent="submit">
       <p v-if="hint" class="category-sheet__hint">{{ hint }}</p>
       <FormAlert v-if="formError" :message="t(formError.key, formError.params ?? {})" />
       <FormField
@@ -66,8 +67,13 @@ const submit = async () => {
         />
         <p class="category-sheet__main-hint">{{ t('menu.category.isMainHint') }}</p>
       </div>
-      <BaseButton type="submit" size="lg" block :loading="busy">{{ t('menu.save') }}</BaseButton>
     </form>
+    <template #actions>
+      <BaseButton variant="secondary" :disabled="busy" @click="emit('close')">
+        {{ t('menu.cancel') }}
+      </BaseButton>
+      <BaseButton type="submit" :form="formId" :loading="busy">{{ t('menu.save') }}</BaseButton>
+    </template>
   </BaseSheet>
 </template>
 
