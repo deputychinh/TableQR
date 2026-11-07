@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router';
 import { settingsRoutes } from '@/features/settings/routes';
+import { tablesRoutes } from '@/features/tables/routes';
 
 // Each feature exports its routes from its own file and adds one spread line here.
 export const coreRoutes: RouteRecordRaw[] = [
@@ -29,4 +30,5 @@ export const coreRoutes: RouteRecordRaw[] = [
   },
 ];
 
-export const featureRoutes: RouteRecordRaw[] = [...settingsRoutes];
+// One spread per line, so parallel merges stay additive.
+export const featureRoutes: RouteRecordRaw[] = [...settingsRoutes, ...tablesRoutes];

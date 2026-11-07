@@ -5,6 +5,7 @@ import { HealthController } from './health/health.controller.js';
 import { IdentityModule } from './identity/identity.module.js';
 import { RealtimeModule } from './realtime/realtime.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { TablesModule } from './tables/tables.module.js';
 import { AppLogger } from './common/logging/app-logger.js';
 import { LOG_SINK, stdoutSink } from './common/logging/log-sink.js';
 
@@ -20,7 +21,8 @@ import { LOG_SINK, stdoutSink } from './common/logging/log-sink.js';
 class CoreModule {}
 
 /** Feature modules; each parallel item adds one line here. */
-const FEATURE_MODULES = [IdentityModule, SettingsModule];
+// One module per line, so parallel merges stay additive.
+const FEATURE_MODULES = [IdentityModule, SettingsModule, TablesModule];
 
 @Module({
   imports: [CoreModule, DatabaseModule, RealtimeModule, ...FEATURE_MODULES],
