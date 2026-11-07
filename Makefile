@@ -7,7 +7,9 @@ API := cd services/api &&
 WEB := cd web &&
 API_PORT ?= 3310
 WEB_PORT ?= 5310
-E2E_DATABASE_URL ?= postgresql://tableqr:tableqr@127.0.0.1:55432/tableqr_e2e
+# Browser e2e database, dropped and recreated per run; set E2E_DB per worktree to run in parallel.
+E2E_DB ?= tableqr_e2e
+E2E_DATABASE_URL = postgresql://tableqr:tableqr@127.0.0.1:55432/$(E2E_DB)
 
 # Settings: .env.example gives safe local defaults, .env (never committed) overrides them.
 -include .env.example
@@ -58,7 +60,7 @@ test: ## Unit and component tests with coverage (Vitest)
 
 e2e: up ## API e2e on Testcontainers; browser journeys (iPhone + iPad) on a fresh e2e database
 	$(API) npm run test:e2e
-	docker compose exec -T db psql -q -U tableqr -d postgres -c 'drop database if exists tableqr_e2e with (force)' -c 'create database tableqr_e2e'
+	docker compose exec -T db psql -q -U tableqr -d postgres -c 'drop database if exists $(E2E_DB) with (force)' -c 'create database $(E2E_DB)'
 	$(API) TQR_DATABASE_URL=$(E2E_DATABASE_URL) npm run db:migrate
 	$(WEB) TQR_DATABASE_URL=$(E2E_DATABASE_URL) npm run test:e2e
 
