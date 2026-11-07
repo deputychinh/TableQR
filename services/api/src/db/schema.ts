@@ -87,3 +87,4 @@ export const loginAttempts = pgTable(
 export * from '../menu/menu.schema.js';
 export * from '../tables/tables.schema.js';
 export * from '../service/service.schema.js';
+export * from '../billing/billing.schema.js';
