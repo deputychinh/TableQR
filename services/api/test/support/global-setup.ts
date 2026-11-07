@@ -8,6 +8,8 @@ export const setup = async (): Promise<void> => {
   container = await new PostgreSqlContainer('postgres:17').start();
   process.env.TQR_DATABASE_URL = container.getConnectionUri();
   process.env.TQR_SESSION_SECRET = 'e2e-secret-e2e-secret-e2e-secret-e2e';
+  // Every spec signs up and in from 127.0.0.1; the rate-limit spec lowers this for its own app.
+  process.env.TQR_AUTH_RATE_LIMIT_PER_MINUTE = '100000';
   await runMigrations(container.getConnectionUri());
 };
 

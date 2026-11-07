@@ -15,6 +15,8 @@ const settingsSchema = z.object({
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0),
     ),
+  /** Sign-up + sign-in requests per client address per minute (in memory, per process). */
+  TQR_AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
   PORT: z.coerce.number().int().positive().default(3310),
 });
 

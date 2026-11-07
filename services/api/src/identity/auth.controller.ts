@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { parseBody } from '../common/http/validate.js';
 import { AuthService, type Me, type Principal } from './auth.service.js';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './domain/password.js';
-import { CurrentPrincipal, Roles, StaffGuard } from './guards.js';
+import { AuthRateLimitGuard, CurrentPrincipal, Roles, StaffGuard } from './guards.js';
 import {
   STAFF_COOKIE,
   clearSessionCookie,
@@ -32,6 +32,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('auth/signup')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(201)
   async signUp(
     @Body() body: unknown,
@@ -47,6 +48,7 @@ export class AuthController {
   }
 
   @Post('auth/login')
+  @UseGuards(AuthRateLimitGuard)
   @HttpCode(200)
   async login(
     @Body() body: unknown,
@@ -54,9 +56,10 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<Me> {
     const input = parseBody(loginSchema, body);
-    const previous = readCookie(request, STAFF_COOKIE);
-    if (previous) await this.auth.logout(hashToken(previous)); // rotate on sign-in
     const session = await this.auth.login(input);
+    // Rotate on a successful sign-in only: a failed attempt keeps the caller's current session.
+    const previous = readCookie(request, STAFF_COOKIE);
+    if (previous) await this.auth.logout(hashToken(previous));
     setSessionCookie(request, response, session.token, session.expiresAt);
     const principal = await this.auth.authenticate(session.token);
     if (!principal) throw new Error('session just issued could not be read');

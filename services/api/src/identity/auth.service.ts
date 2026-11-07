@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, eq, gte } from 'drizzle-orm';
+import { and, count, eq, gte, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import { asTenantId, type TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
 import { authSessions, loginAttempts, restaurants, users } from '../db/schema.js';
-import { hashPassword, verifyPassword } from './domain/password.js';
+import { checkCredentials } from './domain/credentials.js';
+import { hashPassword } from './domain/password.js';
 import { hashToken, newSessionToken } from './domain/session-token.js';
 import { slugify } from './domain/slug.js';
 import { assertRestaurantActive } from './domain/restaurant-status.js';
@@ -77,23 +78,15 @@ export class AuthService {
     throw new DomainError(ErrorCode.Conflict, 409);
   }
 
-  /** AC4/AC4a: throttled per email, one generic error for unknown email and wrong password. */
+  /**
+   * AC4/AC4a: throttled per email, one generic error for unknown email and wrong password.
+   * D1: the attempt is reserved (counted as a failure) under a per-email advisory lock *before*
+   * the password is checked, so parallel requests cannot run more than 10 checks in a window.
+   * D2: unknown and disabled accounts cost one scrypt too (dummy hash).
+   */
   async login(input: { email: string; password: string }): Promise<IssuedSession> {
     const email = input.email.trim().toLowerCase();
-    const now = this.clock.now();
-    const [failures] = await this.db
-      .select({ n: count() })
-      .from(loginAttempts)
-      .where(
-        and(
-          eq(loginAttempts.email, email),
-          eq(loginAttempts.succeeded, false),
-          gte(loginAttempts.attemptedAt, windowStart(now)),
-        ),
-      );
-    if (isLoginBlocked(failures?.n ?? 0)) {
-      throw new DomainError(IdentityErrorCode.LoginBlocked, 429, { detail: 'Thử lại sau 15 phút' });
-    }
+    const attemptId = await this.reserveAttempt(email);
     const [user] = await this.db
       .select({
         id: users.id,
@@ -106,21 +99,50 @@ export class AuthService {
       .leftJoin(restaurants, eq(restaurants.id, users.restaurantId))
       .where(eq(users.email, email))
       .limit(1);
-    const valid =
-      user !== undefined &&
-      user.disabledAt === null &&
-      (await verifyPassword(input.password, user.passwordHash));
-    await this.db.insert(loginAttempts).values({ email, attemptedAt: now, succeeded: valid });
+    const valid = await checkCredentials(user, input.password);
     if (!valid || user === undefined) {
       throw new DomainError(IdentityErrorCode.InvalidCredentials, 401, {
         detail: 'Email hoặc mật khẩu không đúng',
       });
     }
+    await this.db
+      .update(loginAttempts)
+      .set({ succeeded: true })
+      .where(eq(loginAttempts.id, attemptId));
     // AC54: only told after the right password, so it does not reveal which emails exist.
     if (user.restaurantId !== null && user.restaurantStatus !== null) {
       assertRestaurantActive({ status: user.restaurantStatus });
     }
     return this.issueSession(this.db, user.id, user.restaurantId);
+  }
+
+  /** Counts failures and records this attempt as a failure in one short, per-email serialised step. */
+  private async reserveAttempt(email: string): Promise<string> {
+    const now = this.clock.now();
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`login:${email}`}))`);
+      const [failures] = await tx
+        .select({ n: count() })
+        .from(loginAttempts)
+        .where(
+          and(
+            eq(loginAttempts.email, email),
+            eq(loginAttempts.succeeded, false),
+            gte(loginAttempts.attemptedAt, windowStart(now)),
+          ),
+        );
+      if (isLoginBlocked(failures?.n ?? 0)) {
+        throw new DomainError(IdentityErrorCode.LoginBlocked, 429, {
+          detail: 'Thử lại sau 15 phút',
+        });
+      }
+      const [attempt] = await tx
+        .insert(loginAttempts)
+        .values({ email, attemptedAt: now, succeeded: false })
+        .returning({ id: loginAttempts.id });
+      if (!attempt) throw new DomainError(ErrorCode.Internal, 500);
+      return attempt.id;
+    });
   }
 
   async logout(tokenHash: string): Promise<void> {

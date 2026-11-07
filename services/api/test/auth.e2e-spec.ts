@@ -1,4 +1,7 @@
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
+import { DB, type Database } from '../src/db/database.module.js';
+import { loginAttempts } from '../src/db/schema.js';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, cookieOf, newOwner, signUp } from './support/http.js';
 
@@ -142,6 +145,44 @@ describe('restaurant sign-up and staff sessions (e2e)', () => {
       .expect(200);
   });
 
+  it('D1 AC4 holds under 30 parallel wrong passwords: at most 10 checks, then 429', async () => {
+    const { body } = await signUp(t);
+    const results = await Promise.all(
+      Array.from({ length: 30 }, (_, i) =>
+        http()
+          .post('/api/auth/login')
+          .set('origin', ORIGIN)
+          .send({ email: body.email, password: `wrong-${i}-password` }),
+      ),
+    );
+    const statuses = results.map((r) => r.status);
+    expect(statuses.filter((s) => s === 401).length).toBeLessThanOrEqual(10);
+    expect(statuses.filter((s) => s !== 401 && s !== 429)).toEqual([]);
+    const db = t.app.get<Database>(DB);
+    const rows = await db
+      .select({ id: loginAttempts.id })
+      .from(loginAttempts)
+      .where(eq(loginAttempts.email, body.email.toLowerCase()));
+    expect(rows.length).toBeLessThanOrEqual(10);
+    const blocked = await http()
+      .post('/api/auth/login')
+      .set('origin', ORIGIN)
+      .send({ email: body.email, password: body.password })
+      .expect(429);
+    expect(blocked.body.code).toBe('LOGIN_BLOCKED');
+  });
+
+  it('a failed sign-in keeps the caller’s existing session', async () => {
+    const { body, cookie } = await signUp(t);
+    await http()
+      .post('/api/auth/login')
+      .set('origin', ORIGIN)
+      .set('cookie', cookie)
+      .send({ email: body.email, password: 'sai-mat-khau-1' })
+      .expect(401);
+    await http().get('/api/me').set('cookie', cookie).expect(200);
+  });
+
   it('AC5 signs out: the session is gone and the cookie cleared', async () => {
     const { cookie } = await signUp(t);
     const out = await http()
@@ -198,5 +239,41 @@ describe('restaurant sign-up and staff sessions (e2e)', () => {
     await signUp(t, body);
     expect(JSON.stringify(t.logs)).not.toContain(body.email);
     expect(JSON.stringify(t.logs)).not.toContain(body.password);
+  });
+});
+
+describe('per-IP rate limit on sign-up and sign-in (e2e)', () => {
+  let t: TestApp;
+  const http = () => request(t.app.getHttpServer());
+  const previous = process.env.TQR_AUTH_RATE_LIMIT_PER_MINUTE;
+
+  beforeAll(async () => {
+    process.env.TQR_AUTH_RATE_LIMIT_PER_MINUTE = '3';
+    t = await createTestApp();
+  });
+
+  afterAll(async () => {
+    process.env.TQR_AUTH_RATE_LIMIT_PER_MINUTE = previous;
+    await t.app.close();
+  });
+
+  it('answers 429 TOO_MANY_REQUESTS once one address exceeds the limit, across both routes', async () => {
+    const login = () =>
+      http()
+        .post('/api/auth/login')
+        .set('origin', ORIGIN)
+        .send({ email: `nobody-${Date.now()}@example.com`, password: 'sai-mat-khau-1' });
+    await login().expect(401);
+    await login().expect(401);
+    await http().post('/api/auth/signup').set('origin', ORIGIN).send(newOwner()).expect(201);
+    const limited = await http()
+      .post('/api/auth/signup')
+      .set('origin', ORIGIN)
+      .send(newOwner())
+      .expect(429);
+    expect(limited.body.code).toBe('TOO_MANY_REQUESTS');
+    await login().expect(429);
+    t.clock.advance(61_000);
+    await login().expect(401);
   });
 });
