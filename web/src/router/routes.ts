@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router';
+import { menuRoutes } from '@/features/menu/routes';
 import { settingsRoutes } from '@/features/settings/routes';
 import { tablesRoutes } from '@/features/tables/routes';
 
@@ -31,4 +32,9 @@ export const coreRoutes: RouteRecordRaw[] = [
 ];
 
 // One spread per line, so parallel merges stay additive.
-export const featureRoutes: RouteRecordRaw[] = [...settingsRoutes, ...tablesRoutes];
+// prettier-ignore
+export const featureRoutes: RouteRecordRaw[] = [
+  ...menuRoutes,
+  ...settingsRoutes,
+  ...tablesRoutes,
+];

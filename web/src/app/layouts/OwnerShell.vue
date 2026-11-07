@@ -59,7 +59,7 @@ const signOut = async () => {
     'header' auto
     'main' 1fr
     'nav' auto / 1fr;
-  min-block-size: 100dvh;
+  block-size: 100dvh;
   background: var(--color-bg);
 }
 
@@ -125,11 +125,10 @@ const signOut = async () => {
 }
 
 .owner-shell__main {
+  /* Content scrolls between the bars, so they never cover a control (WCAG 2.4.11, 2.5.8). */
+  overflow-y: auto;
   grid-area: main;
-  inline-size: 100%;
-  max-inline-size: var(--measure-page);
-  margin-inline: auto;
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-4) max(var(--space-3), (100% - var(--measure-page)) / 2);
 }
 
 @media (width >= 840px) {
@@ -150,7 +149,7 @@ const signOut = async () => {
   }
 
   .owner-shell__main {
-    padding: var(--space-5);
+    padding: var(--space-5) max(var(--space-5), (100% - var(--measure-page)) / 2);
   }
 }
 

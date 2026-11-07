@@ -25,17 +25,20 @@ Owner rule (2026-11-08): "giao diện dễ dùng, có pattern và thân thiện"
 
 ## Components (one each, reused)
 
-| Component               | Use                                                      | States                                                    |
-| ----------------------- | -------------------------------------------------------- | --------------------------------------------------------- |
-| `AppShell`              | header + nav per role                                    | —                                                         |
-| `BaseButton`            | primary / secondary / danger / ghost, sizes md / lg      | default, hover, focus-visible, pressed, disabled, loading |
-| `FormField`             | label above input, hint, error below, `aria-describedby` | empty, filled, error, disabled                            |
-| `StatusChip`            | dish / order / bill / booking status                     | one per status, icon + word                               |
-| `ListItem` / `CardItem` | menu items, queue tickets, tables                        | default, selected, late (warning)                         |
-| `ConfirmSheet`          | money and destructive actions                            | open, busy                                                |
-| `EmptyState`            | no data yet — says why and offers the next action        | —                                                         |
-| `ErrorState`            | load failed — plain cause + "Thử lại"                    | —                                                         |
-| `LoadingState`          | skeleton rows, never a blank screen                      | —                                                         |
-| `Toast`                 | outcome of an action, polite live region, queued         | success, error                                            |
+| Component                                     | Use                                                                                  | States                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `AppShell`                                    | header + nav per role                                                                | —                                                         |
+| `BaseButton`                                  | primary / secondary / danger / ghost, sizes md / lg                                  | default, hover, focus-visible, pressed, disabled, loading |
+| `FormField`                                   | label above input, hint, error below, `aria-describedby`                             | empty, filled, error, disabled                            |
+| `StatusChip`                                  | dish / order / bill / booking status                                                 | one per status, icon + word                               |
+| `ListItem` / `CardItem`                       | menu items, queue tickets, tables                                                    | default, selected, late (warning)                         |
+| `ConfirmSheet`                                | money and destructive actions                                                        | open, busy                                                |
+| `EmptyState`                                  | no data yet — says why and offers the next action                                    | —                                                         |
+| `ErrorState`                                  | load failed — plain cause + "Thử lại"                                                | —                                                         |
+| `LoadingState`                                | skeleton rows, never a blank screen                                                  | —                                                         |
+| `Toast`                                       | outcome of an action, polite live region, queued                                     | success, error                                            |
+| `BaseSheet`                                   | forms over a list: bottom sheet on phones, dialog on iPad                            | open (Escape or backdrop closes), actions slot            |
+| `ToggleSwitch`                                | on/off with a visible state word (e.g. Còn món / Hết món)                            | on, off, disabled                                         |
+| `SelectField`, `TextAreaField`, `NumberField` | same anatomy as `FormField`; `NumberField` opens the numeric keypad and shows a unit | empty, filled, error                                      |
 
 Every data view shows loading / empty / error / success. Screens are checked at 390 px (iPhone), 820 px (iPad portrait) and 1180 px (iPad landscape) with screenshots in review.

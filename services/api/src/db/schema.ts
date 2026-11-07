@@ -84,4 +84,5 @@ export const loginAttempts = pgTable(
   (t) => [index('login_attempts_email_time_idx').on(t.email, t.attemptedAt)],
 );
 
+export * from '../menu/menu.schema.js';
 export * from '../tables/tables.schema.js';
