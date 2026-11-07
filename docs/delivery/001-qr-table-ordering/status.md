@@ -21,25 +21,25 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 
 ## Stages
 
-| Stage | Status | Evidence / link |
-| --- | --- | --- |
-| Discover | done | [brief](brief.md), [benchmark](benchmark.md) |
-| Specify | done | [spec](spec.md) (16 stories, 54 ACs), [benchmarks/plan.md](../../../benchmarks/plan.md) |
-| Set up | doing | |
-| Architect | todo | |
-| Plan | todo | |
-| Build | todo | |
-| Verify | todo | |
-| Demo | todo | |
-| Release | todo | local only |
-| Operate | n.a. | no deploy target yet |
-| Learn | todo | |
+| Stage     | Status | Evidence / link                                                                         |
+| --------- | ------ | --------------------------------------------------------------------------------------- |
+| Discover  | done   | [brief](brief.md), [benchmark](benchmark.md)                                            |
+| Specify   | done   | [spec](spec.md) (16 stories, 54 ACs), [benchmarks/plan.md](../../../benchmarks/plan.md) |
+| Set up    | doing  |                                                                                         |
+| Architect | todo   |                                                                                         |
+| Plan      | todo   |                                                                                         |
+| Build     | todo   |                                                                                         |
+| Verify    | todo   |                                                                                         |
+| Demo      | todo   |                                                                                         |
+| Release   | todo   | local only                                                                              |
+| Operate   | n.a.   | no deploy target yet                                                                    |
+| Learn     | todo   |                                                                                         |
 
 ## Slices
 
-| Slice | Items | Verified | Demo | Notified | Feedback → re-plan | Release |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 Skeleton | | | | | | — |
+| Slice      | Items | Verified | Demo | Notified | Feedback → re-plan | Release |
+| ---------- | ----- | -------- | ---- | -------- | ------------------ | ------- |
+| 1 Skeleton |       |          |      |          |                    | —       |
 
 ## Progress log (one line per item or slice)
 

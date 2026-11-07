@@ -1,0 +1,49 @@
+# env and secrets
+.env
+.env.*
+!.env.example
+
+# node
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+test-results/
+playwright-report/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+
+# mobile build output (iOS, Android)
+xcuserdata/
+DerivedData/
+*.xcresult
+.gradle/
+local.properties
+*.apk
+*.aab
+
+# signing material: never in git; CI gets it from encrypted secrets
+*.p12
+*.p8
+*.mobileprovision
+*.jks
+*.keystore
+keystore.properties
+
+# data and local state (never commit datasets, models, databases)
+data/
+
+# os / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

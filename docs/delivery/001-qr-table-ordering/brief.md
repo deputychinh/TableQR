@@ -46,13 +46,13 @@ See [`benchmark.md`](benchmark.md). Decisions it drives:
 
 ## Five customer questions
 
-| Question | Answer | Fact or HYPOTHESIS |
-| --- | --- | --- |
-| Who is the customer? | Owners of small/medium Vietnamese restaurants (≈ 5–40 tables) and their staff; diners are the users | Fact (owner request); size range HYPOTHESIS |
-| What problem? | Out-of-order serving, wrong dishes per table, orders that don't match the party, unclear payment status | Fact (owner request) |
-| What benefit? | Fair, visible queue; fewer wrong dishes; quick payment by transfer | Fact (owner request) |
-| How do we know? | The owner names these failures; Sapo/iPOS/Toast sell QR ordering, so demand exists | Fact (benchmark) |
-| What is the experience? | Scan → party size → order → live status → VietQR or pay later; kitchen FIFO iPad; cashier confirms | Fact (owner answers) |
+| Question                | Answer                                                                                                  | Fact or HYPOTHESIS                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Who is the customer?    | Owners of small/medium Vietnamese restaurants (≈ 5–40 tables) and their staff; diners are the users     | Fact (owner request); size range HYPOTHESIS |
+| What problem?           | Out-of-order serving, wrong dishes per table, orders that don't match the party, unclear payment status | Fact (owner request)                        |
+| What benefit?           | Fair, visible queue; fewer wrong dishes; quick payment by transfer                                      | Fact (owner request)                        |
+| How do we know?         | The owner names these failures; Sapo/iPOS/Toast sell QR ordering, so demand exists                      | Fact (benchmark)                            |
+| What is the experience? | Scan → party size → order → live status → VietQR or pay later; kitchen FIFO iPad; cashier confirms      | Fact (owner answers)                        |
 
 ## Impact map
 
@@ -67,9 +67,9 @@ HYPOTHESIS: a strict FIFO queue with item states, fed by guest phones, keeps ser
 measured by "items served out of confirmed order" = 0 and status update p95 < 1 s on 30 concurrent tables in a
 load script; the demo shows it by replaying a rush with two tables arriving 1 minute apart.
 
-| Risk | Assessment |
-| --- | --- |
-| Value | Medium — owners name the pain; competitors exist, so free + fairness rules must be the pull |
-| Usability | Medium — staff on iPads in a hot kitchen: big targets, one screen per role, Vietnamese copy |
-| Feasibility | Low–medium — real-time updates (SSE/WebSocket) and VietQR EMVCo payload are well known |
-| Viability | Unknown — no hosting or pricing yet; local only until the owner names a target |
+| Risk        | Assessment                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------- |
+| Value       | Medium — owners name the pain; competitors exist, so free + fairness rules must be the pull |
+| Usability   | Medium — staff on iPads in a hot kitchen: big targets, one screen per role, Vietnamese copy |
+| Feasibility | Low–medium — real-time updates (SSE/WebSocket) and VietQR EMVCo payload are well known      |
+| Viability   | Unknown — no hosting or pricing yet; local only until the owner names a target              |

@@ -4,10 +4,10 @@ Brief: `brief.md` · Status: ready · Updated: 2026-11-08
 
 ## Story map
 
-| Activity → | Set up the restaurant | Seat & order | Cook & serve | Pay | Book ahead |
-| --- | --- | --- | --- | --- | --- |
-| Release 1 | S1 sign up · S2 menu & stations · S3 tables & QR sheet · S4 house rules · S5 staff accounts | S6 open session & party size · S7 guest orders · S8 anomaly check | S9 FIFO kitchen queue · S10 serve to the right table · S11 guest live status | S12 bill + VietQR · S13 cashier confirms / pay later | S14 guest books a table · S15 staff manage bookings |
-| Later | platform billing, menu photos upload to CDN | call-staff button, split bill | printer tickets, prep-time estimates | PayOS/SePay auto-confirm, card | deposits, SMS/Zalo reminders |
+| Activity → | Set up the restaurant                                                                       | Seat & order                                                      | Cook & serve                                                                 | Pay                                                  | Book ahead                                          |
+| ---------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------- |
+| Release 1  | S1 sign up · S2 menu & stations · S3 tables & QR sheet · S4 house rules · S5 staff accounts | S6 open session & party size · S7 guest orders · S8 anomaly check | S9 FIFO kitchen queue · S10 serve to the right table · S11 guest live status | S12 bill + VietQR · S13 cashier confirms / pay later | S14 guest books a table · S15 staff manage bookings |
+| Later      | platform billing, menu photos upload to CDN                                                 | call-staff button, split bill                                     | printer tickets, prep-time estimates                                         | PayOS/SePay auto-confirm, card                       | deposits, SMS/Zalo reminders                        |
 
 S16 (platform admin suspends a restaurant) sits under "Set up" in release 1.
 
@@ -121,14 +121,14 @@ Roles: owner, cashier, waiter, kitchen.
 
 ## Quality targets
 
-| Characteristic | Workload | Data | Target | Percentile | Environment | How it is checked |
-| --- | --- | --- | --- | --- | --- | --- |
-| Status propagation | cook marks item done → guest + waiter screen updated | 30 open tables, 3 phones each, 1 kitchen, 2 waiters | ≤ 2 s | p95 | local production build, 1 vCPU API, simulated clients | `make bench` (realtime script) |
-| Order submit latency | guest submits a 5-line cart | 30 tenants × 40 items, 30 concurrent tables | ≤ 300 ms | p95 | same | `make bench` (k6) |
-| Fairness | rush replay: 30 tables, 300 items, random cook actions | seeded | 0 items served out of release order without a recorded skip | all | same | `make bench` + integration test |
-| Guest page load | cold load of menu page | 40 items, no photos | LCP ≤ 2.5 s, JS ≤ 150 kB gzip | p75 | Lighthouse mobile, slow 4G | Lighthouse CI |
-| Accessibility | guest, kitchen, cashier screens | — | WCAG 2.2 AA, targets ≥ 44 px | — | iPad 10th gen and iPhone SE widths | axe in e2e + screenshot review |
-| Tenant isolation | every staff/guest endpoint with another tenant's ids | seeded 2 tenants | 0 leaks | all | CI | integration test matrix |
+| Characteristic       | Workload                                               | Data                                                | Target                                                      | Percentile | Environment                                           | How it is checked               |
+| -------------------- | ------------------------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------- | ---------- | ----------------------------------------------------- | ------------------------------- |
+| Status propagation   | cook marks item done → guest + waiter screen updated   | 30 open tables, 3 phones each, 1 kitchen, 2 waiters | ≤ 2 s                                                       | p95        | local production build, 1 vCPU API, simulated clients | `make bench` (realtime script)  |
+| Order submit latency | guest submits a 5-line cart                            | 30 tenants × 40 items, 30 concurrent tables         | ≤ 300 ms                                                    | p95        | same                                                  | `make bench` (k6)               |
+| Fairness             | rush replay: 30 tables, 300 items, random cook actions | seeded                                              | 0 items served out of release order without a recorded skip | all        | same                                                  | `make bench` + integration test |
+| Guest page load      | cold load of menu page                                 | 40 items, no photos                                 | LCP ≤ 2.5 s, JS ≤ 150 kB gzip                               | p75        | Lighthouse mobile, slow 4G                            | Lighthouse CI                   |
+| Accessibility        | guest, kitchen, cashier screens                        | —                                                   | WCAG 2.2 AA, targets ≥ 44 px                                | —          | iPad 10th gen and iPhone SE widths                    | axe in e2e + screenshot review  |
+| Tenant isolation     | every staff/guest endpoint with another tenant's ids   | seeded 2 tenants                                    | 0 leaks                                                     | all        | CI                                                    | integration test matrix         |
 
 ## Non-goals and no-gos
 
@@ -137,15 +137,15 @@ Roles: owner, cashier, waiter, kitchen.
 
 ## Glossary
 
-| Term | Meaning here |
-| --- | --- |
-| Restaurant (tenant) | one self-registered account with its own data and rules |
-| Table session | one party's visit at a table: opened at arrival, closed after payment; phones join it |
-| Order | one cart submission inside a session |
-| Release time | when an order enters the kitchen queue: submit time, or the time it was held for confirmation (AC28) |
-| Main dish | an item whose category is marked "món chính" (counts for the anomaly rule) |
-| Bill | the payable snapshot of a session's items with a code used in the transfer memo |
-| Station | a kitchen area (bếp nóng, bếp lạnh, bar) with its own queue |
+| Term                | Meaning here                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| Restaurant (tenant) | one self-registered account with its own data and rules                                              |
+| Table session       | one party's visit at a table: opened at arrival, closed after payment; phones join it                |
+| Order               | one cart submission inside a session                                                                 |
+| Release time        | when an order enters the kitchen queue: submit time, or the time it was held for confirmation (AC28) |
+| Main dish           | an item whose category is marked "món chính" (counts for the anomaly rule)                           |
+| Bill                | the payable snapshot of a session's items with a code used in the transfer memo                      |
+| Station             | a kitchen area (bếp nóng, bếp lạnh, bar) with its own queue                                          |
 
 ## Open questions
 

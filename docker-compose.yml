@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: tableqr
+      POSTGRES_PASSWORD: tableqr
+      POSTGRES_DB: tableqr
+    ports:
+      - '55432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tableqr']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - db:/var/lib/postgresql/data
+
+volumes:
+  db:
