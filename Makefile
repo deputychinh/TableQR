@@ -59,6 +59,7 @@ e2e: ## API e2e on a real Postgres (Testcontainers) and browser journeys (Playwr
 	$(WEB) npm run test:e2e
 
 bench: ## Performance benchmark (k6) against a running API; see benchmarks/plan.md
+	mkdir -p benchmarks/results
 	k6 run --env BASE_URL=http://127.0.0.1:$(API_PORT) bench/api.js
 
 ci: lint test e2e ## Everything CI runs

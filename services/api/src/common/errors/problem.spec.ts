@@ -37,6 +37,13 @@ describe('toProblem', () => {
     expect(problem.type).toBe('https://tableqr.local/problems/bad-request');
   });
 
+  it('drops extensions named detail or instance when no such option is given', () => {
+    const problem = toProblem(400, { extensions: { detail: 'x', instance: 'y', field: 'f' } });
+    expect(problem).not.toHaveProperty('detail');
+    expect(problem).not.toHaveProperty('instance');
+    expect(problem.field).toBe('f');
+  });
+
   it.each([
     [405, ErrorCode.MethodNotAllowed],
     [415, ErrorCode.UnsupportedMediaType],

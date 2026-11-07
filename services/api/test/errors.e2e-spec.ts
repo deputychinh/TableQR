@@ -1,4 +1,12 @@
-import { Body, ConflictException, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+} from '@nestjs/common';
 import { DomainError } from '../src/common/errors/domain.error.js';
 import request from 'supertest';
 import { createTestApp, type TestApp } from './support/app.js';
@@ -29,6 +37,11 @@ class ThrowingController {
   @Get('http-code')
   httpCode(): never {
     throw new ConflictException({ code: 'SESSION_CLOSED' });
+  }
+
+  @Get('nest-message')
+  nestMessage(): never {
+    throw new BadRequestException('internal text from a library');
   }
 
   @Post('echo')
@@ -105,6 +118,53 @@ describe('problem details and request logs (e2e)', () => {
   it('answers a wrong method on a known route with a problem, not an HTML page', async () => {
     const response = await request(t.app.getHttpServer()).delete('/api/health').expect(404);
     expect(response.headers['content-type']).toMatch(/^application\/problem\+json/);
+  });
+
+  const LIMIT_BYTES = 32 * 1024;
+  const bodyOfBytes = (bytes: number): string => {
+    const shell = JSON.stringify({ text: '' }).length;
+    return JSON.stringify({ text: 'x'.repeat(bytes - shell) });
+  };
+
+  it('accepts a JSON body of exactly 32 768 bytes and rejects 32 769', async () => {
+    const exact = bodyOfBytes(LIMIT_BYTES);
+    expect(Buffer.byteLength(exact)).toBe(LIMIT_BYTES);
+    await request(t.app.getHttpServer())
+      .post('/api/test-errors/echo')
+      .set('content-type', 'application/json')
+      .send(exact)
+      .expect(200);
+    const over = bodyOfBytes(LIMIT_BYTES + 1);
+    const response = await request(t.app.getHttpServer())
+      .post('/api/test-errors/echo')
+      .set('content-type', 'application/json')
+      .send(over)
+      .expect(413);
+    expect(response.body.code).toBe('PAYLOAD_TOO_LARGE');
+  });
+
+  it('never echoes the message of a Nest HttpException', async () => {
+    const response = await request(t.app.getHttpServer())
+      .get('/api/test-errors/nest-message')
+      .expect(400);
+    expect(response.body).toMatchObject({ status: 400, code: 'BAD_REQUEST', title: 'Bad Request' });
+    expect(JSON.stringify(response.body)).not.toContain('internal text');
+  });
+
+  it('replaces a short request id that contains unsafe characters', async () => {
+    const response = await request(t.app.getHttpServer())
+      .get('/api/health')
+      .set('x-request-id', 'a b')
+      .expect(200);
+    expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('replaces a safe-looking request id longer than 64 characters', async () => {
+    const response = await request(t.app.getHttpServer())
+      .get('/api/health')
+      .set('x-request-id', 'a'.repeat(65))
+      .expect(200);
+    expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('accepts a JSON body just under 32 kB', async () => {
