@@ -5,15 +5,14 @@ import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import type { TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
+import { isUniqueViolation } from '../db/pg-error.js';
 import { restaurants } from '../db/schema.js';
 import { isWellFormedQrToken, newQrToken } from './domain/qr-token.js';
 import { TableErrorCode } from './domain/table-error-code.js';
 import { TABLES_PER_RESTAURANT_MAX } from './domain/table-rules.js';
 import { diningTables, retiredQrTokens } from './tables.schema.js';
 
-const UNIQUE_VIOLATION = '23505';
 const NAME_CONSTRAINT = 'dining_tables_tenant_name_key';
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface TableView {
   id: string;
@@ -58,16 +57,6 @@ const toView = (row: Row): TableView => ({
   createdAt: row.createdAt.toISOString(),
 });
 
-const dbErrorField = (error: unknown, field: 'code' | 'constraint'): string | undefined => {
-  let current: unknown = error;
-  while (current instanceof Error) {
-    const value: unknown = (current as Error & Record<string, unknown>)[field];
-    if (typeof value === 'string') return value;
-    current = current.cause;
-  }
-  return undefined;
-};
-
 const tableNotFound = (): DomainError => new DomainError(ErrorCode.NotFound, 404);
 
 const nameTaken = (): DomainError =>
@@ -78,16 +67,14 @@ const nameTaken = (): DomainError =>
 
 /** Maps the name unique index to 409; everything else propagates. */
 const rethrowNameClash = (error: unknown): never => {
-  if (
-    dbErrorField(error, 'code') === UNIQUE_VIOLATION &&
-    dbErrorField(error, 'constraint') === NAME_CONSTRAINT
-  ) {
-    throw nameTaken();
-  }
+  if (isUniqueViolation(error, NAME_CONSTRAINT)) throw nameTaken();
   throw error;
 };
 
-/** Tables and their QR tokens. Every query is scoped by the caller's tenant (ADR 0003). */
+/**
+ * Tables and their QR tokens. Every query is scoped by the caller's tenant (ADR 0003); ids arrive
+ * already parsed as UUIDs by the controller.
+ */
 @Injectable()
 export class TablesService {
   constructor(
@@ -141,7 +128,6 @@ export class TablesService {
   }
 
   async update(tenant: TenantId, id: string, patch: Partial<TableInput>): Promise<TableView> {
-    if (!UUID_PATTERN.test(id)) throw tableNotFound();
     try {
       const [row] = await this.db
         .update(diningTables)
@@ -156,7 +142,6 @@ export class TablesService {
   }
 
   async remove(tenant: TenantId, id: string): Promise<void> {
-    if (!UUID_PATTERN.test(id)) throw tableNotFound();
     const deleted = await this.db
       .delete(diningTables)
       .where(and(eq(diningTables.restaurantId, tenant), eq(diningTables.id, id)))
@@ -229,7 +214,6 @@ export class TablesService {
     id: string,
     lock = false,
   ): Promise<Row> {
-    if (!UUID_PATTERN.test(id)) throw tableNotFound();
     const query = executor
       .select(columns)
       .from(diningTables)

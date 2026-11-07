@@ -11,10 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ErrorCode } from '../common/enums/error-code.enum.js';
-import { DomainError } from '../common/errors/domain.error.js';
+import { uuidParam } from '../common/http/params.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import { isValidSeats, isValidTableName, normalizeTableName } from './domain/table-rules.js';
@@ -31,12 +30,6 @@ const updateSchema = z
   .refine((patch) => patch.name !== undefined || patch.seats !== undefined, {
     message: 'empty_patch',
   });
-
-/** Tenant of a restaurant staff member; platform admins have none and are not allowed here. */
-const tenantOf = (principal: Principal): TenantId => {
-  if (principal.tenantId === null) throw new DomainError(ErrorCode.Forbidden, 403);
-  return principal.tenantId;
-};
 
 /** Owner manages tables (AC8–AC10); floor staff may read them (e.g. to print a lost QR). */
 @Controller('tables')
@@ -55,7 +48,7 @@ export class TablesController {
   @Roles('owner', 'cashier', 'waiter')
   @Header('Cache-Control', 'no-store')
   get(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<TableView> {
-    return this.tables.get(tenantOf(principal), id);
+    return this.tables.get(tenantOf(principal), uuidParam(id));
   }
 
   @Post()
@@ -72,21 +65,21 @@ export class TablesController {
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<TableView> {
-    return this.tables.update(tenantOf(principal), id, parseBody(updateSchema, body));
+    return this.tables.update(tenantOf(principal), uuidParam(id), parseBody(updateSchema, body));
   }
 
   @Delete(':id')
   @HttpCode(204)
   @Roles('owner')
   remove(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<void> {
-    return this.tables.remove(tenantOf(principal), id);
+    return this.tables.remove(tenantOf(principal), uuidParam(id));
   }
 
   @Post(':id/rotate-qr')
   @HttpCode(200)
   @Roles('owner')
   rotateQr(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<TableView> {
-    return this.tables.rotateQr(tenantOf(principal), id);
+    return this.tables.rotateQr(tenantOf(principal), uuidParam(id));
   }
 }
 

@@ -31,22 +31,3 @@ export const lastStation = (): DomainError =>
   new DomainError(MenuErrorCode.LastStation, 409, {
     detail: 'Cần ít nhất một khu bếp.',
   });
-
-const pgField = (error: unknown, field: 'code' | 'constraint'): string | undefined => {
-  let current: unknown = error;
-  while (current instanceof Error) {
-    const value: unknown = (current as Error & Record<string, unknown>)[field];
-    if (typeof value === 'string') return value;
-    current = current.cause;
-  }
-  return undefined;
-};
-
-export const UNIQUE_VIOLATION = '23505';
-export const FOREIGN_KEY_VIOLATION = '23503';
-
-/** Postgres error code and constraint name, looking through drizzle's wrapping errors. */
-export const pgErrorOf = (error: unknown): { code?: string; constraint?: string } => ({
-  code: pgField(error, 'code'),
-  constraint: pgField(error, 'constraint'),
-});

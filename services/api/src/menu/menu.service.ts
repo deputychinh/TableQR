@@ -26,14 +26,12 @@ import {
   type MoveDirection,
 } from './domain/ordering.js';
 import { DEFAULT_LATE_MINUTES, DEFAULT_STATION_NAME } from './domain/station.js';
+import { FOREIGN_KEY_VIOLATION, UNIQUE_VIOLATION, pgCode, pgConstraint } from '../db/pg-error.js';
 import {
-  FOREIGN_KEY_VIOLATION,
-  UNIQUE_VIOLATION,
   categoryNotEmpty,
   lastStation,
   nameTaken,
   notFound,
-  pgErrorOf,
   stationNotEmpty,
 } from './menu.errors.js';
 import { categories, menuItems, stations } from './menu.schema.js';
@@ -82,7 +80,8 @@ const NAME_CONSTRAINTS = new Set(['stations_tenant_name_key', 'categories_tenant
 
 /** Maps the database's own guards (unique names, composite FKs) to domain errors. */
 const translate = (error: unknown, onForeignKey: () => Error): never => {
-  const { code, constraint } = pgErrorOf(error);
+  const code = pgCode(error);
+  const constraint = pgConstraint(error);
   if (code === UNIQUE_VIOLATION && constraint && NAME_CONSTRAINTS.has(constraint)) {
     throw nameTaken();
   }

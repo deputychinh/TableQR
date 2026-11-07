@@ -10,10 +10,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ErrorCode } from '../common/enums/error-code.enum.js';
-import { DomainError } from '../common/errors/domain.error.js';
+import { uuidParam } from '../common/http/params.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from '../identity/domain/password.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
@@ -47,20 +46,6 @@ const updateSchema = z
   .refine((body) => Object.keys(body).length > 0, { message: 'empty' });
 
 const passwordSchema = z.object({ password }).strict();
-const idSchema = z.string().uuid();
-
-/** A malformed id is just another id that does not exist here (ADR 0003: 404). */
-const staffId = (raw: string): string => {
-  const parsed = idSchema.safeParse(raw);
-  if (!parsed.success) throw new DomainError(ErrorCode.NotFound, 404);
-  return parsed.data;
-};
-
-/** The owner's own restaurant; owners always have one (platform admins cannot reach here). */
-const tenantOf = (principal: Principal): TenantId => {
-  if (principal.tenantId === null) throw new DomainError(ErrorCode.Forbidden, 403);
-  return principal.tenantId;
-};
 
 /** Spec S5: only the owner manages staff accounts (AC15 deny-by-default for everyone else). */
 @Controller('staff')
@@ -82,7 +67,7 @@ export class StaffController {
 
   @Get(':id')
   get(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<StaffMember> {
-    return this.staff.get(tenantOf(principal), staffId(id));
+    return this.staff.get(tenantOf(principal), uuidParam(id));
   }
 
   @Patch(':id')
@@ -92,7 +77,7 @@ export class StaffController {
     @Body() body: unknown,
   ): Promise<StaffMember> {
     const input = parseBody(updateSchema, body);
-    return this.staff.update(tenantOf(principal), principal.userId, staffId(id), {
+    return this.staff.update(tenantOf(principal), principal.userId, uuidParam(id), {
       displayName: input.displayName,
       role: input.role,
       disabled: input.active === undefined ? undefined : !input.active,
@@ -108,7 +93,7 @@ export class StaffController {
     @Body() body: unknown,
   ): Promise<void> {
     const input = parseBody(passwordSchema, body);
-    await this.staff.update(tenantOf(principal), principal.userId, staffId(id), {
+    await this.staff.update(tenantOf(principal), principal.userId, uuidParam(id), {
       password: input.password,
     });
   }
