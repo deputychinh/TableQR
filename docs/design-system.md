@@ -39,6 +39,7 @@ Owner rule (2026-11-08): "giao diện dễ dùng, có pattern và thân thiện"
 | `Toast`                                       | outcome of an action, polite live region, queued                                     | success, error                                            |
 | `BaseSheet`                                   | forms over a list: bottom sheet on phones, dialog on iPad                            | open (Escape or backdrop closes), actions slot            |
 | `ToggleSwitch`                                | on/off with a visible state word (e.g. Còn món / Hết món)                            | on, off, disabled                                         |
+| `DateField` (booking feature)                 | the native date picker with `FormField` anatomy (label above, hint and error below)  | empty, filled, error                                      |
 | `SelectField`, `TextAreaField`, `NumberField` | same anatomy as `FormField`; `NumberField` opens the numeric keypad and shows a unit | empty, filled, error                                      |
 
 Every data view shows loading / empty / error / success. Screens are checked at 390 px (iPhone), 820 px (iPad portrait) and 1180 px (iPad landscape) with screenshots in review.

@@ -10,6 +10,7 @@ import { TablesModule } from './tables/tables.module.js';
 import { StaffModule } from './staff/staff.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { BillingModule } from './billing/billing.module.js';
+import { BookingModule } from './booking/booking.module.js';
 import { AppLogger } from './common/logging/app-logger.js';
 import { LOG_SINK, stdoutSink } from './common/logging/log-sink.js';
 
@@ -35,6 +36,7 @@ const FEATURE_MODULES = [
   StaffModule,
   AdminModule,
   BillingModule,
+  BookingModule,
 ];
 
 @Module({

@@ -28,6 +28,8 @@ export interface MatrixFixture {
   payableBillId: () => string;
   /** A fresh open, paid-up session per call (closing twice would answer 409). */
   closableSessionId: () => string;
+  /** A pending booking of the fixture restaurant (confirm is safe to repeat). */
+  bookingId: string;
 }
 
 export interface MatrixRow {
@@ -126,6 +128,13 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     method: 'post',
     path: (f) => `/api/sessions/${f.closableSessionId()}/close`,
     allowed: CASHIER,
+  },
+  // bookings (TQR-021); seat / cancel / no-show are one-way, covered in booking.e2e-spec.ts
+  { method: 'get', path: () => '/api/bookings', allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/bookings/${f.bookingId}/confirm`,
+    allowed: FLOOR,
     body: () => ({}),
   },
   // platform admin (TQR-009)

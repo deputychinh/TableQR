@@ -6,6 +6,7 @@ import { rolesRoutes } from '@/features/roles/routes';
 import { staffRoutes } from '@/features/staff/routes';
 import { adminRoutes } from '@/features/admin/routes';
 import { billingRoutes } from '@/features/billing/routes';
+import { bookingRoutes } from '@/features/booking/routes';
 
 // Each feature exports its routes from its own file and adds one spread line here.
 export const coreRoutes: RouteRecordRaw[] = [
@@ -45,4 +46,5 @@ export const featureRoutes: RouteRecordRaw[] = [
   ...staffRoutes,
   ...adminRoutes,
   ...billingRoutes,
+  ...bookingRoutes,
 ];
