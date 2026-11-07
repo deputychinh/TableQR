@@ -85,9 +85,9 @@ Domain units first where design names them: `anomaly.ts` (013), `queue.ts` (014)
 
 ## Risks
 
-| Risk                                                 | Spike / mitigation                                                  | Result  |
-| ---------------------------------------------------- | ------------------------------------------------------------------- | ------- |
-| SSE fan-out delay on 1 vCPU with hundreds of streams | spike inside TQR-010: 300 streams, 50 status changes/s, measure p95 | pending |
-| VietQR payload rejected by real banking apps         | decoder test + manual scan with 2 bank apps in demo (TQR-018)       | pending |
-| iOS Safari drops EventSource when the screen locks   | snapshot on reconnect (ADR 0004); e2e reconnect test                | pending |
-| Scope (54 ACs) vs 6 days                             | circuit breaker above; re-estimate after slice 1                    | pending |
+| Risk                                                 | Spike / mitigation                                                  | Result                                                                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| SSE fan-out delay on 1 vCPU with hundreds of streams | spike inside TQR-010: 300 streams, 50 status changes/s, measure p95 | done 2026-11-08: p95 21 ms over 30 000 deliveries (local, not 1 vCPU) — risk retired; re-measure in TQR-016 bench |
+| VietQR payload rejected by real banking apps         | decoder test + manual scan with 2 bank apps in demo (TQR-018)       | pending                                                                                                           |
+| iOS Safari drops EventSource when the screen locks   | snapshot on reconnect (ADR 0004); e2e reconnect test                | pending                                                                                                           |
+| Scope (54 ACs) vs 6 days                             | circuit breaker above; re-estimate after slice 1                    | pending                                                                                                           |

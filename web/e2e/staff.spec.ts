@@ -64,6 +64,9 @@ test('AC14/AC16 owner adds a kitchen user who lands on /bep; disabling sends the
   await page.getByLabel('Email đăng nhập').fill(kitchenEmail);
   await page.getByLabel('Mật khẩu ban đầu').fill(STAFF_PASSWORD);
   await page.getByRole('radio', { name: /^Bếp/ }).check();
+  // Checking the radio scrolls the submit button under the sticky bottom bar; axe's target-size
+  // rule then reports that transient overlap, so the form is audited from the top of the page.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expectNoSeriousA11yIssues(page);
   await page.getByRole('button', { name: 'Thêm nhân viên' }).click();
   await expect(page).toHaveURL(/\/quan-ly\/nhan-vien$/);

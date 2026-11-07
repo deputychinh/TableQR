@@ -3,8 +3,9 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ChevronRight, CircleCheck, Lock, UserPlus } from 'lucide-vue-next';
 import OwnerShell from '@/app/layouts/OwnerShell.vue';
-import BaseButton from '@/components/BaseButton.vue';
-import FormAlert from '@/components/FormAlert.vue';
+import EmptyState from '@/components/EmptyState.vue';
+import ErrorState from '@/components/ErrorState.vue';
+import LoadingState from '@/components/LoadingState.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import { ROLE_ICONS } from '@/features/roles/role-icons';
 import { useSessionStore } from '@/stores/session';
@@ -61,16 +62,14 @@ onMounted(load);
       {{ t('staff.added', { name: added }) }}
     </p>
 
-    <div v-if="loading && !members" class="staff-list__loading" :aria-label="t('staff.loading')">
-      <span v-for="n in 3" :key="n" class="staff-list__skeleton" aria-hidden="true" />
-    </div>
+    <LoadingState v-if="loading && !members" :label="t('staff.loading')" />
 
-    <div v-else-if="loadError" class="staff-list__error">
-      <FormAlert :message="t(loadError)" />
-      <BaseButton variant="secondary" :loading="loading" @click="load">{{
-        t('staff.retry')
-      }}</BaseButton>
-    </div>
+    <ErrorState
+      v-else-if="loadError"
+      :message="t(loadError)"
+      :retry-label="t('staff.retry')"
+      @retry="load"
+    />
 
     <template v-else-if="members">
       <ul class="staff-list__items">
@@ -104,10 +103,12 @@ onMounted(load);
           </RouterLink>
         </li>
       </ul>
-      <section v-if="others.length === 0" class="staff-list__empty">
-        <h2 class="staff-list__empty-title">{{ t('staff.empty.title') }}</h2>
-        <p class="staff-list__empty-body">{{ t('staff.empty.body') }}</p>
-      </section>
+      <EmptyState
+        v-if="others.length === 0"
+        class="staff-list__empty"
+        :title="t('staff.empty.title')"
+        :body="t('staff.empty.body')"
+      />
     </template>
   </OwnerShell>
 </template>
@@ -173,7 +174,6 @@ onMounted(load);
   background: var(--color-success-bg);
 }
 
-.staff-list__loading,
 .staff-list__items {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -184,22 +184,9 @@ onMounted(load);
 }
 
 @media (width >= 840px) {
-  .staff-list__loading,
   .staff-list__items {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-.staff-list__skeleton {
-  block-size: 6rem;
-  border-radius: var(--radius-3);
-  background: var(--color-surface-muted);
-}
-
-.staff-list__error {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
 }
 
 .staff-list__item {
@@ -271,19 +258,5 @@ onMounted(load);
 
 .staff-list__empty {
   margin-block-start: var(--space-4);
-  padding: var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-3);
-  text-align: center;
-}
-
-.staff-list__empty-title {
-  margin: 0;
-  font-size: var(--font-size-lead);
-}
-
-.staff-list__empty-body {
-  margin-block: var(--space-2) 0;
-  color: var(--color-text-muted);
 }
 </style>

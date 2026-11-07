@@ -6,6 +6,8 @@
  * `path` and `body` receive the ids of a fixture restaurant (see `MatrixFixture`) so allowed
  * calls reach real rows. Calls must be safe to repeat: they run once per allowed role.
  */
+import { DEFAULT_RULES } from '../../src/settings/domain/house-rules.js';
+
 export type MatrixRole = 'owner' | 'cashier' | 'waiter' | 'kitchen' | 'platform_admin';
 
 export interface MatrixFixture {
@@ -15,6 +17,10 @@ export interface MatrixFixture {
   spareRestaurantId: string;
   /** A fresh email for create calls. */
   email: () => string;
+  /** A table of the fixture restaurant (renamed and rotated by the owner rows). */
+  tableId: string;
+  /** A table the owner's DELETE row may remove. */
+  spareTableId: string;
 }
 
 export interface MatrixRow {
@@ -33,6 +39,9 @@ export const ALL_ROLES: readonly MatrixRole[] = [
 ];
 const OWNER = ['owner'] as const;
 const ADMIN = ['platform_admin'] as const;
+const FLOOR = ['owner', 'cashier', 'waiter'] as const;
+const RESTAURANT = ['owner', 'cashier', 'waiter', 'kitchen'] as const;
+const BANK = { bin: '970436', accountNumber: '0123456789', accountName: 'Nguyễn Văn Ánh' };
 
 export const ROLE_MATRIX: readonly MatrixRow[] = [
   // identity (TQR-004)
@@ -63,6 +72,32 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     allowed: OWNER,
     body: () => ({ password: 'ma-tran-mat-khau-1' }),
   },
+  // settings (TQR-008)
+  { method: 'get', path: () => '/api/restaurant/settings', allowed: OWNER },
+  {
+    method: 'put',
+    path: () => '/api/restaurant/settings',
+    allowed: OWNER,
+    body: () => ({ rules: DEFAULT_RULES, bank: BANK }),
+  },
+  { method: 'get', path: () => '/api/restaurant/rules', allowed: RESTAURANT },
+  // tables (TQR-007); GET /api/stream/floor (TQR-010) is a stream, covered by its own spec
+  { method: 'get', path: () => '/api/tables', allowed: FLOOR },
+  { method: 'get', path: (f) => `/api/tables/${f.tableId}`, allowed: FLOOR },
+  {
+    method: 'post',
+    path: () => '/api/tables',
+    allowed: OWNER,
+    body: () => ({ name: `Bàn ${String(Date.now() % 100000)}`, seats: 4 }),
+  },
+  {
+    method: 'patch',
+    path: (f) => `/api/tables/${f.tableId}`,
+    allowed: OWNER,
+    body: () => ({ seats: 6 }),
+  },
+  { method: 'post', path: (f) => `/api/tables/${f.tableId}/rotate-qr`, allowed: OWNER },
+  { method: 'delete', path: (f) => `/api/tables/${f.spareTableId}`, allowed: OWNER },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {

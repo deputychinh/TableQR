@@ -31,10 +31,21 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     cookies.set('platform_admin', (await platformAdminCookie(t)).cookie);
     const target = await addStaff(t, owner.cookie, 'waiter');
     const spare = await signUp(t);
+    const table = async (name: string) =>
+      (
+        await request(t.app.getHttpServer())
+          .post('/api/tables')
+          .set('origin', ORIGIN)
+          .set('cookie', owner.cookie)
+          .send({ name, seats: 4 })
+          .expect(201)
+      ).body.id as string;
     fixture = {
       staffId: target.member.id,
       spareRestaurantId: spare.response.body.restaurant.id as string,
       email: () => uniqueEmail('matrix'),
+      tableId: await table('Bàn ma trận'),
+      spareTableId: await table('Bàn xoá'),
     };
   });
 
@@ -46,6 +57,8 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     staffId: ':staffId',
     spareRestaurantId: ':restaurantId',
     email: () => 'new@example.com',
+    tableId: ':tableId',
+    spareTableId: ':spareTableId',
   };
   const cases = ROLE_MATRIX.flatMap((row) =>
     ALL_ROLES.map((role) => ({ row, role, allowed: row.allowed.includes(role) })),

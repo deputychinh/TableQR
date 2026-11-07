@@ -102,6 +102,14 @@ describe('sessionGuard', () => {
     setUnauthorizedHandler(undefined);
   });
 
+  it('keeps main’s routes right: guest table page public, tables readable by floor staff', () => {
+    expect(router.resolve('/t/some-token').meta.staff).toBeUndefined();
+    expect(router.resolve('/quan-ly/ban').meta.roles).toEqual(['owner', 'cashier', 'waiter']);
+    expect(router.resolve('/quan-ly/ban/in').meta.roles).toEqual(['owner']);
+    expect(router.resolve('/quan-ly/cai-dat').meta.roles).toEqual(['owner']);
+    expect(router.resolve('/quan-ly/nhan-vien').meta.roles).toEqual(['owner']);
+  });
+
   it('does not call the API for public pages', async () => {
     const fetchSpy = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchSpy);

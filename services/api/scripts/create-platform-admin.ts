@@ -4,12 +4,11 @@
 //
 // The email comes from --email or TQR_ADMIN_EMAIL, the password from TQR_ADMIN_PASSWORD
 // (preferred: arguments are visible in the process list) or --password. Neither is ever printed.
-// Runs with Node's built-in TypeScript support; it imports only files without relative imports.
+// Runs with Node's built-in TypeScript support, so it imports only files that have no relative
+// imports themselves (password.ts, pg-error.ts) and writes the row with plain SQL.
 import { parseArgs } from 'node:util';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { z } from 'zod';
-import { users } from '../src/db/schema.ts';
 import { isUniqueViolation } from '../src/db/pg-error.ts';
 import {
   MAX_PASSWORD_LENGTH,
@@ -50,17 +49,12 @@ const main = async (): Promise<void> => {
     max: 1,
   });
   try {
-    const [admin] = await drizzle({ client: pool })
-      .insert(users)
-      .values({
-        restaurantId: null,
-        email: parsed.data.email,
-        passwordHash: await hashPassword(parsed.data.password),
-        role: 'platform_admin',
-        displayName: 'Quản trị nền tảng',
-      })
-      .returning({ id: users.id });
-    process.stdout.write(`Platform admin created (id ${admin?.id ?? '?'}).\n`);
+    const result = await pool.query<{ id: string }>(
+      `insert into users (restaurant_id, email, password_hash, role, display_name)
+       values (null, $1, $2, 'platform_admin', 'Quản trị nền tảng') returning id`,
+      [parsed.data.email, await hashPassword(parsed.data.password)],
+    );
+    process.stdout.write(`Platform admin created (id ${result.rows[0]?.id ?? '?'}).\n`);
   } catch (error: unknown) {
     if (isUniqueViolation(error, 'users_email_key')) fail('That email already has an account.');
     throw error;

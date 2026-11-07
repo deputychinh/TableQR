@@ -9,7 +9,9 @@ import FormAlert from '@/components/FormAlert.vue';
 import FormField from '@/components/FormField.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import { ROLE_ICONS } from '@/features/roles/role-icons';
-import RolePicker from '@/features/staff/components/RolePicker.vue';
+import RadioCardGroup from '@/components/RadioCardGroup.vue';
+import ErrorState from '@/components/ErrorState.vue';
+import LoadingState from '@/components/LoadingState.vue';
 import {
   RESTAURANT_ROLES,
   describeStaffError,
@@ -37,6 +39,14 @@ const busy = ref<'role' | 'access' | 'password'>();
 const sheet = ref<'disable' | 'password'>();
 const newPassword = ref('');
 const passwordError = ref<string>();
+
+const roleOptions = computed(() =>
+  RESTAURANT_ROLES.map((value) => ({
+    value: value as RestaurantRole | '',
+    title: t(`roles.names.${value}`),
+    body: t(`staff.roleHints.${value}`),
+  })),
+);
 
 const isSelf = computed(() => member.value?.id === session.me?.user.id);
 const name = computed(() => (member.value ? nameOf(member.value) : ''));
@@ -107,12 +117,20 @@ const savePassword = async () => {
       {{ t('staff.back') }}
     </RouterLink>
 
-    <div v-if="loadError" class="staff-detail__error">
-      <FormAlert :message="t(loadError)" />
-      <BaseButton variant="secondary" @click="load">{{ t('staff.retry') }}</BaseButton>
-    </div>
+    <ErrorState
+      v-if="loadError"
+      class="staff-detail__error"
+      :message="t(loadError)"
+      :retry-label="t('staff.retry')"
+      @retry="load"
+    />
 
-    <div v-else-if="!member" class="staff-detail__skeleton" :aria-label="t('staff.loading')" />
+    <LoadingState
+      v-else-if="!member"
+      class="staff-detail__error"
+      :label="t('staff.loading')"
+      :rows="2"
+    />
 
     <template v-else>
       <header class="staff-detail__head">
@@ -142,15 +160,16 @@ const savePassword = async () => {
           <h2 id="staff-role" class="staff-detail__section-title">
             {{ t('staff.detail.roleSection') }}
           </h2>
-          <form class="staff-detail__form" @submit.prevent="saveRole">
-            <RolePicker
+          <p v-if="isSelf" class="staff-detail__text">
+            {{ t(`roles.names.${member.role}`) }} — {{ t(`staff.roleHints.${member.role}`) }}
+          </p>
+          <form v-else class="staff-detail__form" @submit.prevent="saveRole">
+            <RadioCardGroup
               v-model="role"
               :legend="t('staff.detail.roleLegend')"
-              :roles="RESTAURANT_ROLES"
-              :disabled="isSelf"
+              :options="roleOptions"
             />
             <BaseButton
-              v-if="!isSelf"
               type="submit"
               variant="secondary"
               size="lg"
@@ -197,23 +216,26 @@ const savePassword = async () => {
 
       <ConfirmSheet
         :open="sheet === 'disable'"
+        variant="danger"
         :title="t('staff.detail.disableTitle', { name })"
-        :body="t('staff.detail.disableBody', { name })"
         :confirm-label="t('staff.detail.disableConfirm')"
+        :cancel-label="t('sheet.cancel')"
         :busy="busy === 'access'"
         @confirm="setActive(false)"
         @cancel="sheet = undefined"
-      />
+      >
+        <p class="staff-detail__sheet-text">{{ t('staff.detail.disableBody', { name }) }}</p>
+      </ConfirmSheet>
       <ConfirmSheet
         :open="sheet === 'password'"
-        tone="primary"
         :title="t('staff.detail.resetTitle', { name })"
-        :body="t('staff.detail.resetBody', { name })"
         :confirm-label="t('staff.detail.resetConfirm')"
+        :cancel-label="t('sheet.cancel')"
         :busy="busy === 'password'"
         @confirm="savePassword"
         @cancel="sheet = undefined"
       >
+        <p class="staff-detail__sheet-text">{{ t('staff.detail.resetBody', { name }) }}</p>
         <FormField
           v-model="newPassword"
           type="password"
@@ -239,17 +261,11 @@ const savePassword = async () => {
 }
 
 .staff-detail__error {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
   margin-block-start: var(--space-3);
 }
 
-.staff-detail__skeleton {
-  block-size: 8rem;
-  margin-block-start: var(--space-3);
-  border-radius: var(--radius-3);
-  background: var(--color-surface-muted);
+.staff-detail__sheet-text {
+  margin: 0 0 var(--space-3);
 }
 
 .staff-detail__head {

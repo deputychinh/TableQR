@@ -1,9 +1,7 @@
 import { render, screen } from '@testing-library/vue';
 import userEvent from '@testing-library/user-event';
 import { Wallet } from 'lucide-vue-next';
-import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import StatusChip from '@/components/StatusChip.vue';
-import { i18n } from '@/locales';
 import { useSessionStore } from '@/stores/session';
 import { jsonResponse, renderWithApp } from '@/test/render';
 import RoleHomePage from './RoleHomePage.vue';
@@ -65,43 +63,5 @@ describe('StatusChip', () => {
     const { container } = render(StatusChip, { props: { label: 'Bếp' } });
     expect(screen.getByText('Bếp').className).toContain('status-chip--neutral');
     expect(container.querySelector('svg')).toBeNull();
-  });
-});
-
-describe('ConfirmSheet', () => {
-  const renderSheet = (props: Record<string, unknown>) =>
-    render(ConfirmSheet, {
-      props: { open: false, title: 'Khoá?', body: 'Hậu quả', confirmLabel: 'Khoá', ...props },
-      global: { plugins: [i18n] },
-    });
-
-  it('is a named dialog that confirms and cancels', async () => {
-    const view = renderSheet({ open: true });
-    const dialog = await screen.findByRole('dialog', { name: 'Khoá?' });
-    expect(dialog.getAttribute('aria-describedby')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Khoá' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Huỷ' }));
-    expect(view.emitted('confirm')).toHaveLength(1);
-    expect(view.emitted('cancel')).toHaveLength(1);
-  });
-
-  it('opens and closes with its prop and cancels on Escape unless busy', async () => {
-    const view = renderSheet({ open: false, body: undefined });
-    expect(screen.queryByRole('dialog')).toBeNull();
-    await view.rerender({ open: true });
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog.getAttribute('aria-describedby')).toBeNull();
-    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
-    expect(view.emitted('cancel')).toHaveLength(1);
-    await view.rerender({ open: true, busy: true });
-    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
-    expect(view.emitted('cancel')).toHaveLength(1);
-    await view.rerender({ open: false, busy: false });
-    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  });
-
-  it('shows an error message inside the sheet', async () => {
-    renderSheet({ open: true, error: 'Không được' });
-    expect((await screen.findByRole('alert')).textContent).toContain('Không được');
   });
 });

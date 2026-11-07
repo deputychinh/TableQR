@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, reactive, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { ArrowLeft } from 'lucide-vue-next';
@@ -8,7 +8,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import FormField from '@/components/FormField.vue';
 import { describeAuthError, type FieldErrors } from '@/features/auth/errors';
-import RolePicker from '@/features/staff/components/RolePicker.vue';
+import RadioCardGroup from '@/components/RadioCardGroup.vue';
 import {
   NEW_STAFF_ROLES,
   createStaff,
@@ -60,6 +60,14 @@ const focusFirstInvalid = (errors: FieldErrors) => {
   ];
   order.find(([name]) => errors[name])?.[1].value?.focus();
 };
+
+const roleOptions = computed(() =>
+  NEW_STAFF_ROLES.map((role) => ({
+    value: role as RestaurantRole | '',
+    title: t(`roles.names.${role}`),
+    body: t(`staff.roleHints.${role}`),
+  })),
+);
 
 const isNewRole = (role: RestaurantRole | ''): role is NewStaffRole =>
   (NEW_STAFF_ROLES as readonly string[]).includes(role);
@@ -125,12 +133,10 @@ const submit = async () => {
         required
         :error="errorFor('password')"
       />
-      <RolePicker
-        v-model="form.role"
-        :legend="t('staff.form.role')"
-        :roles="NEW_STAFF_ROLES"
-        :error="errorFor('role')"
-      />
+      <div class="staff-add__role">
+        <RadioCardGroup v-model="form.role" :legend="t('staff.form.role')" :options="roleOptions" />
+        <p v-if="errorFor('role')" class="staff-add__error" role="alert">{{ errorFor('role') }}</p>
+      </div>
       <BaseButton type="submit" size="lg" block :loading="busy">{{
         t('staff.form.submit')
       }}</BaseButton>
@@ -162,5 +168,16 @@ const submit = async () => {
   display: grid;
   gap: var(--space-4);
   max-inline-size: 40rem;
+}
+
+.staff-add__role {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.staff-add__error {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--color-danger);
 }
 </style>

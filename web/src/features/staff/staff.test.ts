@@ -291,9 +291,8 @@ describe('StaffDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Khoá tài khoản' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Đặt mật khẩu mới' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Lưu vai trò' })).toBeNull();
-    for (const radio of screen.getAllByRole('radio')) {
-      expect(radio.matches(':disabled')).toBe(true);
-    }
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByText(/Chủ quán — Toàn quyền/)).toBeTruthy();
   });
 
   it('says plainly when the person is not found (e.g. another restaurant)', async () => {

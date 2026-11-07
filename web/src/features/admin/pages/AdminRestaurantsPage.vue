@@ -5,6 +5,9 @@ import { Ban, CircleCheck, RotateCcw, Store } from 'lucide-vue-next';
 import StaffShell from '@/app/layouts/StaffShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
+import EmptyState from '@/components/EmptyState.vue';
+import ErrorState from '@/components/ErrorState.vue';
+import LoadingState from '@/components/LoadingState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import {
@@ -83,20 +86,16 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
       {{ notice }}
     </p>
 
-    <div v-if="loading && !restaurants" class="admin-page__list" :aria-label="t('admin.loading')">
-      <span v-for="n in 3" :key="n" class="admin-page__skeleton" aria-hidden="true" />
-    </div>
+    <LoadingState v-if="loading && !restaurants" :label="t('admin.loading')" />
 
-    <div v-else-if="loadError && !restaurants" class="admin-page__error">
-      <FormAlert :message="t(loadError)" />
-      <BaseButton variant="secondary" :loading="loading" @click="load()">{{
-        t('admin.retry')
-      }}</BaseButton>
-    </div>
+    <ErrorState
+      v-else-if="loadError && !restaurants"
+      :message="t(loadError)"
+      :retry-label="t('admin.retry')"
+      @retry="load()"
+    />
 
-    <p v-else-if="restaurants && restaurants.length === 0" class="admin-page__empty">
-      {{ t('admin.empty') }}
-    </p>
+    <EmptyState v-else-if="restaurants && restaurants.length === 0" :title="t('admin.empty')" />
 
     <template v-else-if="restaurants">
       <p class="admin-page__count">{{ t('admin.count', { n: total }) }}</p>
@@ -139,19 +138,23 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
 
     <ConfirmSheet
       :open="pending !== undefined"
-      :tone="suspending ? 'danger' : 'primary'"
+      :variant="suspending ? 'danger' : 'primary'"
       :title="
         t(suspending ? 'admin.suspendTitle' : 'admin.reactivateTitle', {
           name: pending?.name ?? '',
         })
       "
-      :body="t(suspending ? 'admin.suspendBody' : 'admin.reactivateBody')"
       :confirm-label="t(suspending ? 'admin.suspend' : 'admin.reactivate')"
+      :cancel-label="t('sheet.cancel')"
       :busy="busy"
-      :error="actionError"
       @confirm="confirm"
       @cancel="pending = undefined"
-    />
+    >
+      <p class="admin-page__sheet-text">
+        {{ t(suspending ? 'admin.suspendBody' : 'admin.reactivateBody') }}
+      </p>
+      <FormAlert v-if="actionError" :message="actionError" />
+    </ConfirmSheet>
   </StaffShell>
 </template>
 
@@ -190,24 +193,8 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
   list-style: none;
 }
 
-.admin-page__skeleton {
-  block-size: 6rem;
-  border-radius: var(--radius-3);
-  background: var(--color-surface-muted);
-}
-
-.admin-page__error {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
-}
-
-.admin-page__empty {
-  padding: var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-3);
-  text-align: center;
-  color: var(--color-text-muted);
+.admin-page__sheet-text {
+  margin: 0 0 var(--space-3);
 }
 
 .admin-page__item {
