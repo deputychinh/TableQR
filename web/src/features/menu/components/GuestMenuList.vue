@@ -5,7 +5,7 @@ import StatusChip from '@/components/StatusChip.vue';
 import { formatVnd } from '../price';
 import type { GuestMenu } from '../types';
 
-/** The menu as a guest sees it (AC5, AC6); TQR-012 adds the order buttons to orderable items. */
+/** The menu as a guest sees it (AC5, AC6); slot `action` holds the order buttons (TQR-012). */
 defineProps<{ categories: GuestMenu['categories'] }>();
 const { t } = useI18n();
 </script>
@@ -37,7 +37,10 @@ const { t } = useI18n();
               <template #icon><CircleSlash :size="14" aria-hidden="true" /></template>
             </StatusChip>
           </span>
-          <span class="guest-menu-list__price">{{ formatVnd(item.priceVnd) }}</span>
+          <span class="guest-menu-list__side">
+            <span class="guest-menu-list__price">{{ formatVnd(item.priceVnd) }}</span>
+            <slot name="action" :item="item" />
+          </span>
         </li>
       </ul>
     </section>
@@ -93,9 +96,16 @@ const { t } = useI18n();
   color: var(--color-text-muted);
 }
 
-.guest-menu-list__price {
+.guest-menu-list__side {
+  display: grid;
   flex: none;
+  gap: var(--space-2);
+  justify-items: end;
+}
+
+.guest-menu-list__price {
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .guest-menu-list__item--sold-out .guest-menu-list__name,
