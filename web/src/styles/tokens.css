@@ -45,6 +45,7 @@
   --font-size-lead: 1.125rem;
   --font-size-title: 1.5rem;
   --font-size-display: 2rem;
+  --font-size-kitchen: 1.25rem; /* 20 px: kitchen body text, read at arm’s length */
   --font-weight-medium: 500;
   --font-weight-bold: 650;
   --radius-1: 0.5rem;

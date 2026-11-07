@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { FloorSnapshotRegistry } from './floor-snapshot.js';
 import { RealtimeHub } from './realtime.hub.js';
 import { StreamController } from './stream.controller.js';
 import { IdentityModule } from '../identity/identity.module.js';
@@ -7,7 +8,7 @@ import { IdentityModule } from '../identity/identity.module.js';
 @Module({
   imports: [IdentityModule],
   controllers: [StreamController],
-  providers: [RealtimeHub],
-  exports: [RealtimeHub],
+  providers: [RealtimeHub, FloorSnapshotRegistry],
+  exports: [RealtimeHub, FloorSnapshotRegistry],
 })
 export class RealtimeModule {}

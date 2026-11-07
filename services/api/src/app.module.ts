@@ -9,6 +9,7 @@ import { SettingsModule } from './settings/settings.module.js';
 import { TablesModule } from './tables/tables.module.js';
 import { StaffModule } from './staff/staff.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { KitchenModule } from './kitchen/kitchen.module.js';
 import { AppLogger } from './common/logging/app-logger.js';
 import { LOG_SINK, stdoutSink } from './common/logging/log-sink.js';
 
@@ -33,6 +34,7 @@ const FEATURE_MODULES = [
   MenuModule,
   StaffModule,
   AdminModule,
+  KitchenModule,
 ];
 
 @Module({

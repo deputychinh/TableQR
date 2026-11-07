@@ -17,8 +17,8 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-011 | Guest check-in / join table session                          | todo   |
 | TQR-012 | Guest menu and ordering (idempotent, price check)            | todo   |
 | TQR-013 | Anomaly check, held orders, waiter confirm/reject            | todo   |
-| TQR-014 | Kitchen station queue (FIFO, skip reason, late highlight)    | todo   |
-| TQR-015 | Waiter ready list and serve                                  | todo   |
+| TQR-014 | Kitchen station queue (FIFO, skip reason, late highlight)    | review |
+| TQR-015 | Waiter ready list and serve                                  | review |
 | TQR-016 | Guest live dish status + realtime and rush-replay benchmarks | todo   |
 | TQR-017 | Tenant isolation and role e2e matrix                         | todo   |
 | TQR-018 | Bill with VietQR payload                                     | todo   |

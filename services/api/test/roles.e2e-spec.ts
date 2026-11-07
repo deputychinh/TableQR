@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { DB, type Database } from '../src/db/database.module.js';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, signUp } from './support/http.js';
 import {
@@ -7,6 +8,7 @@ import {
   type MatrixFixture,
   type MatrixRole,
 } from './support/role-matrix.js';
+import { openSession, releaseOrder, seedFloor } from './support/service-fixtures.js';
 import {
   STAFF_PASSWORD,
   addStaff,
@@ -40,7 +42,26 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
           .send({ name, seats: 4 })
           .expect(201)
       ).body.id as string;
+    // Kitchen and serving rows: a pool of items per status, one consumed per call.
+    const db = t.app.get<Database>(DB);
+    const restaurantId = owner.response.body.restaurant.id as string;
+    const floor = await seedFloor(db, restaurantId, 1);
+    const session = await openSession(db, restaurantId, floor.tableIds[0] ?? '');
+    const pool = async (status: 'waiting' | 'cooking' | 'done') => {
+      const items = await releaseOrder(
+        db,
+        restaurantId,
+        session,
+        Array.from({ length: 8 }, () => ({ dish: floor.pho, status })),
+      );
+      const ids = items.map((i) => i.id);
+      return () => ids.shift() ?? 'pool-empty';
+    };
     fixture = {
+      stationId: floor.stationId,
+      waitingItemId: await pool('waiting'),
+      cookingItemId: await pool('cooking'),
+      doneItemId: await pool('done'),
       staffId: target.member.id,
       spareRestaurantId: spare.response.body.restaurant.id as string,
       email: () => uniqueEmail('matrix'),
@@ -59,6 +80,10 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     email: () => 'new@example.com',
     tableId: ':tableId',
     spareTableId: ':spareTableId',
+    stationId: ':stationId',
+    waitingItemId: () => ':itemId',
+    cookingItemId: () => ':itemId',
+    doneItemId: () => ':itemId',
   };
   const cases = ROLE_MATRIX.flatMap((row) =>
     ALL_ROLES.map((role) => ({ row, role, allowed: row.allowed.includes(role) })),
