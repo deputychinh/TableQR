@@ -5,7 +5,7 @@ Path: Full — because new product, several features (multi-tenant, ordering, ki
 Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 0.1 of 6 days**
 Status: doing
 
-**Next action:** Specify — run `spec` (+ `benchmark` B) from brief.md; write spec.md with stories, ACs, non-goals and benchmarks/plan.md.
+**Next action:** Set up — run `init-project` (Vue 3 + Node TypeScript, web only) in this repo, then `make ci` green.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -24,8 +24,8 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 | Stage | Status | Evidence / link |
 | --- | --- | --- |
 | Discover | done | [brief](brief.md), [benchmark](benchmark.md) |
-| Specify | doing | |
-| Set up | todo | |
+| Specify | done | [spec](spec.md) (16 stories, 54 ACs), [benchmarks/plan.md](../../../benchmarks/plan.md) |
+| Set up | doing | |
 | Architect | todo | |
 | Plan | todo | |
 | Build | todo | |
@@ -45,6 +45,7 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 
 - 2026-11-08 triage — repo created, owner answered triage questions
 - 2026-11-08 discover — brief go (appetite 6 days), product benchmark A — ed71312
+- 2026-11-08 spec — 16 stories, 54 ACs, 6 quality targets; booking kept in release 1 as last slice (cuttable)
 
 ## Rulings (decisions taken without asking)
 
@@ -55,6 +56,7 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 - 2026-11-08 Scope: order-at-table first, then online table booking — owner: "cả 1 và 2"; booking comes after ordering in the plan.
 - 2026-11-08 Kitchen fairness: FIFO by order-confirmed time, every item bound to its table session — the core ask.
 - 2026-11-08 Anomaly check: items vs party size beyond the restaurant's threshold → staff must confirm before the kitchen sees it — owner examples (1 person ordering a lot, 5 people getting the wrong food).
+- 2026-11-08 Held orders keep queue position by request time; party size cap = seats + 4; guests need no login — fairness and speed at the table; reversible in spec.
 
 ## Questions for the owner (only what nobody else can answer)
 
