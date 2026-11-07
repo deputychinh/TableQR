@@ -13,7 +13,7 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-007 | Tables, QR tokens, printable QR sheet, rotation              | todo   |
 | TQR-008 | House rules and bank account settings                        | todo   |
 | TQR-009 | ~ Platform admin suspend / reactivate                        | todo   |
-| TQR-010 | Realtime hub: SSE + pg_notify + resync (spike first)         | todo   |
+| TQR-010 | Realtime hub: SSE + pg_notify + resync (spike first)         | review |
 | TQR-011 | Guest check-in / join table session                          | todo   |
 | TQR-012 | Guest menu and ordering (idempotent, price check)            | todo   |
 | TQR-013 | Anomaly check, held orders, waiter confirm/reject            | todo   |

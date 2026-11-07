@@ -3,6 +3,7 @@ import { SETTINGS, loadSettings } from './config/settings.js';
 import { DatabaseModule } from './db/database.module.js';
 import { HealthController } from './health/health.controller.js';
 import { IdentityModule } from './identity/identity.module.js';
+import { RealtimeModule } from './realtime/realtime.module.js';
 import { AppLogger } from './common/logging/app-logger.js';
 import { LOG_SINK, stdoutSink } from './common/logging/log-sink.js';
 
@@ -21,7 +22,7 @@ class CoreModule {}
 const FEATURE_MODULES = [IdentityModule];
 
 @Module({
-  imports: [CoreModule, DatabaseModule, ...FEATURE_MODULES],
+  imports: [CoreModule, DatabaseModule, RealtimeModule, ...FEATURE_MODULES],
   controllers: [HealthController],
 })
 export class AppModule {}
