@@ -1,4 +1,4 @@
-import { verifyPassword } from './password.js';
+import { verifyPasswordLimited } from './password-slots.js';
 
 /**
  * A well-formed scrypt hash with the same parameters as `hashPassword`, of no known password.
@@ -19,7 +19,7 @@ export type VerifyPassword = (password: string, stored: string) => Promise<boole
 export const checkCredentials = async (
   candidate: Candidate | undefined,
   password: string,
-  verify: VerifyPassword = verifyPassword,
+  verify: VerifyPassword = verifyPasswordLimited,
 ): Promise<boolean> => {
   const usable = candidate !== undefined && candidate.disabledAt === null;
   const matches = await verify(password, usable ? candidate.passwordHash : DUMMY_PASSWORD_HASH);

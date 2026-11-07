@@ -51,7 +51,7 @@ flowchart LR
 
 - Settings validated at boot (`src/config/settings.ts`); `.env` never committed; `TQR_SESSION_SECRET` ≥ 32 chars.
 - Headers in production: CSP `default-src 'self'; img-src 'self' data:; frame-ancestors 'none'`, HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
-- Memory: at most 4 scrypt computations (≈128 MB each) run at once per process, the rest queue (`MAX_CONCURRENT_SCRYPT`).
+- Memory: at most 4 scrypt computations (≈128 MB each) run at once per process, the rest queue (`MAX_CONCURRENT_SCRYPT` in `identity/domain/password-slots.ts`).
 - The per-address rate limit and the SSE stream caps are in memory and per process: with several API instances the effective limit is the limit × instances. Behind a reverse proxy, Express must trust it (`trust proxy`) so the client address is the real one.
 - Input validated with zod at the boundary; unknown keys rejected; list endpoints capped at 200.
 - `npm audit --omit=dev` in CI (added with the first feature item); lockfiles committed; install scripts not allowed unless reviewed.

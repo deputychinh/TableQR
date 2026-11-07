@@ -7,7 +7,7 @@ import type { TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
 import { isUniqueViolation } from '../db/pg-error.js';
 import { authSessions, restaurants, users } from '../db/schema.js';
-import { hashPassword } from '../identity/domain/password.js';
+import { hashPasswordLimited } from '../identity/domain/password-slots.js';
 import { EMAIL_UNIQUE_INDEX, emailTakenError } from '../identity/identity.errors.js';
 import {
   MAX_STAFF_PER_RESTAURANT_LIST,
@@ -98,7 +98,7 @@ export class StaffService {
 
   /** AC14: the person can sign in with this email and password right away. */
   async create(tenant: TenantId, input: NewStaff): Promise<StaffMember> {
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = await hashPasswordLimited(input.password);
     try {
       const [row] = await this.db
         .insert(users)
@@ -130,7 +130,7 @@ export class StaffService {
     change: StaffChange,
   ): Promise<StaffMember> {
     const passwordHash =
-      change.password === undefined ? undefined : await hashPassword(change.password);
+      change.password === undefined ? undefined : await hashPasswordLimited(change.password);
     return this.db.transaction(async (tx) => {
       await tx
         .select({ id: restaurants.id })

@@ -7,7 +7,7 @@ import { asTenantId, type TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
 import { authSessions, loginAttempts, restaurants, users } from '../db/schema.js';
 import { checkCredentials } from './domain/credentials.js';
-import { hashPassword } from './domain/password.js';
+import { hashPasswordLimited } from './domain/password-slots.js';
 import { hashToken, newSessionToken } from './domain/session-token.js';
 import { slugify } from './domain/slug.js';
 import { assertRestaurantActive } from './domain/restaurant-status.js';
@@ -51,7 +51,7 @@ export class AuthService {
     password: string;
   }): Promise<IssuedSession> {
     const email = input.email.trim().toLowerCase();
-    const passwordHash = await hashPassword(input.password);
+    const passwordHash = await hashPasswordLimited(input.password);
     for (let attempt = 0; attempt < SLUG_ATTEMPTS; attempt += 1) {
       const base = slugify(input.restaurantName);
       const slug = attempt === 0 ? base : `${base}-${Math.random().toString(36).slice(2, 6)}`;
