@@ -11,6 +11,8 @@ export const describeAuthError = (
   if (error.code === 'EMAIL_TAKEN') return { fields: { email: 'auth.errors.emailTaken' } };
   if (error.code === 'INVALID_CREDENTIALS')
     return { fields: {}, form: 'auth.errors.invalidCredentials' };
+  if (error.code === 'RESTAURANT_SUSPENDED')
+    return { fields: {}, form: 'auth.errors.restaurantSuspended' };
   if (error.code === 'LOGIN_BLOCKED') return { fields: {}, form: 'auth.errors.loginBlocked' };
   if (error.code === 'NETWORK') return { fields: {}, form: 'errors.network' };
   if (error.code === 'VALIDATION_FAILED') {

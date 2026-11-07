@@ -6,6 +6,8 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Added
 
+- Platform admin: `npm run admin:create` CLI (no sign-up screen), `/api/admin/restaurants` list with suspend / reactivate, `/quan-tri` screen; a suspended restaurant's staff are signed out at once and refused at sign-in ("Nhà hàng tạm ngưng"); reusable `assertRestaurantActive` for guest pages (TQR-009).
+- Staff accounts: owner adds cashier / waiter / kitchen people, changes roles, disables (sessions end at once), re-enables and sets a new password; no self lock-out, always one active owner; role homes `/thu-ngan`, `/phuc-vu`, `/bep` with sign-in landing per role; AC15 role matrix e2e; shared `StatusChip` and `ConfirmSheet` (TQR-005).
 - Restaurant sign-up, staff sign-in/out with cookie sessions (scrypt, rotation, 12 h sliding expiry), login throttling, Origin check; landing page, sign-up, sign-in and owner overview screens with the shared design-system components (TQR-004).
 - Benchmark harness: `make bench` (k6, p95 and error thresholds), `make budget` (initial JS ≤ 150 kB gzip, in `make ci`), `make lighthouse` (LCP ≤ 2.5 s, mobile slow 4G), `make baseline` → `benchmarks/baseline.json` (TQR-003).
 - API under `/api` on the web app's origin (Vite proxy), RFC 9457 problem responses with stable `code`, 32 kB JSON body limit, JSON request logs with request id and route pattern, redaction of tokens and personal data (TQR-002).

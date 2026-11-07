@@ -17,6 +17,8 @@ make dev       # infrastructure, migrations, API and web together
 
 Open http://localhost:5310 (web); the API listens on http://127.0.0.1:3310. Optional: `cp .env.example .env` to override settings. `make help` lists every command.
 
+The platform admin (suspends abusive restaurants at `/quan-tri`) has no sign-up screen; create one with `cd services/api && TQR_ADMIN_PASSWORD='…' npm run admin:create -- --email admin@example.com` (the password is read from the environment and never printed).
+
 ## Features
 
 Planned in [docs/delivery/001-qr-table-ordering/spec.md](docs/delivery/001-qr-table-ordering/spec.md): restaurant self-signup with house rules, menu and stations, one QR per table, guest ordering with party size and anomaly check, FIFO kitchen queue, waiter serve list, live dish status, VietQR bill with cashier confirmation, table booking.

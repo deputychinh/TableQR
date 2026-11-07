@@ -27,8 +27,10 @@ export const useSessionStore = defineStore('session', () => {
     me.value = await sendJson<Me>('POST', '/auth/signup', input);
   };
 
-  const signIn = async (input: { email: string; password: string }) => {
-    me.value = await sendJson<Me>('POST', '/auth/login', input);
+  const signIn = async (input: { email: string; password: string }): Promise<Me> => {
+    const signedIn = await sendJson<Me>('POST', '/auth/login', input);
+    me.value = signedIn;
+    return signedIn;
   };
 
   const signOut = async () => {

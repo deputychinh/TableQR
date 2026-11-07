@@ -9,10 +9,12 @@ import { authSessions, loginAttempts, restaurants, users } from '../db/schema.js
 import { hashPassword, verifyPassword } from './domain/password.js';
 import { hashToken, newSessionToken } from './domain/session-token.js';
 import { slugify } from './domain/slug.js';
+import { assertRestaurantActive } from './domain/restaurant-status.js';
+import { EMAIL_UNIQUE_INDEX, IdentityErrorCode, emailTakenError } from './identity.errors.js';
+import { UNIQUE_VIOLATION, isUniqueViolation, pgCode } from '../db/pg-error.js';
 import { isLoginBlocked, windowStart } from './domain/throttle.js';
 
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const UNIQUE_VIOLATION = '23505';
 const SLUG_ATTEMPTS = 5;
 
 export type StaffRole = 'owner' | 'cashier' | 'waiter' | 'kitchen' | 'platform_admin';
@@ -33,26 +35,6 @@ export interface IssuedSession {
   token: string;
   expiresAt: Date;
 }
-
-const pgCode = (error: unknown): string | undefined => {
-  let current: unknown = error;
-  while (current instanceof Error) {
-    const code: unknown = (current as Error & { code?: unknown }).code;
-    if (typeof code === 'string') return code;
-    current = current.cause;
-  }
-  return undefined;
-};
-
-const pgConstraint = (error: unknown): string | undefined => {
-  let current: unknown = error;
-  while (current instanceof Error) {
-    const constraint: unknown = (current as Error & { constraint?: unknown }).constraint;
-    if (typeof constraint === 'string') return constraint;
-    current = current.cause;
-  }
-  return undefined;
-};
 
 @Injectable()
 export class AuthService {
@@ -88,12 +70,7 @@ export class AuthService {
         });
       } catch (error: unknown) {
         if (pgCode(error) !== UNIQUE_VIOLATION) throw error;
-        if (pgConstraint(error) === 'users_email_key') {
-          throw new DomainError('EMAIL_TAKEN', 409, {
-            detail: 'Email đã được dùng',
-            extensions: { fields: [{ path: 'email', code: 'taken' }] },
-          });
-        }
+        if (isUniqueViolation(error, EMAIL_UNIQUE_INDEX)) throw emailTakenError();
         // slug clash: try again with a suffix
       }
     }
@@ -115,18 +92,33 @@ export class AuthService {
         ),
       );
     if (isLoginBlocked(failures?.n ?? 0)) {
-      throw new DomainError('LOGIN_BLOCKED', 429, { detail: 'Thử lại sau 15 phút' });
+      throw new DomainError(IdentityErrorCode.LoginBlocked, 429, { detail: 'Thử lại sau 15 phút' });
     }
-    const [user] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+    const [user] = await this.db
+      .select({
+        id: users.id,
+        restaurantId: users.restaurantId,
+        passwordHash: users.passwordHash,
+        disabledAt: users.disabledAt,
+        restaurantStatus: restaurants.status,
+      })
+      .from(users)
+      .leftJoin(restaurants, eq(restaurants.id, users.restaurantId))
+      .where(eq(users.email, email))
+      .limit(1);
     const valid =
       user !== undefined &&
       user.disabledAt === null &&
       (await verifyPassword(input.password, user.passwordHash));
     await this.db.insert(loginAttempts).values({ email, attemptedAt: now, succeeded: valid });
     if (!valid || user === undefined) {
-      throw new DomainError('INVALID_CREDENTIALS', 401, {
+      throw new DomainError(IdentityErrorCode.InvalidCredentials, 401, {
         detail: 'Email hoặc mật khẩu không đúng',
       });
+    }
+    // AC54: only told after the right password, so it does not reveal which emails exist.
+    if (user.restaurantId !== null && user.restaurantStatus !== null) {
+      assertRestaurantActive({ status: user.restaurantStatus });
     }
     return this.issueSession(this.db, user.id, user.restaurantId);
   }
