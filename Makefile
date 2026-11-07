@@ -39,7 +39,8 @@ up: ## Start local infrastructure (docker compose)
 down: ## Stop local infrastructure
 	docker compose down
 
-migrate: ## Apply database migrations (Drizzle)
+migrate: ## Create the dev database if missing and apply migrations (Drizzle)
+	docker compose exec -T db sh -c "psql -U tableqr -d postgres -tAc \"select 1 from pg_database where datname='tableqr_dev'\" | grep -q 1 || createdb -U tableqr tableqr_dev"
 	$(API) npm run db:migrate
 
 # --- quality -----------------------------------------------------------------
