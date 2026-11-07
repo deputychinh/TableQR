@@ -1,30 +1,23 @@
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Test } from '@nestjs/testing';
-import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import type { App } from 'supertest/types.js';
-import { AppModule } from '../src/app.module.js';
+import { createTestApp, type TestApp } from './support/app.js';
 
-describe('GET /health (e2e, real Postgres)', () => {
-  let container: StartedPostgreSqlContainer;
-  let app: INestApplication<App>;
+describe('GET /api/health (e2e, real Postgres)', () => {
+  let t: TestApp;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:17').start();
-    process.env.TQR_DATABASE_URL = container.getConnectionUri();
-    process.env.TQR_SESSION_SECRET = 'e2e-secret-e2e-secret-e2e-secret-e2e';
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    await app.init();
-  }, 120_000);
-
-  afterAll(async () => {
-    await app.close();
-    await container.stop();
+    t = await createTestApp();
   });
 
-  it('reports the API and the database as up', async () => {
-    const response = await request(app.getHttpServer()).get('/health').expect(200);
+  afterAll(async () => {
+    await t.app.close();
+  });
+
+  it('reports the API and the database as up under /api', async () => {
+    const response = await request(t.app.getHttpServer()).get('/api/health').expect(200);
     expect(response.body).toEqual({ status: 'ok', db: 'up' });
+  });
+
+  it('no longer answers on the old unprefixed path', async () => {
+    await request(t.app.getHttpServer()).get('/health').expect(404);
   });
 });
