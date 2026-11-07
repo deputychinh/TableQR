@@ -48,6 +48,12 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 - 2026-11-08 spec — 16 stories, 54 ACs, 6 quality targets; booking kept in release 1 as last slice (cuttable)
 - 2026-11-08 set up — node-vue preset (NestJS 12 + Drizzle + Postgres 17, Vite + Vue 3), make ci green, user path proven on localhost and 127.0.0.1
 - 2026-11-08 TQR-002 same-origin /api, problem details, redacted logs — shipped 9.0/10 (round 1: 6.5) — 2251990, 107511c, 3b22661
+- 2026-11-08 TQR-003 benchmark harness + baseline — review 7.0 → fixes 985036e → batch review 9.0 PASS
+- 2026-11-08 TQR-004 sign-up, sessions, owner screens — 744eac3 (pushed while make ci was red: only deletions; fixed by cfb84e8 minutes later), cfb84e8
+- 2026-11-08 TQR-010 realtime hub — c93b2ae (spike: 300 streams, 30 000 deliveries, p95 21 ms)
+- 2026-11-08 slice 1 via 4 parallel agents, merged: TQR-008 4632e0e, TQR-007 1ca6da3, TQR-006 63e1f5a, TQR-005+009 d47f25b — make ci green (API 201 unit + 276 e2e, web 229 unit + 22 Playwright)
+- 2026-11-08 shared service schema 24b16cf; slices 2–4 started as 4 parallel agents: ordering (011/012/013/016), kitchen+serving (014/015), billing (018/019), booking (020/021)
+- 2026-11-08 slice-1 batch review: PASS TQR-003 9.0, TQR-008 9.0; FAIL TQR-004 7.0 (security 0: parallel throttle bypass, timing oracle, malformed cookie 500), TQR-005 7.0, TQR-006 7.5, TQR-007 7.5, TQR-009 8.0, TQR-010 8.0 (streams survive revocation) — improve round 1 running in a fix agent
 - 2026-11-08 plan — 21 items in 5 slices, estimate 4.5–7 d (60 %), circuit breaker written
 - 2026-11-08 architect — design.md, ADRs 0002–0007 (same-origin cookies, tenant scoping, SSE+NOTIFY, queue order, VietQR, booking exclusion), threat model
 
