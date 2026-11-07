@@ -5,7 +5,7 @@ Path: Full — because new product, several features (multi-tenant, ordering, ki
 Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 0.1 of 6 days**
 Status: doing
 
-**Next action:** Discover — run `discover` (+ `benchmark` A: Grab/ShopeeFood-style QR ordering products such as iPOS O2, Sapo FnB, Square/Toast QR ordering) and write `brief.md`.
+**Next action:** Specify — run `spec` (+ `benchmark` B) from brief.md; write spec.md with stories, ACs, non-goals and benchmarks/plan.md.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -23,8 +23,8 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 
 | Stage | Status | Evidence / link |
 | --- | --- | --- |
-| Discover | doing | |
-| Specify | todo | |
+| Discover | done | [brief](brief.md), [benchmark](benchmark.md) |
+| Specify | doing | |
 | Set up | todo | |
 | Architect | todo | |
 | Plan | todo | |
