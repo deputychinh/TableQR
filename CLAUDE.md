@@ -13,7 +13,7 @@ Skills read these keys; a key left out falls back to the default in the skills R
 - backend default: Node (TypeScript)
 - mobile: web only (responsive, iPad + phone first); no native apps
 - autonomy: decide-and-record — ask only what nobody else can answer (secrets, money, legal, irreversible or outward-facing actions)
-- push policy: push every green commit when a remote exists (no remote yet)
+- push policy: push every green commit to `origin` (https://github.com/deputychinh/TableQR)
 - review gate: independent review, ship at ≥ 9/10 with requirements fit = 1 and security ≥ 0.5, at most 3 improve rounds
 - deploy target: local only (until the owner names one)
 - tenancy: multi-tenant — each restaurant self-registers, own data and own operating rules (house rules)
@@ -37,7 +37,7 @@ make install   # dependencies
 make dev       # infra, migrations, API and web together
 make lint      # format check + lint + typecheck for every part
 make test      # unit + API/component tests with coverage
-make ci        # = lint + test, exactly what CI runs
+make ci        # = lint + test + script tests + e2e + bundle budget, exactly what CI runs
 ```
 
 Use the Makefile target rather than calling npm or uv directly, unless you are debugging that target:

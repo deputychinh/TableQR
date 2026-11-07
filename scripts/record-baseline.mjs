@@ -1,21 +1,31 @@
-// Merges benchmarks/results/*.json into benchmarks/baseline.json with machine, date and commit.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+// Merges passing, fresh benchmarks/results/*.json into benchmarks/baseline.json (run from anywhere).
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
+import { selectResults } from './baseline-lib.mjs';
 
-const read = (path) => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : undefined);
-const results = ['api', 'web', 'bundle']
-  .map((name) => read(`benchmarks/results/${name}.json`))
-  .filter(Boolean);
-if (results.length === 0) {
-  console.error('record-baseline: no results — run `make bench` and `make lighthouse` first');
+const root = new URL('..', import.meta.url).pathname;
+const resultsDir = `${root}benchmarks/results/`;
+const entries = ['api', 'web', 'bundle'].map((name) => {
+  const path = `${resultsDir}${name}.json`;
+  return existsSync(path)
+    ? { name, result: JSON.parse(readFileSync(path, 'utf8')), mtimeMs: statSync(path).mtimeMs }
+    : { name, result: undefined, mtimeMs: 0 };
+});
+const { accepted, rejected } = selectResults(entries, Date.now());
+if (rejected.length > 0 || accepted.length === 0) {
+  console.error(
+    `record-baseline: refused — ${rejected.join('; ') || 'no results; run make bench, make budget, make lighthouse'}`,
+  );
   process.exit(1);
 }
+const git = (...args) => execFileSync('git', args, { cwd: root }).toString().trim();
 const baseline = {
   recorded_at: new Date().toISOString(),
-  commit: execFileSync('git', ['rev-parse', '--short', 'HEAD']).toString().trim(),
+  commit: git('rev-parse', '--short', 'HEAD'),
+  dirty_tree: git('status', '--porcelain').length > 0,
   machine: `${os.cpus()[0]?.model ?? 'cpu'} × ${os.cpus().length}, ${Math.round(os.totalmem() / 2 ** 30)} GB, ${os.type()} ${os.release()}`,
-  workloads: Object.fromEntries(results.map((r) => [r.workload, r])),
+  workloads: Object.fromEntries(accepted.map((r) => [r.workload, r])),
 };
-writeFileSync('benchmarks/baseline.json', `${JSON.stringify(baseline, null, 2)}\n`);
+writeFileSync(`${root}benchmarks/baseline.json`, `${JSON.stringify(baseline, null, 2)}\n`);
 console.log(JSON.stringify(baseline, null, 2));

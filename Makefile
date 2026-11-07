@@ -1,7 +1,7 @@
 # TableQR — one command per task. `make help` lists them.
 # Node API (NestJS + Vitest + Drizzle) in services/api and a Vite + Vue web app in web/.
 .DEFAULT_GOAL := help
-.PHONY: help install dev up down api web migrate lint format test e2e bench budget lighthouse baseline ci
+.PHONY: help install dev up down api web migrate lint format test e2e bench budget lighthouse baseline test-scripts ci
 SHELL := /bin/bash
 API := cd services/api &&
 WEB := cd web &&
@@ -71,4 +71,7 @@ lighthouse: ## Lighthouse (mobile, slow 4G) on the preview build; fails when LCP
 baseline: ## Record benchmarks/results/*.json into benchmarks/baseline.json (run bench, budget, lighthouse first)
 	node scripts/record-baseline.mjs
 
-ci: lint test e2e budget ## Everything CI runs
+test-scripts: ## Unit tests of the repo scripts (node:test)
+	node --test scripts/
+
+ci: lint test test-scripts e2e budget ## Everything CI runs

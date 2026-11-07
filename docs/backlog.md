@@ -7,7 +7,7 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-001 | Walking skeleton                                             | done   |
 | TQR-002 | Same-origin `/api`, RFC 9457 errors, redacted request logs   | done   |
 | TQR-003 | Benchmark harness + baseline                                 | doing  |
-| TQR-004 | Restaurant sign-up, staff sign-in/out, sessions, throttling  | todo   |
+| TQR-004 | Restaurant sign-up, staff sign-in/out, sessions, throttling  | doing  |
 | TQR-005 | Staff accounts and role guard                                | todo   |
 | TQR-006 | Menu: stations, categories, items, availability              | todo   |
 | TQR-007 | Tables, QR tokens, printable QR sheet, rotation              | todo   |

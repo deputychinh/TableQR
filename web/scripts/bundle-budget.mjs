@@ -5,7 +5,15 @@ import { join } from 'node:path';
 
 const BUDGET_KB = Number(process.env.JS_BUDGET_KB ?? 150);
 const dist = new URL('../dist/', import.meta.url).pathname;
-const manifest = JSON.parse(readFileSync(join(dist, '.vite/manifest.json'), 'utf8'));
+let manifest;
+try {
+  manifest = JSON.parse(readFileSync(join(dist, '.vite/manifest.json'), 'utf8'));
+} catch {
+  console.error(
+    'bundle-budget: dist/.vite/manifest.json not found — run `npm run build-only` first',
+  );
+  process.exit(2);
+}
 
 const entryKey = Object.keys(manifest).find((key) => manifest[key].isEntry);
 if (!entryKey) {
@@ -31,7 +39,12 @@ mkdirSync(results, { recursive: true });
 writeFileSync(
   `${results}bundle.json`,
   JSON.stringify(
-    { workload: 'guest-initial-js', js_gzip_kb: Number(gzipKb.toFixed(1)), budget_kb: BUDGET_KB },
+    {
+      workload: 'guest-initial-js',
+      passed: gzipKb <= BUDGET_KB,
+      js_gzip_kb: Number(gzipKb.toFixed(1)),
+      budget_kb: BUDGET_KB,
+    },
     null,
     2,
   ),
