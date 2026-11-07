@@ -2,14 +2,14 @@ import type { RouteRecordRaw } from 'vue-router';
 
 const page = () => import('./RoleHomePage.vue');
 
-/** Role homes (AC14); TQR-014/015/019 replace these placeholders with the real screens. */
+/** Role homes (AC14); TQR-014/015 replace these placeholders with the real screens. */
 export const rolesRoutes: RouteRecordRaw[] = [
   {
+    // Cashier screen (TQR-019); the owner may confirm payments too.
     path: '/thu-ngan',
     name: 'cashier-home',
-    component: page,
-    props: { role: 'cashier' },
-    meta: { staff: true, roles: ['cashier'], title: 'Thu ngân' },
+    component: () => import('@/features/billing/pages/CashierPage.vue'),
+    meta: { staff: true, roles: ['cashier', 'owner'], title: 'Thu ngân' },
   },
   {
     path: '/phuc-vu',

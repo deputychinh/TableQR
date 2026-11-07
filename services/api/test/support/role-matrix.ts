@@ -21,6 +21,13 @@ export interface MatrixFixture {
   tableId: string;
   /** A table the owner's DELETE row may remove. */
   spareTableId: string;
+  /** An open session with an open bill (TQR-018). */
+  sessionId: string;
+  billId: string;
+  /** A fresh open bill per call (paying twice would answer 409). */
+  payableBillId: () => string;
+  /** A fresh open, paid-up session per call (closing twice would answer 409). */
+  closableSessionId: () => string;
 }
 
 export interface MatrixRow {
@@ -40,6 +47,7 @@ export const ALL_ROLES: readonly MatrixRole[] = [
 const OWNER = ['owner'] as const;
 const ADMIN = ['platform_admin'] as const;
 const FLOOR = ['owner', 'cashier', 'waiter'] as const;
+const CASHIER = ['owner', 'cashier'] as const;
 const RESTAURANT = ['owner', 'cashier', 'waiter', 'kitchen'] as const;
 const BANK = { bin: '970436', accountNumber: '0123456789', accountName: 'Nguyễn Văn Ánh' };
 
@@ -98,6 +106,28 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
   },
   { method: 'post', path: (f) => `/api/tables/${f.tableId}/rotate-qr`, allowed: OWNER },
   { method: 'delete', path: (f) => `/api/tables/${f.spareTableId}`, allowed: OWNER },
+  // billing (TQR-018/019)
+  { method: 'get', path: () => '/api/bills/overview', allowed: CASHIER },
+  { method: 'get', path: (f) => `/api/bills/${f.billId}`, allowed: CASHIER },
+  {
+    method: 'post',
+    path: () => '/api/bills',
+    allowed: FLOOR,
+    body: (f) => ({ sessionId: f.sessionId }),
+  },
+  { method: 'get', path: (f) => `/api/sessions/${f.sessionId}/bill`, allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/bills/${f.payableBillId()}/pay`,
+    allowed: CASHIER,
+    body: () => ({ method: 'cash' }),
+  },
+  {
+    method: 'post',
+    path: (f) => `/api/sessions/${f.closableSessionId()}/close`,
+    allowed: CASHIER,
+    body: () => ({}),
+  },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {

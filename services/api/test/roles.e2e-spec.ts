@@ -1,5 +1,7 @@
 import request from 'supertest';
+import { DB } from '../src/db/database.module.js';
 import { createTestApp, type TestApp } from './support/app.js';
+import { addOrder, openSession, seedMenu, type SessionFixture } from './support/floor.js';
 import { ORIGIN, signUp } from './support/http.js';
 import {
   ALL_ROLES,
@@ -40,7 +42,37 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
           .send({ name, seats: 4 })
           .expect(201)
       ).body.id as string;
+    const db = t.app.get(DB);
+    const floor = await seedMenu(db, owner.response.body.restaurant.id as string);
+    const billFor = async (session: SessionFixture) => {
+      await addOrder(db, floor, session, 'released', [{ priceVnd: 10_000, quantity: 1 }]);
+      return (
+        await request(t.app.getHttpServer())
+          .post('/api/bills')
+          .set('origin', ORIGIN)
+          .set('cookie', owner.cookie)
+          .send({ sessionId: session.sessionId })
+          .expect(200)
+      ).body.bill.id as string;
+    };
+    const billed = await openSession(db, floor);
+    const billId = await billFor(billed);
+    // One per role (each case calls the path once), cycled for the 401 sweep.
+    const payable = await Promise.all(
+      ALL_ROLES.map(async () => billFor(await openSession(db, floor))),
+    );
+    const closable = await Promise.all(
+      ALL_ROLES.map(async () => (await openSession(db, floor)).sessionId),
+    );
+    const cycle = (ids: string[]) => {
+      let next = 0;
+      return () => ids[next++ % ids.length] ?? '';
+    };
     fixture = {
+      sessionId: billed.sessionId,
+      billId,
+      payableBillId: cycle(payable),
+      closableSessionId: cycle(closable),
       staffId: target.member.id,
       spareRestaurantId: spare.response.body.restaurant.id as string,
       email: () => uniqueEmail('matrix'),
@@ -59,6 +91,10 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     email: () => 'new@example.com',
     tableId: ':tableId',
     spareTableId: ':spareTableId',
+    sessionId: ':sessionId',
+    billId: ':billId',
+    payableBillId: () => ':billId',
+    closableSessionId: () => ':sessionId',
   };
   const cases = ROLE_MATRIX.flatMap((row) =>
     ALL_ROLES.map((role) => ({ row, role, allowed: row.allowed.includes(role) })),
