@@ -19,6 +19,11 @@ export interface StreamOptions<S> {
   snapshot: () => Promise<S>;
   audience: StreamAudience;
   heartbeatMs?: number;
+  /**
+   * Aborted when the server shuts down (TQR-032): the stream says `bye` and ends, so closing the
+   * HTTP server never waits for a browser (or a proxy) that keeps the connection open.
+   */
+  stop?: AbortSignal;
   /** Called once when the stream closes for any reason. */
   onClose?: () => void;
   /**
@@ -29,11 +34,14 @@ export interface StreamOptions<S> {
 }
 
 /**
- * Opens an SSE stream: `snapshot` first, then `delta` events for the subscribed topics, a heartbeat
- * comment every 15 s, and a fresh snapshot after the hub reconnects. Subscribes before reading the
- * snapshot so no change between the two is lost (the client ignores deltas older than its state).
- * A revocation for the audience, or a heartbeat that finds the session gone, sends `revoked` and
- * ends the response; the browser's reconnect then meets the guard (401/403).
+ * Opens an SSE stream: `snapshot` first, then `delta` events for the subscribed topics, a
+ * `heartbeat` event (`{intervalMs}`) right after the first snapshot and then every `heartbeatMs`
+ * (TQR-031: a named event, because EventSource never surfaces comments, so the client can tell a
+ * silently dead stream from a quiet one), and a fresh snapshot after the hub reconnects. Subscribes
+ * before reading the snapshot so no change between the two is lost (the client ignores deltas older
+ * than its state). A revocation for the audience, or a heartbeat that finds the session gone, sends
+ * `revoked` and ends the response; the browser's reconnect then meets the guard (401/403). Server
+ * shutdown (`stop`) sends `bye` and ends it (TQR-032).
  */
 export const openStream = async <S>(
   hub: RealtimeHub,
@@ -67,14 +75,27 @@ export const openStream = async <S>(
     if (closed) return;
     closed = true;
     clearInterval(heartbeat);
+    options.stop?.removeEventListener('abort', bye);
     unsubscribe();
     options.onClose?.();
   };
-  const end = () => {
+  const end = (event: 'revoked' | 'bye' = 'revoked') => {
     if (closed) return;
-    write(formatSse('revoked', {}));
+    write(formatSse(event, {}));
     close();
     response.end();
+  };
+  const bye = () => {
+    end('bye');
+  };
+  if (options.stop?.aborted) {
+    bye();
+    return;
+  }
+  options.stop?.addEventListener('abort', bye, { once: true });
+  const heartbeatMs = options.heartbeatMs ?? HEARTBEAT_MS;
+  const beat = () => {
+    write(formatSse('heartbeat', { intervalMs: heartbeatMs }));
   };
 
   unsubscribe = hub.subscribe(
@@ -93,15 +114,16 @@ export const openStream = async <S>(
     options.audience.userId,
   );
   heartbeat = setInterval(() => {
-    write(': ping\n\n');
+    beat();
     options.audience.isStillAllowed().then(
       (allowed) => {
         if (!allowed) end();
       },
       (error: unknown) => options.onError?.('session_check', error),
     );
-  }, options.heartbeatMs ?? HEARTBEAT_MS);
+  }, heartbeatMs);
   request.on('close', close);
   response.on('close', close);
   await sendSnapshot();
+  beat();
 };

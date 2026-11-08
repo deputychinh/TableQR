@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type BeforeApplicationShutdown } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AppLogger } from '../common/logging/app-logger.js';
 import { DomainError } from '../common/errors/domain.error.js';
@@ -44,9 +44,11 @@ interface Audience {
  * suspension), snapshot failures logged without content.
  */
 @Injectable()
-export class StreamGate {
+export class StreamGate implements BeforeApplicationShutdown {
   private readonly perKey = new Map<string, number>();
   private readonly perRestaurant = new Map<string, number>();
+  /** Aborted on shutdown: every open stream says `bye` and ends (TQR-032). */
+  private readonly shutdown = new AbortController();
 
   constructor(
     private readonly hub: RealtimeHub,
@@ -54,6 +56,15 @@ export class StreamGate {
     private readonly logger: AppLogger,
     @Inject(SETTINGS) private readonly settings: Settings,
   ) {}
+
+  /**
+   * Runs before Nest closes the HTTP server, which would otherwise wait for every open stream
+   * (`nest --watch` restarts and SIGTERM hung while a browser or proxy held one). A stream that
+   * opens after this ends at once with `bye`.
+   */
+  beforeApplicationShutdown(): void {
+    this.shutdown.abort();
+  }
 
   /** A staff stream: tenant from the session; ends when the person's access ends. */
   open<S>(
@@ -124,6 +135,7 @@ export class StreamGate {
       topics: options.topics,
       snapshot: options.snapshot,
       heartbeatMs: this.settings.TQR_SSE_HEARTBEAT_MS,
+      stop: this.shutdown.signal,
       audience: { userId: audience.userId, isStillAllowed: audience.isStillAllowed },
       onClose: () => {
         decrement(this.perKey, key);

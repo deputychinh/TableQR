@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { eq, sql } from 'drizzle-orm';
 import request from 'supertest';
@@ -184,6 +185,22 @@ describe('TQR-029 QR payment is a per-restaurant option, default off (e2e, real 
       new URL('../drizzle/0009_qr_payment_option.sql', import.meta.url),
       'utf8',
     );
+
+    it('Q11 is in the journal and was applied by runMigrations (a dropped journal entry fails)', async () => {
+      const journal = JSON.parse(
+        readFileSync(new URL('../drizzle/meta/_journal.json', import.meta.url), 'utf8'),
+      ) as { entries: { tag: string; when: number }[] };
+      const entry = journal.entries.find((e) => e.tag === '0009_qr_payment_option');
+      expect(entry).toBeDefined();
+      // The e2e database was built by `runMigrations` (global setup): drizzle records each applied
+      // file by the SHA-256 of its SQL and the journal's `when`.
+      const hash = createHash('sha256').update(migration).digest('hex');
+      const applied = await db.execute<{ hash: string; created_at: string }>(
+        sql`select hash, created_at from drizzle.__drizzle_migrations where hash = ${hash}`,
+      );
+      expect(applied.rows).toHaveLength(1);
+      expect(Number(applied.rows[0]?.created_at)).toBe(entry?.when);
+    });
 
     it('sets qrEnabled where an account exists, leaves the others and the rules version alone', async () => {
       const withBank = await restaurant();
