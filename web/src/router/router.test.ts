@@ -102,10 +102,10 @@ describe('sessionGuard', () => {
     setUnauthorizedHandler(undefined);
   });
 
-  it('keeps main’s routes right: guest table page public, tables readable by floor staff', () => {
+  it('keeps main’s routes right: guest table page public, tables readable and printable by floor staff', () => {
     expect(router.resolve('/t/some-token').meta.staff).toBeUndefined();
     expect(router.resolve('/quan-ly/ban').meta.roles).toEqual(['owner', 'cashier', 'waiter']);
-    expect(router.resolve('/quan-ly/ban/in').meta.roles).toEqual(['owner']);
+    expect(router.resolve('/quan-ly/ban/in').meta.roles).toEqual(['owner', 'cashier', 'waiter']);
     expect(router.resolve('/quan-ly/cai-dat').meta.roles).toEqual(['owner']);
     expect(router.resolve('/quan-ly/nhan-vien').meta.roles).toEqual(['owner']);
   });

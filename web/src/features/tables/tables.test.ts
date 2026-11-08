@@ -222,7 +222,15 @@ describe('tables page', () => {
 
   it('waiters see and print tables but cannot add, edit, regenerate or delete', async () => {
     fakeApi({ 'GET /api/tables': () => jsonResponse({ items: [table()] }) });
-    const { router } = await renderTables('waiter');
+    // The real route table and guard: the print sheet must really be open to a waiter (D5).
+    const { router } = await renderWithApp(TablesPage, {
+      guarded: true,
+      at: '/quan-ly/ban',
+      me: {
+        user: { id: 'u', email: 'e@x.vn', role: 'waiter', displayName: '' },
+        restaurant: { id: 'r', name: 'Quán Ngon', slug: 'quan-ngon' },
+      },
+    });
     await screen.findByRole('heading', { name: 'Bàn 1' });
     expect(screen.queryByRole('button', { name: 'Thêm bàn' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Sửa Bàn 1' })).toBeNull();
