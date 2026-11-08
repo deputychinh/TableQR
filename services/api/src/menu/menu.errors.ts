@@ -10,6 +10,7 @@ export enum MenuErrorCode {
   StationLimitReached = 'STATION_LIMIT_REACHED',
   CategoryLimitReached = 'CATEGORY_LIMIT_REACHED',
   ItemLimitReached = 'ITEM_LIMIT_REACHED',
+  ItemHasOrders = 'ITEM_HAS_ORDERS',
 }
 
 export const notFound = (): DomainError => new DomainError(ErrorCode.NotFound, 404);
@@ -28,6 +29,12 @@ export const categoryNotEmpty = (): DomainError =>
 export const stationNotEmpty = (): DomainError =>
   new DomainError(MenuErrorCode.StationNotEmpty, 409, {
     detail: 'Khu bếp này còn món. Hãy chuyển các món sang khu khác trước.',
+  });
+
+/** Guests' orders and bills keep pointing at the dish, so it is retired instead (TQR-006 review). */
+export const itemHasOrders = (): DomainError =>
+  new DomainError(MenuErrorCode.ItemHasOrders, 409, {
+    detail: 'Món này đã có khách gọi nên không xoá được. Hãy chọn "Ngừng bán" để ẩn khỏi thực đơn.',
   });
 
 export const lastStation = (): DomainError =>

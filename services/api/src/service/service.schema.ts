@@ -47,7 +47,7 @@ export const tableSessions = pgTable(
       name: 'table_sessions_table_fk',
       columns: [t.restaurantId, t.tableId],
       foreignColumns: [diningTables.restaurantId, diningTables.id],
-    }).onDelete('cascade'),
+    }).onDelete('no action'),
     // AC17/AC18: at most one open session per table.
     uniqueIndex('table_sessions_one_open_per_table')
       .on(t.tableId)

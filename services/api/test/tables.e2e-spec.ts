@@ -1,7 +1,15 @@
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { DB, type Database } from '../src/db/database.module.js';
-import { diningTables, restaurants, retiredQrTokens, users } from '../src/db/schema.js';
+import {
+  bills,
+  bookings,
+  diningTables,
+  restaurants,
+  retiredQrTokens,
+  tableSessions,
+  users,
+} from '../src/db/schema.js';
 import { hashPassword } from '../src/identity/domain/password.js';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, cookieOf, newOwner, signUp } from './support/http.js';
@@ -233,6 +241,85 @@ describe('tables and QR codes (e2e)', () => {
         .expect(404);
       const response = await guest(table.qrToken).expect(404);
       expect(response.body.code).toBe('TABLE_NOT_FOUND');
+    });
+
+    const remove = (cookie: string, id: string) =>
+      http().delete(`/api/tables/${id}`).set('origin', ORIGIN).set('cookie', cookie);
+
+    it('refuses to delete a table with a paid bill (TABLE_HAS_HISTORY) and keeps the bill', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      const [session] = await db
+        .insert(tableSessions)
+        .values({
+          restaurantId: a.restaurantId,
+          tableId: table.id,
+          partySize: 2,
+          openedBy: 'staff',
+          status: 'closed',
+          closedAt: new Date(),
+        })
+        .returning({ id: tableSessions.id });
+      const sessionId = session?.id ?? '';
+      await db.insert(bills).values({
+        restaurantId: a.restaurantId,
+        sessionId,
+        code: 'AB12C',
+        amountVnd: 120_000,
+        status: 'paid',
+        paidAt: new Date(),
+        method: 'cash',
+      });
+      const response = await remove(a.cookie, table.id).expect(409);
+      expect(response.body.code).toBe('TABLE_HAS_HISTORY');
+      expect(response.body.detail).toMatch(/lịch sử/);
+      await http().get(`/api/tables/${table.id}`).set('cookie', a.cookie).expect(200);
+      const kept = await db.select().from(bills).where(eq(bills.sessionId, sessionId));
+      expect(kept).toHaveLength(1);
+      await guest(table.qrToken).expect(200);
+    });
+
+    it('refuses to delete a table with an open session', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      await db.insert(tableSessions).values({
+        restaurantId: a.restaurantId,
+        tableId: table.id,
+        partySize: 2,
+        openedBy: 'guest',
+      });
+      const response = await remove(a.cookie, table.id).expect(409);
+      expect(response.body.code).toBe('TABLE_HAS_HISTORY');
+    });
+
+    it('refuses to delete a table with a booking', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      const startsAt = new Date(Date.now() + 86_400_000);
+      await db.insert(bookings).values({
+        restaurantId: a.restaurantId,
+        tableId: table.id,
+        partySize: 2,
+        guestName: 'Lan',
+        guestPhone: '+84901234567',
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 5_400_000),
+        idempotencyKey: `k-${Date.now()}`,
+      });
+      const response = await remove(a.cookie, table.id).expect(409);
+      expect(response.body.code).toBe('TABLE_HAS_HISTORY');
+    });
+
+    it('the database itself refuses to cascade a table delete onto its sessions', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      await db.insert(tableSessions).values({
+        restaurantId: a.restaurantId,
+        tableId: table.id,
+        partySize: 2,
+        openedBy: 'guest',
+      });
+      await expect(db.delete(diningTables).where(eq(diningTables.id, table.id))).rejects.toThrow();
     });
 
     it('answers 404 (not 500) for an id that is not a UUID', async () => {

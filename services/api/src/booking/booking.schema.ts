@@ -55,7 +55,7 @@ export const bookings = pgTable(
       name: 'bookings_table_fk',
       columns: [t.restaurantId, t.tableId],
       foreignColumns: [diningTables.restaurantId, diningTables.id],
-    }).onDelete('cascade'),
+    }).onDelete('no action'),
     // A retried request (same Idempotency-Key) returns the same booking.
     unique('bookings_tenant_idempotency_key').on(t.restaurantId, t.idempotencyKey),
     // Staff day list.
