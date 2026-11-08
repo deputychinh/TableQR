@@ -33,3 +33,6 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-027 | Kitchen voice: read new orders aloud on `/bep` (browser speech, vi-VN)     | review |
 | TQR-028 | Spoken overdue reminders (house rule `kitchen.reminderMinutes`)            | review |
 | TQR-029 | QR payment as a per-restaurant option (default off)                        | review |
+| TQR-030 | Cook voice commands (speech recognition) — deferred, see ADR 0009          | later  |
+| TQR-031 | Client stream liveness: named heartbeat, dead-stream banner and voice      | review |
+| TQR-032 | Graceful API shutdown with open SSE streams (`bye`)                        | review |

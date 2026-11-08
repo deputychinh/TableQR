@@ -17,7 +17,7 @@ Skills read these keys; a key left out falls back to the default in the skills R
 - review gate: independent review, ship at ≥ 9/10 with requirements fit = 1 and security ≥ 0.5, at most 3 improve rounds
 - deploy target: local only (until the owner names one)
 - tenancy: multi-tenant — each restaurant self-registers, own data and own operating rules (house rules)
-- payment: VietQR (EMVCo) per restaurant bank account, staff confirms receipt manually; PayOS/SePay adapter later
+- payment: VietQR (EMVCo) is an optional per-restaurant setting, off by default (pay at the counter); when on, per restaurant bank account, staff confirms receipt manually; PayOS/SePay adapter later (ADR 0008)
 
 ## Sources of truth (read before changing code)
 
@@ -85,5 +85,6 @@ Reply in the language of the delivery profile (default: the language the user wr
 - UI copy is Vietnamese (vue-i18n `vi` locale is the source of truth); code, docs and commits English.
 - Every query is scoped by `restaurantId` from the authenticated staff session or the table token — never from the request body. Cross-tenant access answers 404.
 - Kitchen queue order is by release time (spec glossary); never reorder silently.
+- The kitchen voice is the core feature: the kitchen screen reads new orders and overdue dishes aloud in Vietnamese and says when it lost the server (ADR 0009, ADR 0010); never let it go silent without telling the cook.
 - Current delivery ledger: `docs/delivery/001-qr-table-ordering/status.md`.
 - UI must be easy and friendly, built from one set of patterns (`docs/design-system.md`): same app shell per role, same buttons, lists, forms, status chips and empty/error states everywhere; large touch targets for phones and kitchen iPads; plain Vietnamese copy that tells people what to do next. A new screen reuses these patterns before inventing one.
