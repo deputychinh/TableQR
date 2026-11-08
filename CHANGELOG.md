@@ -21,6 +21,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 - Guest bill page after the kitchen drops dishes (review round 1, TQR-025): when nothing is due any more it shows "Bàn không còn món cần thanh toán" with "Quay lại bàn", live and after a reload (a reload used to show only the title); the change notice no longer says "vì có thêm món" when the amount went down.
 - Seating a booking whose table was hidden after it was made now answers 404 like opening a hidden table; move the booking to a shown table first (review round 1, TQR-024).
 - Tests (review round 1): the tenant-isolation sweep now proves that nothing of the target restaurant changes (row snapshot before and after every intruder call) and a route-coverage guard fails on any staff route that is neither in the role matrix nor excluded with a reason — it found `POST /api/sessions`, order confirm/reject/flag-seen and booking seat/cancel/no-show, now matrix rows (TQR-017); the security-header tests pin the six literal values instead of the constant under test (TQR-022).
+- Tests (review round 1): the bench setup retry is a pure module `bench/lib/retry.mjs` with node tests in `make test-scripts` (TQR-026); the menu journey waits for the availability PUT before reloading (it was flaky).
 
 ## [0.5.0] - 2026-11-08
 

@@ -77,7 +77,7 @@ lighthouse: ## Lighthouse (mobile, slow 4G) on the preview build; fails when LCP
 baseline: ## Record benchmarks/results/*.json into benchmarks/baseline.json (run bench, budget, lighthouse first)
 	node scripts/record-baseline.mjs
 
-test-scripts: ## Unit tests of the repo scripts (node:test)
-	node --test scripts/
+test-scripts: ## Unit tests of the repo scripts and the bench helpers (node:test)
+	node --test scripts/ bench/
 
 ci: lint test test-scripts e2e budget ## Everything CI runs
