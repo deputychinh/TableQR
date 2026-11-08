@@ -8,6 +8,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
+import FormField from '@/components/FormField.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import NumberStepper from '@/components/NumberStepper.vue';
 import RadioCardGroup from '@/components/RadioCardGroup.vue';
@@ -42,6 +43,11 @@ const formError = ref<string>();
 const toast = useToastStore();
 const busy = ref(false);
 const confirmBank = ref(false);
+// Step-up (TQR-023): typed into the bank sheet, sent once with that save, then cleared; never
+// kept in a store or the browser's storage.
+const currentPassword = ref('');
+const passwordError = ref<string>();
+const passwordField = ref<InstanceType<typeof FormField> | null>(null);
 const confirmLeave = ref(false);
 let resolveLeave: ((leave: boolean) => void) | undefined;
 
@@ -124,14 +130,43 @@ const focusFirstInvalid = async () => {
   if (typeof field.scrollIntoView === 'function') field.scrollIntoView({ block: 'center' });
 };
 
-const save = async () => {
+/** Answers of the password check that keep the bank sheet open with the reason under the field. */
+const PASSWORD_ERRORS: Readonly<Record<string, string>> = {
+  REAUTH_FAILED: 'settings.bank.passwordWrong',
+  REAUTH_REQUIRED: 'settings.bank.passwordRequired',
+  LOGIN_BLOCKED: 'settings.bank.passwordBlocked',
+};
+
+const closeBankSheet = () => {
+  confirmBank.value = false;
+  currentPassword.value = '';
+  passwordError.value = undefined;
+};
+
+const save = async (password?: string) => {
   if (!rules.value) return;
   busy.value = true;
   formError.value = undefined;
   try {
-    apply(await saveSettings({ rules: rules.value, bank: newBank.value }));
+    apply(
+      await saveSettings({
+        rules: rules.value,
+        bank: newBank.value,
+        ...(password === undefined ? {} : { currentPassword: password }),
+      }),
+    );
     toast.show(t('settings.saved'));
+    closeBankSheet();
   } catch (error: unknown) {
+    const passwordProblem = error instanceof ApiError ? PASSWORD_ERRORS[error.code] : undefined;
+    if (confirmBank.value && passwordProblem) {
+      currentPassword.value = '';
+      passwordError.value = passwordProblem;
+      await nextTick();
+      passwordField.value?.focus();
+      return;
+    }
+    closeBankSheet();
     if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
       errors.value = Object.fromEntries(error.fields.map((f) => [f.path, messageForPath(f.path)]));
       formError.value = 'settings.fixErrors';
@@ -144,8 +179,18 @@ const save = async () => {
     }
   } finally {
     busy.value = false;
-    confirmBank.value = false;
   }
+};
+
+const confirmBankChange = async () => {
+  if (busy.value) return;
+  if (currentPassword.value === '') {
+    passwordError.value = 'settings.bank.passwordRequired';
+    passwordField.value?.focus();
+    return;
+  }
+  passwordError.value = undefined;
+  await save(currentPassword.value);
 };
 
 const requestSave = async () => {
@@ -157,9 +202,12 @@ const requestSave = async () => {
     return;
   }
   formError.value = undefined;
-  if (bankChanged.value)
-    confirmBank.value = true; // money: confirm with the consequence shown
-  else await save();
+  if (bankChanged.value) {
+    // Money: confirm with the consequence shown and the owner's password (TQR-023).
+    currentPassword.value = '';
+    passwordError.value = undefined;
+    confirmBank.value = true;
+  } else await save();
 };
 
 // Once errors show, re-check as the owner edits so fixed fields stop being red.
@@ -337,8 +385,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
       :cancel-label="t('settings.bank.cancel')"
       :variant="newBank ? 'primary' : 'danger'"
       :busy="busy"
-      @confirm="save"
-      @cancel="confirmBank = false"
+      @confirm="confirmBankChange"
+      @cancel="closeBankSheet"
     >
       <template v-if="newBank">
         <p class="settings-page__confirm-text">{{ t('settings.bank.confirmBody') }}</p>
@@ -348,6 +396,18 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
         </p>
       </template>
       <p v-else class="settings-page__confirm-text">{{ t('settings.bank.confirmRemoveBody') }}</p>
+      <FormField
+        ref="passwordField"
+        v-model="currentPassword"
+        class="settings-page__password"
+        type="password"
+        autocomplete="current-password"
+        required
+        :label="t('settings.bank.password')"
+        :hint="t('settings.bank.passwordHint')"
+        :error="passwordError && t(passwordError)"
+        @keydown.enter.prevent="confirmBankChange"
+      />
     </ConfirmSheet>
 
     <ConfirmSheet
@@ -458,6 +518,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
 
 .settings-page__confirm-text {
   margin: 0 0 var(--space-3);
+}
+
+.settings-page__password {
+  margin-block-start: var(--space-3);
+  color: var(--color-text);
 }
 
 .settings-page__confirm-account {

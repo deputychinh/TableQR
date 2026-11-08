@@ -1,6 +1,19 @@
+import { isIP } from 'node:net';
 import { z } from 'zod';
 
 const MIN_SECRET_LENGTH = 32;
+
+/** Express's named ranges (`trust proxy`), besides plain addresses and CIDR blocks. */
+const PROXY_NAMES = new Set(['loopback', 'linklocal', 'uniquelocal']);
+const CIDR_PATTERN = /^(.+)\/(\d{1,3})$/;
+
+const isProxyEntry = (entry: string): boolean => {
+  if (PROXY_NAMES.has(entry) || isIP(entry) !== 0) return true;
+  const cidr = CIDR_PATTERN.exec(entry);
+  if (!cidr?.[1] || !cidr[2]) return false;
+  const version = isIP(cidr[1]);
+  return version !== 0 && Number(cidr[2]) <= (version === 4 ? 32 : 128);
+};
 
 const settingsSchema = z.object({
   TQR_DATABASE_URL: z.string().url(),
@@ -35,6 +48,26 @@ const settingsSchema = z.object({
   TQR_BOOKINGS_PER_HOUR: z.coerce.number().int().positive().default(10),
   /** SSE heartbeat; each beat also re-checks the stream's session (D4 backstop). */
   TQR_SSE_HEARTBEAT_MS: z.coerce.number().int().min(100).default(15_000),
+  /**
+   * Reverse proxies whose `X-Forwarded-For` is believed (Express `trust proxy`): comma-separated
+   * addresses, CIDR blocks or `loopback` / `linklocal` / `uniquelocal`. Empty (default) = none, so
+   * a client cannot choose its own rate-limit key by sending the header (TQR-022).
+   */
+  TQR_TRUSTED_PROXIES: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    )
+    .pipe(z.array(z.string().refine(isProxyEntry))),
+  /** `Strict-Transport-Security` on every API response; only with HTTPS in front (off locally). */
+  TQR_HSTS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   PORT: z.coerce.number().int().positive().default(3310),
 });
 

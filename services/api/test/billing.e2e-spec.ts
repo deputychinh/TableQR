@@ -16,7 +16,7 @@ import {
   type FloorFixture,
   type SessionFixture,
 } from './support/floor.js';
-import { ORIGIN, signUp } from './support/http.js';
+import { ORIGIN, OWNER_PASSWORD, signUp } from './support/http.js';
 import { openSse, type SseClient } from './support/sse.js';
 import { STAFF_PASSWORD, addStaff, loginCookie } from './support/staff.js';
 
@@ -52,7 +52,7 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
       .put('/api/restaurant/settings')
       .set('origin', ORIGIN)
       .set('cookie', owner)
-      .send({ rules: DEFAULT_RULES, bank })
+      .send({ rules: DEFAULT_RULES, bank, currentPassword: OWNER_PASSWORD })
       .expect(200);
 
   const restaurant = async (withBank: boolean): Promise<Restaurant> => {
@@ -244,7 +244,11 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
         .put('/api/restaurant/settings')
         .set('origin', ORIGIN)
         .set('cookie', r.owner)
-        .send({ rules: { ...DEFAULT_RULES, ...patch }, bank: BANK })
+        .send({
+          rules: { ...DEFAULT_RULES, ...patch },
+          bank: BANK,
+          currentPassword: OWNER_PASSWORD,
+        })
         .expect(200);
       return r;
     };

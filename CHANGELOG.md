@@ -4,6 +4,11 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ## [Unreleased]
 
+### Security
+
+- Production security headers (TQR-022): every API response — problem details and event streams included — sends a deny-all CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `Cross-Origin-Opener-Policy: same-origin` and a `Permissions-Policy` denying camera, microphone and location; `X-Powered-By` is gone; `Strict-Transport-Security` with `TQR_HSTS=true`. The SPA's CSP and headers live in `deploy/security-headers.json`, are sent by `vite preview` and by the new `deploy/nginx.conf.example` (serves `web/dist`, proxies `/api`, SSE-ready), and every browser journey now fails on a CSP violation. New setting `TQR_TRUSTED_PROXIES` (Express `trust proxy`, default none): a client's own `X-Forwarded-For` no longer moves its rate-limit key, while a listed proxy's does.
+- Step-up authentication for the bank account (TQR-023): changing or removing it via `PUT /api/restaurant/settings` needs the owner's current password (`currentPassword`; missing → 422 `REAUTH_REQUIRED`, wrong → 403 `REAUTH_FAILED`), checked with the sign-in scrypt and counted by the same per-email throttle (10 failures / 15 min → 429 `LOGIN_BLOCKED`, for sign-in too); rules-only changes need none. The bank confirm sheet on `/quan-ly/cai-dat` asks "Mật khẩu đăng nhập của bạn", shows a wrong password inline and never keeps it. `ConfirmSheet` now starts in its first form field when it has one.
+
 ## [0.5.0] - 2026-11-08
 
 Release 1 (local only): QR table ordering for many restaurants — sign-up and house rules, menu, tables and printable QR codes, staff roles, guest ordering with anomaly holds, fair kitchen queue, serving, live dish status, VietQR bills with cashier confirmation, online table booking, platform admin.

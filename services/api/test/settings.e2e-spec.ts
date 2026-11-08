@@ -1,10 +1,11 @@
 import request from 'supertest';
 import { DB, type Database } from '../src/db/database.module.js';
-import { users } from '../src/db/schema.js';
+import { and, eq } from 'drizzle-orm';
+import { loginAttempts, users } from '../src/db/schema.js';
 import { hashPassword } from '../src/identity/domain/password.js';
 import { DEFAULT_RULES, type HouseRules } from '../src/settings/domain/house-rules.js';
 import { createTestApp, type TestApp } from './support/app.js';
-import { ORIGIN, cookieOf, signUp } from './support/http.js';
+import { ORIGIN, OWNER_PASSWORD, cookieOf, signUp } from './support/http.js';
 
 const BANK = { bin: '970436', accountNumber: '0123456789', accountName: 'Nguyễn Văn Ánh' };
 
@@ -17,7 +18,14 @@ const rulesWith = (patch: (r: HouseRules) => void): HouseRules => {
 describe('house rules and bank account settings (e2e)', () => {
   let t: TestApp;
   const http = () => request(t.app.getHttpServer());
+  /** Sends the owner's current password unless the body says otherwise (step-up, TQR-023). */
   const put = (cookie: string, body: object) =>
+    http()
+      .put('/api/restaurant/settings')
+      .set('origin', ORIGIN)
+      .set('cookie', cookie)
+      .send({ currentPassword: OWNER_PASSWORD, ...body });
+  const putRaw = (cookie: string, body: object) =>
     http().put('/api/restaurant/settings').set('origin', ORIGIN).set('cookie', cookie).send(body);
 
   /** Staff accounts arrive with TQR-005; until then the test inserts them next to the owner. */
@@ -276,5 +284,138 @@ describe('house rules and bank account settings (e2e)', () => {
     expect(everything).not.toContain('0123456789');
     expect(everything).not.toContain('9876543210');
     expect(everything).not.toContain('NGUYEN');
+  });
+  describe('step-up: the current password guards bank account changes (TQR-023)', () => {
+    const failuresOf = async (email: string) =>
+      (
+        await t.app
+          .get<symbol, Database>(DB)
+          .select()
+          .from(loginAttempts)
+          .where(and(eq(loginAttempts.email, email), eq(loginAttempts.succeeded, false)))
+      ).length;
+    const settingsOf = async (cookie: string) =>
+      (await http().get('/api/restaurant/settings').set('cookie', cookie).expect(200)).body;
+
+    it('a new bank account without the password → 422 REAUTH_REQUIRED; nothing changes', async () => {
+      const { cookie } = await signUp(t);
+      const refused = await putRaw(cookie, { rules: DEFAULT_RULES, bank: BANK }).expect(422);
+      expect(refused.body).toMatchObject({
+        code: 'REAUTH_REQUIRED',
+        fields: [{ path: 'currentPassword', code: 'required' }],
+      });
+      expect(await settingsOf(cookie)).toMatchObject({ bank: null, bankChangedAt: null });
+    });
+
+    it('removing the bank account needs the password too', async () => {
+      const { cookie } = await signUp(t);
+      await put(cookie, { rules: DEFAULT_RULES, bank: BANK }).expect(200);
+      const refused = await putRaw(cookie, { rules: DEFAULT_RULES, bank: null }).expect(422);
+      expect(refused.body.code).toBe('REAUTH_REQUIRED');
+      expect((await settingsOf(cookie)).bank.accountNumber).toBe('0123456789');
+    });
+
+    it('an empty password is a validation error, not a password check', async () => {
+      const { cookie, body } = await signUp(t);
+      const refused = await putRaw(cookie, {
+        rules: DEFAULT_RULES,
+        bank: BANK,
+        currentPassword: '',
+      }).expect(422);
+      expect(refused.body.code).toBe('VALIDATION_FAILED');
+      expect(await failuresOf(body.email)).toBe(0);
+    });
+
+    it('a wrong password → 403 REAUTH_FAILED, counted as a failed sign-in; nothing changes', async () => {
+      const { cookie, body } = await signUp(t);
+      const refused = await putRaw(cookie, {
+        rules: rulesWith((r) => (r.paymentTiming = 'pay_before')),
+        bank: BANK,
+        currentPassword: 'sai-mat-khau-1',
+      }).expect(403);
+      expect(refused.body.code).toBe('REAUTH_FAILED');
+      expect(await failuresOf(body.email)).toBe(1);
+      expect(await settingsOf(cookie)).toMatchObject({
+        rules: DEFAULT_RULES,
+        bank: null,
+        rulesUpdatedAt: null,
+      });
+      // The session is still good: the owner keeps working.
+      await http().get('/api/me').set('cookie', cookie).expect(200);
+    });
+
+    it('the right password → 200; the attempt is recorded as a success', async () => {
+      const { cookie, body } = await signUp(t);
+      const saved = await putRaw(cookie, {
+        rules: DEFAULT_RULES,
+        bank: BANK,
+        currentPassword: OWNER_PASSWORD,
+      }).expect(200);
+      expect(saved.body.bank.accountNumber).toBe('0123456789');
+      expect(await failuresOf(body.email)).toBe(0);
+    });
+
+    it('rules-only changes and re-sending the same account need no password', async () => {
+      const { cookie, body } = await signUp(t);
+      await put(cookie, { rules: DEFAULT_RULES, bank: BANK }).expect(200);
+      const rules = rulesWith((r) => (r.orderApproval = 'none'));
+      const saved = await putRaw(cookie, { rules, bank: BANK }).expect(200);
+      expect(saved.body.rules).toEqual(rules);
+      // No password check ran for the rules-only save.
+      expect(await failuresOf(body.email)).toBe(0);
+    });
+
+    it('10 wrong passwords → 429 LOGIN_BLOCKED, here and at sign-in, even with the right one', async () => {
+      const { cookie, body } = await signUp(t);
+      for (let i = 0; i < 10; i += 1) {
+        await putRaw(cookie, {
+          rules: DEFAULT_RULES,
+          bank: BANK,
+          currentPassword: `sai-mat-khau-${i}`,
+        }).expect(403);
+      }
+      const blocked = await putRaw(cookie, {
+        rules: DEFAULT_RULES,
+        bank: BANK,
+        currentPassword: OWNER_PASSWORD,
+      }).expect(429);
+      expect(blocked.body.code).toBe('LOGIN_BLOCKED');
+      const login = await http()
+        .post('/api/auth/login')
+        .set('origin', ORIGIN)
+        .send({ email: body.email, password: OWNER_PASSWORD })
+        .expect(429);
+      expect(login.body.code).toBe('LOGIN_BLOCKED');
+      expect((await settingsOf(cookie)).bank).toBeNull();
+      // The window passes (AC4: 15 minutes) and the right password works again.
+      t.clock.advance(15 * 60 * 1000 + 1);
+      await put(cookie, { rules: DEFAULT_RULES, bank: BANK }).expect(200);
+    });
+
+    it('wrong sign-ins count against the step-up as well (one throttle per email)', async () => {
+      const { cookie, body } = await signUp(t);
+      for (let i = 0; i < 10; i += 1) {
+        await http()
+          .post('/api/auth/login')
+          .set('origin', ORIGIN)
+          .send({ email: body.email, password: `sai-${i}-mat-khau` })
+          .expect(401);
+      }
+      const blocked = await put(cookie, { rules: DEFAULT_RULES, bank: BANK }).expect(429);
+      expect(blocked.body.code).toBe('LOGIN_BLOCKED');
+    });
+
+    it('the audit line and the logs never hold the password', async () => {
+      const { cookie } = await signUp(t);
+      const before = t.logs.length;
+      await putRaw(cookie, { rules: DEFAULT_RULES, bank: BANK, currentPassword: 'sai-mat-khau-1' });
+      await put(cookie, { rules: DEFAULT_RULES, bank: BANK }).expect(200);
+      const written = t.logs.slice(before);
+      expect(written.filter((entry) => entry.msg === 'bank_account_changed')).toHaveLength(1);
+      const everything = JSON.stringify(written);
+      expect(everything).not.toContain(OWNER_PASSWORD);
+      expect(everything).not.toContain('sai-mat-khau-1');
+      expect(everything).not.toContain('0123456789');
+    });
   });
 });

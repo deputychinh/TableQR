@@ -1,3 +1,4 @@
+import { nextTick } from 'vue';
 import { fireEvent, render, screen, within } from '@testing-library/vue';
 import userEvent from '@testing-library/user-event';
 import { createPinia } from 'pinia';
@@ -69,6 +70,17 @@ const renderRouted = async () => {
   return { router };
 };
 
+const PASSWORD_LABEL = 'Mật khẩu đăng nhập của bạn';
+
+/** Fills a new bank account and opens the confirm sheet. */
+const openBankSheet = async () => {
+  await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970436');
+  await userEvent.type(screen.getByLabelText('Số tài khoản'), '0123456789');
+  await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'An');
+  await userEvent.click(saveButton());
+  return screen.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' });
+};
+
 const saveButton = () => screen.getByRole('button', { name: 'Lưu thay đổi' }) as HTMLButtonElement;
 
 describe('SettingsPage', () => {
@@ -125,6 +137,8 @@ describe('SettingsPage', () => {
       },
       bank: null,
     });
+    // Rules only: no password asked, none sent (TQR-023).
+    expect(put?.body).not.toHaveProperty('currentPassword');
     expect(await screen.findByText(/Đã lưu/)).toBeTruthy();
     expect(saveButton().disabled).toBe(true);
   });
@@ -151,9 +165,11 @@ describe('SettingsPage', () => {
     const sheet = screen.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' });
     expect(within(sheet).getByText(/NGUYEN VAN ANH/)).toBeTruthy();
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+    await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Đúng, lưu tài khoản này' }));
     expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({
       bank: { bin: '970436', accountNumber: '0123456789', accountName: 'NGUYEN VAN ANH' },
+      currentPassword: 'mat-khau-dai-123',
     });
     expect(await screen.findByText(/Tài khoản đổi lần cuối lúc/)).toBeTruthy();
   });
@@ -191,8 +207,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByLabelText('Số tài khoản')).toBeNull();
     await userEvent.click(saveButton());
     const sheet = screen.getByRole('dialog', { name: 'Bỏ tài khoản nhận tiền?' });
+    await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Bỏ tài khoản' }));
-    expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({ bank: null });
+    expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({
+      bank: null,
+      currentPassword: 'mat-khau-dai-123',
+    });
   });
 
   it('checks the form before sending and focuses the first wrong field', async () => {
@@ -313,5 +333,101 @@ describe('SettingsPage', () => {
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
     expect(await screen.findByRole('heading', { name: 'Thanh toán' })).toBeTruthy();
+  });
+  describe('the bank sheet asks for the owner’s password (TQR-023)', () => {
+    const confirmIn = (sheet: HTMLElement) =>
+      within(sheet).getByRole('button', { name: 'Đúng, lưu tài khoản này' });
+
+    it('is a password field for the current password, focused when the sheet opens', async () => {
+      stubApi(ownerSettings());
+      await renderPage();
+      const sheet = await openBankSheet();
+      const field = within(sheet).getByLabelText(PASSWORD_LABEL) as HTMLInputElement;
+      expect(field.type).toBe('password');
+      expect(field.autocomplete).toBe('current-password');
+      expect(within(sheet).getByText(/chính chủ quán/)).toBeTruthy();
+      await nextTick();
+      expect(document.activeElement).toBe(field);
+    });
+
+    it('an empty password is refused on the spot, nothing is sent', async () => {
+      const calls = stubApi(ownerSettings());
+      await renderPage();
+      const sheet = await openBankSheet();
+      await userEvent.click(confirmIn(sheet));
+      expect(within(sheet).getByText('Nhập mật khẩu để xác nhận.')).toBeTruthy();
+      const field = within(sheet).getByLabelText(PASSWORD_LABEL);
+      expect(field.getAttribute('aria-invalid')).toBe('true');
+      expect(document.activeElement).toBe(field);
+      expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+    });
+
+    it('a wrong password shows inline, keeps the sheet open and empties the field', async () => {
+      const calls = stubApi(ownerSettings(), () => jsonResponse({ code: 'REAUTH_FAILED' }, 403));
+      await renderPage();
+      const sheet = await openBankSheet();
+      const field = within(sheet).getByLabelText(PASSWORD_LABEL) as HTMLInputElement;
+      await userEvent.type(field, 'sai-mat-khau{Enter}');
+      expect(
+        await within(sheet).findByText('Mật khẩu không đúng. Kiểm tra lại rồi thử lần nữa.'),
+      ).toBeTruthy();
+      expect(screen.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' })).toBe(sheet);
+      expect(field.value).toBe('');
+      expect(document.activeElement).toBe(field);
+      expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+      expect(screen.getByText(/Bạn có thay đổi chưa lưu/)).toBeTruthy();
+    });
+
+    it('too many wrong passwords says to wait 15 minutes', async () => {
+      stubApi(ownerSettings(), () => jsonResponse({ code: 'LOGIN_BLOCKED' }, 429));
+      await renderPage();
+      const sheet = await openBankSheet();
+      await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
+      await userEvent.click(confirmIn(sheet));
+      expect(await within(sheet).findByText(/Hãy thử lại sau 15 phút/)).toBeTruthy();
+    });
+
+    it('the server asking for the password again shows the same inline message', async () => {
+      stubApi(ownerSettings(), () =>
+        jsonResponse(
+          { code: 'REAUTH_REQUIRED', fields: [{ path: 'currentPassword', code: 'required' }] },
+          422,
+        ),
+      );
+      await renderPage();
+      const sheet = await openBankSheet();
+      await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'x');
+      await userEvent.click(confirmIn(sheet));
+      expect(await within(sheet).findByText('Nhập mật khẩu để xác nhận.')).toBeTruthy();
+    });
+
+    it('the password is never kept: not after cancel, not after saving, not in storage', async () => {
+      stubApi(ownerSettings());
+      await renderPage();
+      let sheet = await openBankSheet();
+      await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Huỷ' }));
+      await userEvent.click(saveButton());
+      sheet = screen.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' });
+      const field = within(sheet).getByLabelText(PASSWORD_LABEL) as HTMLInputElement;
+      expect(field.value).toBe('');
+      await userEvent.type(field, 'mat-khau-dai-123');
+      await userEvent.click(confirmIn(sheet));
+      expect(await screen.findByText(/Đã lưu/)).toBeTruthy();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(JSON.stringify({ ...localStorage })).not.toContain('mat-khau');
+      expect(JSON.stringify({ ...sessionStorage })).not.toContain('mat-khau');
+      expect(document.body.innerHTML).not.toContain('mat-khau');
+    });
+
+    it('a failure other than the password closes the sheet and says so', async () => {
+      stubApi(ownerSettings(), () => jsonResponse({ code: 'INTERNAL' }, 500));
+      await renderPage();
+      const sheet = await openBankSheet();
+      await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
+      await userEvent.click(confirmIn(sheet));
+      expect(await screen.findByText('Có lỗi xảy ra. Vui lòng thử lại.')).toBeTruthy();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
   });
 });

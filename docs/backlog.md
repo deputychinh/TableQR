@@ -25,8 +25,8 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-019 | Cashier confirm, close session, pay-before-cooking                         | done   |
 | TQR-020 | Guest table booking (exclusion constraint)                                 | done   |
 | TQR-021 | Staff booking list: confirm, seat, cancel, late                            | done   |
-| TQR-022 | Production security headers and X-Powered-By removal (before first deploy) | todo   |
-| TQR-023 | Step-up auth (current password) for bank account changes                   | todo   |
+| TQR-022 | Production security headers and X-Powered-By removal (before first deploy) | review |
+| TQR-023 | Step-up auth (current password) for bank account changes                   | review |
 | TQR-024 | Archive ("Ẩn bàn") tables with history                                     | todo   |
 | TQR-025 | Re-sync the open bill when the kitchen cancels an item                     | todo   |
 | TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | todo   |
