@@ -1,7 +1,7 @@
 # TableQR — one command per task. `make help` lists them.
 # Node API (NestJS + Vitest + Drizzle) in services/api and a Vite + Vue web app in web/.
 .DEFAULT_GOAL := help
-.PHONY: help install dev up down api web migrate lint format test e2e bench budget lighthouse baseline test-scripts ci
+.PHONY: help install dev up down api web migrate lint format test e2e bench budget lighthouse baseline test-scripts ci demo-video
 SHELL := /bin/bash
 API := cd services/api &&
 WEB := cd web &&
@@ -79,5 +79,9 @@ baseline: ## Record benchmarks/results/*.json into benchmarks/baseline.json (run
 
 test-scripts: ## Unit tests of the repo scripts and the bench helpers (node:test)
 	node --test scripts/ bench/
+
+demo-video: ## Re-record the Vietnamese phone demo video against the running dev server (make dev); see README
+	node scripts/demo-video/record.mjs
+	node scripts/demo-video/compose.mjs
 
 ci: lint test test-scripts e2e budget ## Everything CI runs

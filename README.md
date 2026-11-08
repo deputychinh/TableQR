@@ -32,6 +32,12 @@ The platform admin (suspends abusive restaurants at `/quan-tri`) has no sign-up 
 
 Results of release 1: [docs/delivery/001-qr-table-ordering/demo.md](docs/delivery/001-qr-table-ordering/demo.md).
 
+## Demo video
+
+`make demo-video` records a ~3-minute Vietnamese demo for restaurant owners, shown on a phone (sign-up, menu, tables and QR, settings, a kitchen account, a guest ordering at Bàn 1, the kitchen reading the order aloud and its 10-minute reminder, serving, paying at the counter). It needs the dev server running (`make dev`; or set `DEMO_BASE_URL`), macOS (`say -v Linh` voices the narration and the kitchen's spoken sentences) and ffmpeg. Each run signs up a new invented restaurant ("Bún Chả Hương Liên", `demo-…@example.com`).
+
+Output in `docs/delivery/001-qr-table-ordering/video/` (`DEMO_OUT` to change): `tableqr-demo-dien-thoai.mp4` (1080×1920, H.264 + AAC; not committed), `cover.jpg` and `tableqr-demo-dien-thoai.srt`. Scratch files go to `$TMPDIR/tableqr-demo-video` (`DEMO_WORK`). The scenes and actions live in `scripts/demo-video/record.mjs`, the narration words in `scripts/demo-video/narration.mjs`, the frame, cards and audio mix in `scripts/demo-video/compose.mjs`; after a UI change, fix the locator that failed (the run saves `failed-<phone>.png` in the work folder) and run it again.
+
 ## Architecture
 
 ```mermaid
