@@ -78,6 +78,8 @@ export const test = base.extend<{ noHorizontalScroll: undefined }>({
         // about:blank (before the first goto) has a 980 px layout and is not an app screen.
         if (page.isClosed() || !page.url().startsWith('http')) return;
         try {
+          // Print emulation lays out an A4 sheet on purpose; only screen layouts must fit the phone.
+          if (await page.evaluate(() => window.matchMedia('print').matches)) return;
           const path = new URL(page.url()).pathname;
           for (const found of await page.evaluate(measure, viewportWidth(page))) {
             if (!seen.some((s) => s.path === path && s.what === found.what)) {

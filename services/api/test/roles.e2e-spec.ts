@@ -42,6 +42,8 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
   let base: string;
   const cookies = new Map<MatrixRole, string>();
   let fixture: MatrixFixture;
+  /** Owner of another restaurant: must never reach the fixture restaurant's rows (TQR-017). */
+  let intruderCookie = '';
 
   beforeAll(async () => {
     t = await createTestApp({ imports: [IdentityModule], controllers: [NoRolesController] });
@@ -55,6 +57,7 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
       cookies.set(role, await loginCookie(t, body.email, STAFF_PASSWORD));
     }
     cookies.set('platform_admin', (await platformAdminCookie(t)).cookie);
+    intruderCookie = (await signUp(t)).cookie;
     const target = await addStaff(t, owner.cookie, 'waiter');
     const spare = await signUp(t);
     const table = async (name: string) =>
@@ -233,6 +236,39 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
         expect(response.status).toBe(403);
         expect(response.body.code).toBe('FORBIDDEN');
       }
+    },
+  );
+
+  /** Rows that name a row of the fixture restaurant, in the path or in the body (ids are ':…'). */
+  const referencesFixtureRow = (row: (typeof ROLE_MATRIX)[number]): boolean =>
+    row.path(placeholders).includes('/:') ||
+    // A placeholder id value serialises as `"key":":placeholder"`.
+    (row.body !== undefined && JSON.stringify(row.body(placeholders)).includes('":":'));
+  const isolationCases = ROLE_MATRIX.filter(
+    (row) => row.allowed.includes('owner') && referencesFixtureRow(row),
+  );
+
+  it('TQR-017 has id-bearing rows to sweep', () => {
+    expect(isolationCases.length).toBeGreaterThan(20);
+  });
+
+  it.each(isolationCases.map((row) => [row.method.toUpperCase(), row.path(placeholders), row]))(
+    'TQR-017 tenant isolation: %s %s as the owner of another restaurant → 404',
+    async (_method, _path, row) => {
+      if (row.stream) {
+        const { status } = await streamStatus(row.path(fixture), intruderCookie);
+        expect(status).toBe(404);
+        return;
+      }
+      let call = request(t.app.getHttpServer())
+        [row.method](row.path(fixture))
+        .set('origin', ORIGIN)
+        .set('cookie', intruderCookie);
+      if (row.body) call = call.send(row.body(fixture) as object);
+      const response = await call;
+      expect({ status: response.status, code: response.body.code }).toMatchObject({
+        status: 404,
+      });
     },
   );
 

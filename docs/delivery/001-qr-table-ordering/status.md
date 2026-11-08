@@ -2,10 +2,10 @@
 
 Request (verbatim): "Tôi muốn làm 1 website chạy chủ yếu trên ipad và mobile mục đích chính là cung cấp QR để dán lên các bàn ăn trong quán ăn xong r khách hàng có thể nhanh chóng đặt bàn và thanh toán luôn khi thanh toán thì sẽ là hình thức quét mã QR ở ngay bàn thông qua hình thức chuyển khoản hoặc có thể thanh toán sau khi ăn tuỳ nhưng nhìn chung là như vậy có timeline ra đồ ăn và quy trình rõ ràng để tránh trường hợp khách vào sau mà lại nhận món trước khách vào hay quy trình ví dụ bàn đi 5 người mà ra đồ ăn sai hay bàn đi 1 ngừoi mà lại order nhiều kiểu vậy hiểu ý tôi rồi chứ" + "mỗi nhà hàng nên có 1 tài khoản riêng" + "và quy cách vận hành riêng nhé"
 Path: Full — because new product, several features (multi-tenant, ordering, kitchen queue, payment, booking)
-Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 3.5 of 6 days**
+Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 4.5 of 6 days**
 Status: doing
 
-**Next action:** Merge the two round-2 fix branches (money/guest path; owner/staff UI + data), `make ci`, push; re-review the failed items (006, 007, 012, 016, 018) with a fresh reviewer; then TQR-017, verify-app, demo, release v0.5.0.
+**Next action:** Verify (`verify-app`: every AC with evidence on the dev server, benchmark diff), then `demo` (results page), then `release` v0.5.0 (local only: tag, CHANGELOG section, smoke), retro + improve-skills.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -57,8 +57,35 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 - 2026-11-08 slices 2–4 merged: billing TQR-018/019 (agent self-review 6.5 → fixed), booking TQR-020/021 62fbb0e (agent review 9/10), guest ordering TQR-011/012/013/016 17abfac, kitchen + serving TQR-014/015 b81f32f (agent review 9/10; rush replay 0 unfair serves over 302 items) — make ci green (API 321 unit + 486 e2e, web 325 unit + 34 Playwright)
 - 2026-11-08 slice-1 fixes merged edc4ad9 (12 findings, each with a failing-first test) — make ci green (API 342 unit + 574 e2e, web 339 unit + 36 Playwright)
 - 2026-11-08 release-1 batch review (fresh reviewer, real browser walkthrough): PASS 004, 005, 008, 009, 010, 011, 013, 014, 015, 019, 020, 021 (9.0–9.5); FAIL 006 8.5, 007 8.0 (deleting a table erases paid bills), 012 8.5, 016 8.5, 018 5.5 (no bill entry for guests, open bill not superseded live) — improve round 2 running as 2 agents (money/guest path, owner/staff UI + data)
+- 2026-11-08 round 2 merged (b901958 UI/data, 8958771 guest/money), guest menu LCP 2 601 → 1 960 ms (3316e70), round 3 TQR-018 dead end fixed (f2ab976) — re-reviews: 006, 007, 012, 016 PASS 9.5; 018 PASS 9.0
+- 2026-11-08 TQR-017 tenant isolation sweep — 28 id-bearing endpoints answer 404 to another restaurant's owner
 - 2026-11-08 plan — 21 items in 5 slices, estimate 4.5–7 d (60 %), circuit breaker written
 - 2026-11-08 architect — design.md, ADRs 0002–0007 (same-origin cookies, tenant scoping, SSE+NOTIFY, queue order, VietQR, booking exclusion), threat model
+
+## Review scores (independent reviewers, final gate)
+
+| Item    | Final | History                                                                                                    |
+| ------- | ----- | ---------------------------------------------------------------------------------------------------------- |
+| TQR-002 | 9.0   | 6.5 → 9.0                                                                                                  |
+| TQR-003 | 9.0   | 7.0 → 9.0                                                                                                  |
+| TQR-004 | 9.5   | 7.0 (security 0) → fixes → 9.5                                                                             |
+| TQR-005 | 9.5   | 7.0 → 9.5                                                                                                  |
+| TQR-006 | 9.5   | 7.5 → 8.5 → 9.5                                                                                            |
+| TQR-007 | 9.5   | 7.5 → 8.0 (paid bills lost on delete) → 9.5                                                                |
+| TQR-008 | 9.5   | 9.0 → 9.5                                                                                                  |
+| TQR-009 | 9.5   | 8.0 → 9.5                                                                                                  |
+| TQR-010 | 9.0   | 8.0 → 9.0                                                                                                  |
+| TQR-011 | 9.0   | 9.0                                                                                                        |
+| TQR-012 | 9.5   | 8.5 → 9.5                                                                                                  |
+| TQR-013 | 9.5   | 9.5                                                                                                        |
+| TQR-014 | 9.5   | 9.5                                                                                                        |
+| TQR-015 | 9.5   | 9.5                                                                                                        |
+| TQR-016 | 9.5   | 8.5 → 9.5                                                                                                  |
+| TQR-017 | —     | built after the batch review (test-only sweep, 28 endpoints → 404); reviewed with the release verification |
+| TQR-018 | 9.0   | 5.5 → 8.5 → 9.0 (round 3, last allowed)                                                                    |
+| TQR-019 | 9.0   | 9.0                                                                                                        |
+| TQR-020 | 9.0   | 9.0                                                                                                        |
+| TQR-021 | 9.5   | 9.5                                                                                                        |
 
 ## Rulings (decisions taken without asking)
 

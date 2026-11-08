@@ -91,15 +91,7 @@ export interface SyncOptions {
   issueWhenNone: boolean;
 }
 
-/**
- * AC42: keeps a session's open bill equal to what it owes now. Same amount → the code on screen
- * stays; a different amount → the open bill becomes `superseded` and a new code is issued; nothing
- * due → no open bill. Without an open bill nothing happens unless `issueWhenNone`. Runs inside the
- * caller's transaction with the session row locked, and publishes every change (`bill.status`).
- *
- * Called wherever billable items change: a bill request, an order released or put to payment at
- * placement, a held order accepted (waiter or AC20), and after a payment released orders.
- */
+/** True when the session already paid a bill (the guest is in the billing flow). */
 const hasPaidBill = async (tx: Executor, tenant: TenantId, sessionId: string): Promise<boolean> => {
   const [row] = await tx
     .select({ id: bills.id })
@@ -111,6 +103,15 @@ const hasPaidBill = async (tx: Executor, tenant: TenantId, sessionId: string): P
   return row !== undefined;
 };
 
+/**
+ * AC42: keeps a session's open bill equal to what it owes now. Same amount → the code on screen
+ * stays; a different amount → the open bill becomes `superseded` and a new code is issued; nothing
+ * due → no open bill. Without an open bill nothing happens unless `issueWhenNone` or the session already paid a bill. Runs inside the
+ * caller's transaction with the session row locked, and publishes every change (`bill.status`).
+ *
+ * Called wherever billable items change: a bill request, an order released or put to payment at
+ * placement, a held order accepted (waiter or AC20), and after a payment released orders.
+ */
 export const syncOpenBill = async (
   tx: Executor,
   tenant: TenantId,
