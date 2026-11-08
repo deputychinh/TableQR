@@ -6,7 +6,7 @@ import { selectResults } from './baseline-lib.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const resultsDir = `${root}benchmarks/results/`;
-const entries = ['api', 'web', 'bundle'].map((name) => {
+const entries = ['api', 'web', 'web-guest', 'bundle'].map((name) => {
   const path = `${resultsDir}${name}.json`;
   return existsSync(path)
     ? { name, result: JSON.parse(readFileSync(path, 'utf8')), mtimeMs: statSync(path).mtimeMs }

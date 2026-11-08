@@ -1,25 +1,48 @@
 {
-  "recorded_at": "2026-11-07T19:11:18.479Z",
-  "commit": "3b22661",
+  "recorded_at": "2026-11-08T05:05:00.000Z",
+  "commit": "edc4ad9",
+  "dirty_tree": true,
   "machine": "Apple M4 Pro × 14, 48 GB, Darwin 27.0.0",
   "workloads": {
-    "api-health": {
-      "workload": "api-health",
-      "vus": 30,
-      "p95_ms": 18.22,
-      "p99_ms": 40.24,
-      "rps": 3673.8,
+    "guest-order-submit": {
+      "workload": "guest-order-submit",
+      "passed": true,
+      "rate_per_s": 6,
+      "duration_s": 60,
+      "tables": 30,
+      "lines_per_cart": 5,
+      "orders": 361,
+      "p95_ms": 22.46,
+      "p99_ms": 63.78,
+      "max_ms": 121.16,
       "error_rate": 0
     },
     "landing-cold-load": {
       "workload": "landing-cold-load",
-      "lcp_ms": 1869,
+      "passed": true,
+      "lcp_ms": 754,
       "performance_score": 1
+    },
+    "guest-menu-cold-load": {
+      "workload": "guest-menu-cold-load",
+      "passed": false,
+      "lcp_ms": 2621,
+      "performance_score": 0.97,
+      "menu_items": 40
     },
     "guest-initial-js": {
       "workload": "guest-initial-js",
-      "js_gzip_kb": 52.6,
+      "passed": true,
+      "js_gzip_kb": 73.7,
       "budget_kb": 150
+    },
+    "realtime-freshness": {
+      "workload": "realtime-freshness",
+      "passed": true,
+      "deliveries": 150,
+      "p95_ms": 8.8,
+      "runs_p95_ms": [7.1, 8.8, 5.0],
+      "budget_ms": 2000
     }
   }
 }
