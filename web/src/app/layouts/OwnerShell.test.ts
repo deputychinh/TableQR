@@ -18,7 +18,7 @@ const navLinks = () =>
 describe('OwnerShell', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('shows the restaurant, the five owner sections and signs out to the sign-in page', async () => {
+  it('shows the restaurant, the six owner sections and signs out to the sign-in page', async () => {
     const { router } = await renderWithApp(OwnerShell, {
       guarded: true,
       at: '/quan-ly',
@@ -30,6 +30,7 @@ describe('OwnerShell', () => {
       ['Tổng quan', '/quan-ly'],
       ['Thực đơn', '/quan-ly/thuc-don'],
       ['Bàn & QR', '/quan-ly/ban'],
+      ['Đặt bàn', '/dat-ban'],
       ['Nhân viên', '/quan-ly/nhan-vien'],
       ['Cài đặt', '/quan-ly/cai-dat'],
     ]);
@@ -48,7 +49,7 @@ describe('OwnerShell', () => {
     ['waiter', 'Phục vụ', '/phuc-vu'],
     ['cashier', 'Thu ngân', '/thu-ngan'],
   ] as const)(
-    'D5 shows a %s only the pages their role can open: their home and Bàn & QR',
+    'D5 shows a %s only the pages their role can open: their home, Bàn & QR and Đặt bàn',
     async (role, homeLabel, home) => {
       await renderWithApp(OwnerShell, {
         guarded: true,
@@ -60,6 +61,7 @@ describe('OwnerShell', () => {
       expect(navLinks()).toEqual([
         [homeLabel, home],
         ['Bàn & QR', '/quan-ly/ban'],
+        ['Đặt bàn', '/dat-ban'],
       ]);
     },
   );

@@ -14,16 +14,16 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-008 | House rules and bank account settings                                      | review |
 | TQR-009 | ~ Platform admin suspend / reactivate                                      | review |
 | TQR-010 | Realtime hub: SSE + pg_notify + resync (spike first)                       | review |
-| TQR-011 | Guest check-in / join table session                                        | todo   |
-| TQR-012 | Guest menu and ordering (idempotent, price check)                          | todo   |
-| TQR-013 | Anomaly check, held orders, waiter confirm/reject                          | todo   |
-| TQR-014 | Kitchen station queue (FIFO, skip reason, late highlight)                  | todo   |
-| TQR-015 | Waiter ready list and serve                                                | todo   |
-| TQR-016 | Guest live dish status + realtime and rush-replay benchmarks               | todo   |
+| TQR-011 | Guest check-in / join table session                                        | review |
+| TQR-012 | Guest menu and ordering (idempotent, price check)                          | review |
+| TQR-013 | Anomaly check, held orders, waiter confirm/reject                          | review |
+| TQR-014 | Kitchen station queue (FIFO, skip reason, late highlight)                  | review |
+| TQR-015 | Waiter ready list and serve                                                | review |
+| TQR-016 | Guest live dish status + realtime and rush-replay benchmarks               | review |
 | TQR-017 | Tenant isolation and role e2e matrix                                       | todo   |
-| TQR-018 | Bill with VietQR payload                                                   | todo   |
-| TQR-019 | Cashier confirm, close session, pay-before-cooking                         | todo   |
-| TQR-020 | Guest table booking (exclusion constraint)                                 | todo   |
-| TQR-021 | Staff booking list: confirm, seat, cancel, late                            | todo   |
+| TQR-018 | Bill with VietQR payload                                                   | review |
+| TQR-019 | Cashier confirm, close session, pay-before-cooking                         | review |
+| TQR-020 | Guest table booking (exclusion constraint)                                 | review |
+| TQR-021 | Staff booking list: confirm, seat, cancel, late                            | review |
 | TQR-022 | Production security headers and X-Powered-By removal (before first deploy) | todo   |
 | TQR-023 | Step-up auth (current password) for bank account changes                   | todo   |

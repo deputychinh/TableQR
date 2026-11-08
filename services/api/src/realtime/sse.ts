@@ -6,7 +6,8 @@ export const HEARTBEAT_MS = 15_000;
 
 /** Who the stream belongs to, so it can end when their access ends (D4). */
 export interface StreamAudience {
-  userId: string;
+  /** The staff member behind the stream; undefined for guests (closed only restaurant-wide). */
+  userId: string | undefined;
   /** Re-checked on every heartbeat (backstop for a missed revocation); false ends the stream. */
   isStillAllowed: () => Promise<boolean>;
 }

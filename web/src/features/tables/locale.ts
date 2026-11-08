@@ -75,21 +75,10 @@ export const tables = {
   },
   guestTable: {
     loading: 'Đang mở bàn của bạn',
-    youAreAt: 'Bạn đang ngồi',
-    welcome: 'Chào mừng bạn đến {restaurant}',
-    seats: '{n} chỗ ngồi',
-    menuSoonTitle: 'Thực đơn sắp có',
-    menuSoonBody:
-      'Quán đang chuẩn bị gọi món qua mã QR. Trong lúc chờ, bạn vui lòng gọi nhân viên để gọi món nhé.',
     expiredTitle: 'Mã QR đã hết hạn',
     expiredBody: 'Quán vừa đổi mã QR của bàn này. Hãy quét mã mới dán trên bàn hoặc hỏi nhân viên.',
     notFoundTitle: 'Không tìm thấy bàn',
     notFoundBody:
       'Mã QR này không thuộc bàn nào. Hãy kiểm tra lại mã dán trên bàn hoặc hỏi nhân viên.',
-    suspendedTitle: 'Nhà hàng tạm ngưng',
-    suspendedBody:
-      'Quán đang tạm ngưng nhận gọi món qua mã QR. Bạn vui lòng hỏi nhân viên để được phục vụ.',
-    loadError: 'Không mở được bàn. Kiểm tra mạng rồi thử lại.',
-    retry: 'Thử lại',
   },
 } as const;

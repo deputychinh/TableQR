@@ -22,8 +22,22 @@ export interface MatrixFixture {
   tableId: string;
   /** A table the owner's DELETE row may remove. */
   spareTableId: string;
-  /** Menu rows (TQR-006): a station, category and item to edit, and spares the DELETE rows remove. */
+  /** An open session with an open bill (TQR-018). */
+  sessionId: string;
+  billId: string;
+  /** A fresh open bill per call (paying twice would answer 409). */
+  payableBillId: () => string;
+  /** A fresh open, paid-up session per call (closing twice would answer 409). */
+  closableSessionId: () => string;
+  /** A pending booking of the fixture restaurant (confirm is safe to repeat). */
+  bookingId: string;
+  /** A kitchen station of the fixture restaurant (TQR-014). */
   stationId: string;
+  /** A fresh item per call in the status the action needs (each call consumes one). */
+  waitingItemId: () => string;
+  cookingItemId: () => string;
+  doneItemId: () => string;
+  /** Menu rows (TQR-006, `stationId` below is shared): a category and item to edit, and spares. */
   spareStationId: string;
   categoryId: string;
   spareCategoryId: string;
@@ -52,8 +66,9 @@ export const ALL_ROLES: readonly MatrixRole[] = [
 const OWNER = ['owner'] as const;
 const ADMIN = ['platform_admin'] as const;
 const FLOOR = ['owner', 'cashier', 'waiter'] as const;
+const CASHIER = ['owner', 'cashier'] as const;
 const RESTAURANT = ['owner', 'cashier', 'waiter', 'kitchen'] as const;
-const OWNER_KITCHEN = ['owner', 'kitchen'] as const;
+const COOKS = ['owner', 'kitchen'] as const;
 const BANK = { bin: '970436', accountNumber: '0123456789', accountName: 'Nguyễn Văn Ánh' };
 
 export const ROLE_MATRIX: readonly MatrixRow[] = [
@@ -148,7 +163,7 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
   {
     method: 'put',
     path: (f) => `/api/menu/items/${f.itemId}/availability`,
-    allowed: OWNER_KITCHEN,
+    allowed: COOKS,
     body: () => ({ available: false }),
   },
   { method: 'delete', path: (f) => `/api/menu/items/${f.spareItemId}`, allowed: OWNER },
@@ -171,6 +186,72 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
   },
   { method: 'post', path: (f) => `/api/tables/${f.tableId}/rotate-qr`, allowed: OWNER },
   { method: 'delete', path: (f) => `/api/tables/${f.spareTableId}`, allowed: OWNER },
+  // billing (TQR-018/019)
+  { method: 'get', path: () => '/api/bills/overview', allowed: CASHIER },
+  { method: 'get', path: (f) => `/api/bills/${f.billId}`, allowed: CASHIER },
+  {
+    method: 'post',
+    path: () => '/api/bills',
+    allowed: FLOOR,
+    body: (f) => ({ sessionId: f.sessionId }),
+  },
+  { method: 'get', path: (f) => `/api/sessions/${f.sessionId}/bill`, allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/bills/${f.payableBillId()}/pay`,
+    allowed: CASHIER,
+    body: () => ({ method: 'cash' }),
+  },
+  {
+    method: 'post',
+    path: (f) => `/api/sessions/${f.closableSessionId()}/close`,
+    allowed: CASHIER,
+  },
+  // bookings (TQR-021); seat / cancel / no-show are one-way, covered in booking.e2e-spec.ts
+  { method: 'get', path: () => '/api/bookings', allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/bookings/${f.bookingId}/confirm`,
+    allowed: FLOOR,
+    body: () => ({}),
+  },
+  // service floor (TQR-011, TQR-013); confirm/reject are one-shot, covered in ordering.e2e-spec.ts
+  {
+    method: 'patch',
+    path: (f) => `/api/sessions/${f.sessionId}`,
+    allowed: FLOOR,
+    body: () => ({ partySize: 2 }),
+  },
+  { method: 'get', path: () => '/api/orders/review', allowed: FLOOR },
+  // kitchen queue (TQR-014)
+  {
+    method: 'get',
+    path: (f) => `/api/stream/station/${f.stationId}`,
+    allowed: COOKS,
+    stream: true,
+  },
+  { method: 'get', path: () => '/api/kitchen/stations', allowed: COOKS },
+  { method: 'get', path: (f) => `/api/kitchen/stations/${f.stationId}/queue`, allowed: COOKS },
+  {
+    method: 'post',
+    path: (f) => `/api/kitchen/items/${f.waitingItemId()}/start`,
+    allowed: COOKS,
+    body: () => ({ version: 1 }),
+  },
+  {
+    method: 'post',
+    path: (f) => `/api/kitchen/items/${f.cookingItemId()}/done`,
+    allowed: COOKS,
+    body: () => ({ version: 1, skipReason: 'ma trận' }),
+  },
+  // serving (TQR-015): a cook cannot mark a dish served, a waiter cannot cook
+  { method: 'get', path: () => '/api/serve/ready', allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/serve/items/${f.doneItemId()}/serve`,
+    allowed: FLOOR,
+    body: () => ({ version: 1 }),
+  },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {

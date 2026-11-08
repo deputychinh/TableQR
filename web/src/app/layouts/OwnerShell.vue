@@ -2,7 +2,15 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { LayoutDashboard, LogOut, QrCode, Settings, Users, UtensilsCrossed } from 'lucide-vue-next';
+import {
+  CalendarDays,
+  LayoutDashboard,
+  LogOut,
+  QrCode,
+  Settings,
+  Users,
+  UtensilsCrossed,
+} from 'lucide-vue-next';
 import BrandMark from '@/components/BrandMark.vue';
 import ToastRegion from '@/components/ToastRegion.vue';
 import { roleHome } from '@/features/roles/role-home';
@@ -18,6 +26,7 @@ const reachable = useReachable();
 const sections = [
   { to: '/quan-ly/thuc-don', label: 'nav.menu', icon: UtensilsCrossed, exact: false },
   { to: '/quan-ly/ban', label: 'nav.tables', icon: QrCode, exact: false },
+  { to: '/dat-ban', label: 'booking.nav', icon: CalendarDays, exact: false },
   { to: '/quan-ly/nhan-vien', label: 'nav.staff', icon: Users, exact: false },
   { to: '/quan-ly/cai-dat', label: 'nav.settings', icon: Settings, exact: false },
 ] as const;
@@ -172,6 +181,7 @@ const signOut = async () => {
   .owner-shell__nav {
     inset-block: 4rem auto;
     grid-auto-flow: row;
+    grid-template-columns: 1fr;
     align-content: start;
     gap: var(--space-2);
     padding-block: var(--space-3);

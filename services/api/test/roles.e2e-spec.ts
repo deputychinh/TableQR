@@ -3,7 +3,10 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import request from 'supertest';
 import { StaffGuard } from '../src/identity/guards.js';
 import { IdentityModule } from '../src/identity/identity.module.js';
+import { DB } from '../src/db/database.module.js';
+import { utcToLocal } from '../src/booking/domain/slots.js';
 import { createTestApp, type TestApp } from './support/app.js';
+import { addOrder, openSession, seedMenu, type SessionFixture } from './support/floor.js';
 import { ORIGIN, signUp } from './support/http.js';
 import {
   ALL_ROLES,
@@ -11,6 +14,11 @@ import {
   type MatrixFixture,
   type MatrixRole,
 } from './support/role-matrix.js';
+import {
+  openSession as openKitchenSession,
+  releaseOrder,
+  seedFloor,
+} from './support/service-fixtures.js';
 import {
   STAFF_PASSWORD,
   addStaff,
@@ -58,6 +66,63 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
           .send({ name, seats: 4 })
           .expect(201)
       ).body.id as string;
+    const db = t.app.get(DB);
+    const floor = await seedMenu(db, owner.response.body.restaurant.id as string);
+    const billFor = async (session: SessionFixture) => {
+      await addOrder(db, floor, session, 'released', [{ priceVnd: 10_000, quantity: 1 }]);
+      return (
+        await request(t.app.getHttpServer())
+          .post('/api/bills')
+          .set('origin', ORIGIN)
+          .set('cookie', owner.cookie)
+          .send({ sessionId: session.sessionId })
+          .expect(200)
+      ).body.bill.id as string;
+    };
+    const billed = await openSession(db, floor);
+    const billId = await billFor(billed);
+    // One per role (each case calls the path once), cycled for the 401 sweep.
+    const payable = await Promise.all(
+      ALL_ROLES.map(async () => billFor(await openSession(db, floor))),
+    );
+    const closable = await Promise.all(
+      ALL_ROLES.map(async () => (await openSession(db, floor)).sessionId),
+    );
+    const cycle = (ids: string[]) => {
+      let next = 0;
+      return () => ids[next++ % ids.length] ?? '';
+    };
+    const tableId = await table('Bàn ma trận');
+    const booking = await request(t.app.getHttpServer())
+      .post(`/api/g/r/${owner.response.body.restaurant.slug as string}/bookings`)
+      .set('origin', ORIGIN)
+      .set('idempotency-key', 'role-matrix-booking')
+      .send({
+        date: utcToLocal(new Date(Date.now() + 2 * 86_400_000)).date,
+        time: '12:00',
+        partySize: 2,
+        name: 'Khách ma trận',
+        phone: '0901234567',
+      })
+      .expect(201);
+    // Kitchen and serving rows: a pool of items per status, one consumed per call.
+    const restaurantId = owner.response.body.restaurant.id as string;
+    const kitchenFloor = await seedFloor(db, restaurantId, 1);
+    const kitchenSession = await openKitchenSession(
+      db,
+      restaurantId,
+      kitchenFloor.tableIds[0] ?? '',
+    );
+    const pool = async (status: 'waiting' | 'cooking' | 'done') => {
+      const items = await releaseOrder(
+        db,
+        restaurantId,
+        kitchenSession,
+        Array.from({ length: 8 }, () => ({ dish: kitchenFloor.pho, status })),
+      );
+      const ids = items.map((i) => i.id);
+      return () => ids.shift() ?? 'pool-empty';
+    };
     const create = async (path: string, body: object) =>
       (
         await request(t.app.getHttpServer())
@@ -72,17 +137,30 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
       names += 1;
       return `${prefix} ma trận ${String(names)}`;
     };
-    const stationId = await create('/api/menu/stations', { name: name('Khu') });
+    // Menu rows reuse the kitchen station of the fixture restaurant.
     const categoryId = await create('/api/menu/categories', { name: name('Nhóm') });
     const item = () =>
-      create('/api/menu/items', { name: name('Món'), priceVnd: 30000, categoryId, stationId });
+      create('/api/menu/items', {
+        name: name('Món'),
+        priceVnd: 30000,
+        categoryId,
+        stationId: kitchenFloor.stationId,
+      });
     fixture = {
+      sessionId: billed.sessionId,
+      billId,
+      payableBillId: cycle(payable),
+      closableSessionId: cycle(closable),
+      stationId: kitchenFloor.stationId,
+      waitingItemId: await pool('waiting'),
+      cookingItemId: await pool('cooking'),
+      doneItemId: await pool('done'),
       staffId: target.member.id,
       spareRestaurantId: spare.response.body.restaurant.id as string,
       email: () => uniqueEmail('matrix'),
-      tableId: await table('Bàn ma trận'),
+      tableId,
       spareTableId: await table('Bàn xoá'),
-      stationId,
+      bookingId: booking.body.id as string,
       spareStationId: await create('/api/menu/stations', { name: name('Khu xoá') }),
       categoryId,
       spareCategoryId: await create('/api/menu/categories', { name: name('Nhóm xoá') }),
@@ -102,7 +180,15 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     email: () => 'new@example.com',
     tableId: ':tableId',
     spareTableId: ':spareTableId',
+    sessionId: ':sessionId',
+    billId: ':billId',
+    payableBillId: () => ':billId',
+    closableSessionId: () => ':sessionId',
+    bookingId: ':bookingId',
     stationId: ':stationId',
+    waitingItemId: () => ':itemId',
+    cookingItemId: () => ':itemId',
+    doneItemId: () => ':itemId',
     spareStationId: ':spareStationId',
     categoryId: ':categoryId',
     spareCategoryId: ':spareCategoryId',

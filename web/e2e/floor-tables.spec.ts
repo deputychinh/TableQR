@@ -46,9 +46,9 @@ test('a waiter opens Bàn & QR from their home, sees only reachable pages and pr
   await expect(page).toHaveURL(/\/quan-ly\/ban$/);
   await expect(page.getByRole('heading', { name: 'Bàn 7' })).toBeVisible();
 
-  // Navigation: their home and Bàn & QR only — no owner sections.
+  // Navigation: their home and the pages open to floor staff — no owner-only sections.
   const nav = page.getByRole('navigation', { name: 'Quản lý nhà hàng' });
-  await expect(nav.getByRole('link')).toHaveText(['Phục vụ', 'Bàn & QR']);
+  await expect(nav.getByRole('link')).toHaveText(['Phục vụ', 'Bàn & QR', 'Đặt bàn']);
   await expect(page.getByRole('button', { name: 'Thêm bàn' })).toHaveCount(0);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])

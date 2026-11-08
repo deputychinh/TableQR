@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Hourglass } from 'lucide-vue-next';
+import { CalendarDays, Hourglass } from 'lucide-vue-next';
 import StaffShell from '@/app/layouts/StaffShell.vue';
 import type { StaffRole } from '@/stores/session';
 
@@ -17,6 +17,10 @@ const roleName = computed(() => t(`roles.names.${props.role}`));
       <span class="role-home__icon"><Hourglass :size="32" aria-hidden="true" /></span>
       <h1 :id="`role-home-${role}`" class="role-home__title">{{ t('roles.soon.title') }}</h1>
       <p class="role-home__body">{{ t('roles.soon.body', { role: roleName.toLowerCase() }) }}</p>
+      <RouterLink v-if="role !== 'kitchen'" to="/dat-ban" class="role-home__link">
+        <CalendarDays :size="20" aria-hidden="true" />
+        {{ t('booking.nav') }}
+      </RouterLink>
     </section>
   </StaffShell>
 </template>
@@ -53,5 +57,19 @@ const roleName = computed(() => t(`roles.names.${props.role}`));
 .role-home__body {
   margin: 0;
   color: var(--color-text-muted);
+}
+
+/* Until the floor screens arrive (TQR-015/019), the booking list is reachable from here. */
+.role-home__link {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--target-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-2);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  text-decoration: none;
 }
 </style>

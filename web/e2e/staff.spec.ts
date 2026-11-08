@@ -70,7 +70,7 @@ test('AC14/AC16 owner adds a kitchen user who lands on /bep; disabling sends the
   await expectNoSeriousA11yIssues(page);
   await page.getByRole('button', { name: 'Thêm nhân viên' }).click();
   await expect(page).toHaveURL(/\/quan-ly\/nhan-vien$/);
-  await expect(page.getByRole('status')).toContainText('Đã thêm Anh Bếp');
+  await expect(page.getByRole('status').filter({ hasText: 'Đã thêm Anh Bếp' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Anh Bếp/ })).toContainText('Bếp');
 
   // Owner signs out; the kitchen user signs in on the same device and lands on /bep.
@@ -78,7 +78,8 @@ test('AC14/AC16 owner adds a kitchen user who lands on /bep; disabling sends the
   await expect(page).toHaveURL(/\/dang-nhap$/);
   await signIn(page, kitchenEmail, STAFF_PASSWORD);
   await expect(page).toHaveURL(/\/bep$/);
-  await expect(page.getByRole('heading', { name: 'Màn hình này sắp có' })).toBeVisible();
+  // The kitchen screen (TQR-014); this owner has not opened the menu, so no station exists yet.
+  await expect(page.getByRole('heading', { name: 'Chưa có khu bếp' })).toBeVisible();
   await expectNoSeriousA11yIssues(page);
   // A kitchen user who types an owner address is sent back to their own screen.
   await page.goto('/quan-ly/nhan-vien');

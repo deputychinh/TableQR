@@ -28,18 +28,18 @@ describe('role homes (AC14)', () => {
     expect(canOpen('waiter', ['kitchen'])).toBe(false);
   });
 
-  it('shows the kitchen placeholder in the staff shell and signs out', async () => {
+  it('shows the cashier placeholder in the staff shell and signs out', async () => {
     const { router } = await renderWithApp(RoleHomePage, {
-      paths: ['/bep', '/dang-nhap'],
-      at: '/bep',
-      props: { role: 'kitchen' },
+      paths: ['/thu-ngan', '/dang-nhap'],
+      at: '/thu-ngan',
+      props: { role: 'cashier' },
     });
     useSessionStore().me = {
-      user: { id: 'u', email: 'b@example.com', role: 'kitchen', displayName: 'Anh Bếp' },
+      user: { id: 'u', email: 'b@example.com', role: 'cashier', displayName: 'Chị Thu' },
       restaurant: { id: 'r', name: 'Quán Ngon', slug: 'quan-ngon' },
     };
     expect(await screen.findByRole('heading', { name: 'Màn hình này sắp có' })).toBeTruthy();
-    expect(screen.getByText('Bếp')).toBeTruthy();
+    expect(screen.getByText('Thu ngân')).toBeTruthy();
     expect(screen.getByText('Quán Ngon')).toBeTruthy();
     vi.stubGlobal(
       'fetch',

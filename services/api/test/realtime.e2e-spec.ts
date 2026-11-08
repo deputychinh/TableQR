@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, signUp } from './support/http.js';
 import { openSse, type SseClient } from './support/sse.js';
+import { openSession, seedMenu } from './support/floor.js';
 import { STAFF_PASSWORD, addStaff, loginCookie, platformAdminCookie } from './support/staff.js';
 
 /** Fails when the server has not ended the stream within `ms`. */
@@ -184,6 +185,46 @@ describe('realtime hub and floor stream (e2e, real Postgres)', () => {
     await otherClient.waitFor((m) => m.data.type === 'still-here');
   });
 
+  it('D4 also ends the kitchen station, guest order and guest bill streams on suspension', async () => {
+    const owner = await signUp(t);
+    const restaurantId = await restaurantOf(owner.cookie);
+    const floor = await seedMenu(db, restaurantId);
+    const session = await openSession(db, floor);
+    const cook = await addStaff(t, owner.cookie, 'kitchen');
+    const cookCookie = await loginCookie(t, cook.body.email, STAFF_PASSWORD);
+    const streams = await Promise.all([
+      openSse(`${base}/api/stream/station/${floor.stationId}`, cookCookie),
+      openSse(`${base}/api/g/stream`, session.guestCookie),
+      openSse(`${base}/api/g/bill/stream`, session.guestCookie),
+    ]);
+    clients.push(...streams);
+    await Promise.all(streams.map((c) => c.waitFor((m) => m.event === 'snapshot')));
+    const admin = await platformAdminCookie(t);
+    await request(t.app.getHttpServer())
+      .post(`/api/admin/restaurants/${restaurantId}/suspend`)
+      .set('origin', ORIGIN)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    await Promise.all(streams.map((c) => endsWithin(c, 3000)));
+  });
+
+  it('D4 ends a cook’s station stream when the owner disables them', async () => {
+    const owner = await signUp(t);
+    const floor = await seedMenu(db, await restaurantOf(owner.cookie));
+    const cook = await addStaff(t, owner.cookie, 'kitchen');
+    const cookCookie = await loginCookie(t, cook.body.email, STAFF_PASSWORD);
+    const client = await openSse(`${base}/api/stream/station/${floor.stationId}`, cookCookie);
+    clients.push(client);
+    await client.waitFor((m) => m.event === 'snapshot');
+    await request(t.app.getHttpServer())
+      .patch(`/api/staff/${cook.member.id}`)
+      .set('origin', ORIGIN)
+      .set('cookie', owner.cookie)
+      .send({ active: false })
+      .expect(200);
+    await endsWithin(client, 3000);
+  });
+
   it('refuses the floor stream to kitchen and platform admin (403)', async () => {
     const owner = await signUp(t);
     const { body } = await addStaff(t, owner.cookie, 'kitchen');
@@ -249,12 +290,14 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
     perUser: process.env.TQR_STREAMS_PER_USER,
     perRestaurant: process.env.TQR_STREAMS_PER_RESTAURANT,
     heartbeat: process.env.TQR_SSE_HEARTBEAT_MS,
+    perGuestSession: process.env.TQR_STREAMS_PER_GUEST_SESSION,
   };
 
   beforeAll(async () => {
     process.env.TQR_STREAMS_PER_USER = '2';
     process.env.TQR_STREAMS_PER_RESTAURANT = '3';
     process.env.TQR_SSE_HEARTBEAT_MS = '200';
+    process.env.TQR_STREAMS_PER_GUEST_SESSION = '2';
     t = await createTestApp();
     await t.app.listen(0, '127.0.0.1');
     const server = t.app.getHttpServer() as unknown as { address: () => AddressInfo };
@@ -269,6 +312,7 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
     process.env.TQR_STREAMS_PER_USER = saved.perUser;
     process.env.TQR_STREAMS_PER_RESTAURANT = saved.perRestaurant;
     process.env.TQR_SSE_HEARTBEAT_MS = saved.heartbeat;
+    process.env.TQR_STREAMS_PER_GUEST_SESSION = saved.perGuestSession;
     await t.app.close();
   });
 
@@ -313,5 +357,24 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
       .set('cookie', owner.cookie)
       .expect(204);
     await endsWithin(client, 2000);
+  });
+
+  it('caps the guest streams of one table session with 429 TOO_MANY_STREAMS', async () => {
+    const owner = await signUp(t);
+    const restaurantId = (
+      await request(t.app.getHttpServer()).get('/api/me').set('cookie', owner.cookie)
+    ).body.restaurant.id as string;
+    const floor = await seedMenu(t.app.get(DB), restaurantId);
+    const session = await openSession(t.app.get(DB), floor);
+    for (const path of ['/api/g/stream', '/api/g/bill/stream']) {
+      const client = await openSse(`${base}${path}`, session.guestCookie);
+      clients.push(client);
+      await client.waitFor((m) => m.event === 'snapshot');
+    }
+    const response = await fetch(`${base}/api/g/stream`, {
+      headers: { cookie: session.guestCookie },
+    });
+    expect(response.status).toBe(429);
+    expect(((await response.json()) as { code: string }).code).toBe('TOO_MANY_STREAMS');
   });
 });

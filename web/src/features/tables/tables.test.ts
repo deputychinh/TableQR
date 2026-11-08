@@ -5,7 +5,6 @@ import { useSessionStore, type StaffRole } from '@/stores/session';
 import type { TableItem } from './api';
 import TablesPage from './pages/TablesPage.vue';
 import TablePrintPage from './pages/TablePrintPage.vue';
-import GuestTablePage from './pages/GuestTablePage.vue';
 
 const table = (over: Partial<TableItem> = {}): TableItem => ({
   id: '11111111-1111-4111-8111-111111111111',
@@ -321,79 +320,5 @@ describe('print sheet (AC9)', () => {
     fakeApi({ 'GET /api/tables': () => jsonResponse({ code: 'INTERNAL' }, 500) });
     await renderPrint();
     expect(await screen.findByRole('button', { name: 'Thử lại' })).toBeTruthy();
-  });
-});
-
-describe('guest table page', () => {
-  const renderGuest = (token = 'AAAAAAAAAAAAAAAAAAAAAA') =>
-    renderWithApp(GuestTablePage, { paths: ['/t/:qrToken'], at: `/t/${token}` });
-
-  it('AC8 shows the restaurant and the table, with the menu placeholder', async () => {
-    fakeApi({
-      'GET /api/g/t/AAAAAAAAAAAAAAAAAAAAAA': () =>
-        jsonResponse({
-          restaurant: { name: 'Quán Ngon', slug: 'quan-ngon' },
-          table: { id: 't', name: 'Bàn 3', seats: 4 },
-        }),
-    });
-    await renderGuest();
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Chào mừng bạn đến Quán Ngon' }),
-    ).toBeTruthy();
-    expect(screen.getAllByText('Bàn 3').length).toBeGreaterThan(0);
-    expect(screen.getByRole('heading', { name: 'Thực đơn sắp có' })).toBeTruthy();
-    expect(document.title).toBe('Bàn 3 · Quán Ngon');
-  });
-
-  it('AC10 an old code shows "Mã QR đã hết hạn"', async () => {
-    fakeApi({
-      'GET /api/g/t/AAAAAAAAAAAAAAAAAAAAAA': () => jsonResponse({ code: 'QR_EXPIRED' }, 410),
-    });
-    await renderGuest();
-    expect(await screen.findByRole('heading', { level: 1, name: 'Mã QR đã hết hạn' })).toBeTruthy();
-    expect(screen.queryByText('Thực đơn sắp có')).toBeNull();
-  });
-
-  it('AC11 an unknown code shows "Không tìm thấy bàn" and nothing to order', async () => {
-    fakeApi({ 'GET /api/g/t/nope': () => jsonResponse({ code: 'TABLE_NOT_FOUND' }, 404) });
-    await renderGuest('nope');
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Không tìm thấy bàn' }),
-    ).toBeTruthy();
-    expect(screen.queryByRole('button')).toBeNull();
-  });
-
-  it('AC54 a suspended restaurant shows "Nhà hàng tạm ngưng" and nothing to order', async () => {
-    fakeApi({
-      'GET /api/g/t/AAAAAAAAAAAAAAAAAAAAAA': () =>
-        jsonResponse({ code: 'RESTAURANT_SUSPENDED', detail: 'Nhà hàng tạm ngưng' }, 403),
-    });
-    await renderGuest();
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Nhà hàng tạm ngưng' }),
-    ).toBeTruthy();
-    expect(screen.queryByRole('button')).toBeNull();
-  });
-
-  it('offers a retry when the network fails', async () => {
-    let fail = true;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        fail
-          ? Promise.reject(new TypeError('offline'))
-          : Promise.resolve(
-              jsonResponse({
-                restaurant: { name: 'Quán Ngon', slug: 'q' },
-                table: { id: 't', name: 'Bàn 3', seats: 4 },
-              }),
-            ),
-      ),
-    );
-    await renderGuest();
-    expect(await screen.findByText(/Không mở được bàn/)).toBeTruthy();
-    fail = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
-    expect(await screen.findByRole('heading', { name: 'Thực đơn sắp có' })).toBeTruthy();
   });
 });
