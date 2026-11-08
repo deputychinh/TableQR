@@ -11,6 +11,11 @@ import {
   type MatrixRole,
 } from './support/role-matrix.js';
 import {
+  openSession as openKitchenSession,
+  releaseOrder,
+  seedFloor,
+} from './support/service-fixtures.js';
+import {
   STAFF_PASSWORD,
   addStaff,
   loginCookie,
@@ -82,11 +87,33 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
         phone: '0901234567',
       })
       .expect(201);
+    // Kitchen and serving rows: a pool of items per status, one consumed per call.
+    const restaurantId = owner.response.body.restaurant.id as string;
+    const kitchenFloor = await seedFloor(db, restaurantId, 1);
+    const kitchenSession = await openKitchenSession(
+      db,
+      restaurantId,
+      kitchenFloor.tableIds[0] ?? '',
+    );
+    const pool = async (status: 'waiting' | 'cooking' | 'done') => {
+      const items = await releaseOrder(
+        db,
+        restaurantId,
+        kitchenSession,
+        Array.from({ length: 8 }, () => ({ dish: kitchenFloor.pho, status })),
+      );
+      const ids = items.map((i) => i.id);
+      return () => ids.shift() ?? 'pool-empty';
+    };
     fixture = {
       sessionId: billed.sessionId,
       billId,
       payableBillId: cycle(payable),
       closableSessionId: cycle(closable),
+      stationId: kitchenFloor.stationId,
+      waitingItemId: await pool('waiting'),
+      cookingItemId: await pool('cooking'),
+      doneItemId: await pool('done'),
       staffId: target.member.id,
       spareRestaurantId: spare.response.body.restaurant.id as string,
       email: () => uniqueEmail('matrix'),
@@ -111,6 +138,10 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     payableBillId: () => ':billId',
     closableSessionId: () => ':sessionId',
     bookingId: ':bookingId',
+    stationId: ':stationId',
+    waitingItemId: () => ':itemId',
+    cookingItemId: () => ':itemId',
+    doneItemId: () => ':itemId',
   };
   const cases = ROLE_MATRIX.flatMap((row) =>
     ALL_ROLES.map((role) => ({ row, role, allowed: row.allowed.includes(role) })),

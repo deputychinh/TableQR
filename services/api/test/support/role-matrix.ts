@@ -30,6 +30,12 @@ export interface MatrixFixture {
   closableSessionId: () => string;
   /** A pending booking of the fixture restaurant (confirm is safe to repeat). */
   bookingId: string;
+  /** A kitchen station of the fixture restaurant (TQR-014). */
+  stationId: string;
+  /** A fresh item per call in the status the action needs (each call consumes one). */
+  waitingItemId: () => string;
+  cookingItemId: () => string;
+  doneItemId: () => string;
 }
 
 export interface MatrixRow {
@@ -51,6 +57,7 @@ const ADMIN = ['platform_admin'] as const;
 const FLOOR = ['owner', 'cashier', 'waiter'] as const;
 const CASHIER = ['owner', 'cashier'] as const;
 const RESTAURANT = ['owner', 'cashier', 'waiter', 'kitchen'] as const;
+const COOKS = ['owner', 'kitchen'] as const;
 const BANK = { bin: '970436', accountNumber: '0123456789', accountName: 'Nguyễn Văn Ánh' };
 
 export const ROLE_MATRIX: readonly MatrixRow[] = [
@@ -145,6 +152,29 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     body: () => ({ partySize: 2 }),
   },
   { method: 'get', path: () => '/api/orders/review', allowed: FLOOR },
+  // kitchen queue (TQR-014); GET /api/stream/station/:id is a stream, covered by kitchen.e2e-spec
+  { method: 'get', path: () => '/api/kitchen/stations', allowed: COOKS },
+  { method: 'get', path: (f) => `/api/kitchen/stations/${f.stationId}/queue`, allowed: COOKS },
+  {
+    method: 'post',
+    path: (f) => `/api/kitchen/items/${f.waitingItemId()}/start`,
+    allowed: COOKS,
+    body: () => ({ version: 1 }),
+  },
+  {
+    method: 'post',
+    path: (f) => `/api/kitchen/items/${f.cookingItemId()}/done`,
+    allowed: COOKS,
+    body: () => ({ version: 1, skipReason: 'ma trận' }),
+  },
+  // serving (TQR-015): a cook cannot mark a dish served, a waiter cannot cook
+  { method: 'get', path: () => '/api/serve/ready', allowed: FLOOR },
+  {
+    method: 'post',
+    path: (f) => `/api/serve/items/${f.doneItemId()}/serve`,
+    allowed: FLOOR,
+    body: () => ({ version: 1 }),
+  },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {

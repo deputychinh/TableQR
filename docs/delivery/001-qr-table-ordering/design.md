@@ -109,9 +109,9 @@ No AI calls in this delivery.
 
 ## API shape (contract-first, OpenAPI from Nest, RFC 9457 errors with `code`)
 
-- Staff: `/api/auth/*`, `/api/restaurant`, `/api/menu/*`, `/api/tables/*`, `/api/staff/*`, `/api/sessions/*`, `/api/kitchen/stations/:id/queue`, `/api/items/:id/status`, `/api/bills/*`, `/api/bookings/*`, `/api/admin/restaurants/*`.
+- Staff: `/api/auth/*`, `/api/restaurant`, `/api/menu/*`, `/api/tables/*`, `/api/staff/*`, `/api/sessions/*`, `/api/kitchen/stations`, `/api/kitchen/stations/:id/queue`, `/api/kitchen/items/:id/{start,done}` (cooks), `/api/serve/ready`, `/api/serve/items/:id/serve` (floor) — one endpoint per action so the role guard is per route (TQR-014/015), `/api/bills/*`, `/api/bookings/*`, `/api/admin/restaurants/*`.
 - Guest: `/api/g/t/:qrToken` (resolve table + restaurant + menu), `/api/g/session` (check-in/join), `/api/g/orders`, `/api/g/bill`, `/api/g/r/:slug/bookings`.
-- Streams: `/api/stream/station/:id`, `/api/stream/floor` (waiter/cashier), `/api/g/stream` (guest session).
+- Streams: `/api/stream/station/:id` (kitchen/owner; snapshot = the station queue), `/api/stream/floor` (waiter/cashier/owner; snapshot `{ at, ...parts }` built from parts each module registers with `FloorSnapshotRegistry`, `ready` from TQR-015), `/api/g/stream` (guest session).
 - Writes accept `Idempotency-Key` header where retried by clients (orders, bookings). Bodies validated with zod (unknown keys rejected). Lists paginated, max 200.
 
 ## Decisions
