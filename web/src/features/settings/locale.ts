@@ -58,6 +58,25 @@ export const settings = {
       minHint: 'Gọi ít hơn sẽ hiện nhắc “có thể thiếu món”. Đặt 0 để tắt nhắc.',
       unit: 'phần',
     },
+    kitchen: {
+      title: 'Nhắc món chờ lâu',
+      lead: 'Màn hình Bếp đọc to món chờ quá lâu, ví dụ “Bàn 5 gọi phở bò đã 10 phút, chưa ra món”. Bếp bật “Đọc to” trên máy của bếp.',
+      reminderLegend: 'Nhắc khi một món chờ quá',
+      repeatLegend: 'Nếu món vẫn chưa xong, nhắc lại sau mỗi',
+      choice: '{n} phút',
+      reminderBody: {
+        m5: 'Quán nhỏ, món ra nhanh.',
+        m10: 'Phù hợp với đa số quán (mặc định).',
+        m15: 'Món cần nấu lâu hơn.',
+        m20: 'Món hầm, nướng lâu.',
+      },
+      repeatBody: {
+        m5: 'Nhắc dồn dập, khi bếp hay quên.',
+        m10: 'Mặc định.',
+        m15: 'Ít nhắc hơn.',
+        m20: 'Ít nhắc nhất.',
+      },
+    },
     booking: {
       title: 'Đặt bàn',
       legend: 'Khách có đặt bàn trước được không?',

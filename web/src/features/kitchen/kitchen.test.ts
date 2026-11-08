@@ -23,6 +23,7 @@ const ticket = (id: string, over: Partial<Ticket> = {}): Ticket => ({
   id,
   version: 1,
   status: 'waiting',
+  orderId: `o-${id}`,
   menuItemId: 'pho',
   name: 'Phở bò tái',
   quantity: 1,
@@ -122,14 +123,23 @@ describe('TicketCard (AC34, AC33)', () => {
     expect(screen.getByText('Ghi chú: Không hành')).toBeTruthy();
     expect(screen.getByText('Chờ 5 phút')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Bắt đầu nấu' })).toBeTruthy();
-    expect(screen.queryByText('Trễ')).toBeNull();
+    expect(screen.queryByText(/Trễ/)).toBeNull();
   });
 
   it('marks a late ticket with an icon and the word "Trễ", not colour alone', () => {
     const { container } = renderCard(ticket('3', { status: 'cooking' }), NOW + 11 * 60_000);
-    expect(screen.getByText('Trễ')).toBeTruthy();
+    expect(screen.getByText('Trễ 16 phút')).toBeTruthy();
     expect(container.querySelector('.ticket-card--late')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Xong' })).toBeTruthy();
+  });
+
+  it('TQR-028 marks a ticket past the reminder time late too, before the station’s threshold', () => {
+    const fresh = ticket('4', { queueAt: new Date(NOW - 6 * 60_000).toISOString() });
+    render(TicketCard, {
+      props: { ticket: fresh, now: NOW, busy: false, reminder: { minutes: 5, repeatMinutes: 5 } },
+      global: { plugins: [i18n] },
+    });
+    expect(screen.getByText('Trễ 6 phút')).toBeTruthy();
   });
 
   it('says "Vừa vào" for a ticket that just arrived', () => {
@@ -146,6 +156,7 @@ describe('KitchenPage (S9)', () => {
   const queue = (items: Ticket[]): StationQueue => ({
     station: { id: 'hot', name: 'Bếp nóng', lateAfterMinutes: 15 },
     serverTime: new Date().toISOString(),
+    reminder: { minutes: 10, repeatMinutes: 10 },
     items,
   });
 
@@ -189,7 +200,7 @@ describe('KitchenPage (S9)', () => {
         .map((h) => h.textContent?.trim()),
     ).toEqual(['Bàn 2 · 2 khách', 'Bàn 3 · 2 khách']);
     const cooking = screen.getByRole('region', { name: 'Đang nấu (1)' });
-    expect(within(cooking).getByText('Trễ')).toBeTruthy();
+    expect(within(cooking).getByText('Trễ 20 phút')).toBeTruthy();
     expect(FakeEventSource.last('/api/stream/station/hot')).toBeTruthy();
 
     // Arrow keys move to the next station; the URL keeps the choice.
@@ -358,5 +369,135 @@ describe('KitchenPage (S9)', () => {
     });
     await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
     expect(await screen.findByRole('button', { name: 'Thử lại' })).toBeTruthy();
+  });
+});
+
+describe('KitchenPage voice (TQR-027/028)', () => {
+  const stations = [{ id: 'hot', name: 'Bếp nóng', lateAfterMinutes: 15, waiting: 1, cooking: 0 }];
+  const queue = (items: Ticket[], reminder = { minutes: 10, repeatMinutes: 10 }): StationQueue => ({
+    station: { id: 'hot', name: 'Bếp nóng', lateAfterMinutes: 15 },
+    serverTime: new Date().toISOString(),
+    reminder,
+    items,
+  });
+
+  /** A fake speechSynthesis that records what is said and ends each sentence right away. */
+  const installSpeech = () => {
+    const spoken: { text: string; lang: string }[] = [];
+    class Utterance {
+      lang = '';
+      voice: SpeechSynthesisVoice | null = null;
+      rate = 1;
+      volume = 1;
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(readonly text: string) {}
+    }
+    vi.stubGlobal('SpeechSynthesisUtterance', Utterance);
+    vi.stubGlobal('speechSynthesis', {
+      speak: (u: Utterance) => {
+        if (u.text !== '') spoken.push({ text: u.text, lang: u.lang });
+        queueMicrotask(() => u.onend?.());
+      },
+      cancel: () => undefined,
+      getVoices: () => [],
+    });
+    return spoken;
+  };
+
+  const memoryStorage = () => {
+    const data = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => data.set(k, v),
+    };
+    vi.stubGlobal('localStorage', storage);
+    return data;
+  };
+
+  const route = (reads: () => Ticket[], reminder?: { minutes: number; repeatMinutes: number }) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((input) => {
+        const url = String(input);
+        if (url.endsWith('/api/kitchen/stations')) {
+          return Promise.resolve(jsonResponse({ stations }));
+        }
+        return Promise.resolve(jsonResponse(queue(reads(), reminder)));
+      }),
+    );
+  };
+
+  it('turns on with a tap that says "Đã bật đọc to", remembers it, then reads a new order', async () => {
+    const spoken = installSpeech();
+    const stored = memoryStorage();
+    const fresh = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000).toISOString();
+    let items = [ticket('1', { queueAt: fresh(1) })];
+    route(() => items);
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    const toggle = await screen.findByRole('switch', { name: 'Bật đọc to' });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    expect(spoken).toEqual([{ text: 'Đã bật đọc to', lang: 'vi-VN' }]);
+    expect(JSON.parse(stored.get('tqr.kitchen.voice') ?? '{}')).toMatchObject({ enabled: true });
+
+    // Speed and volume appear while it is on; a choice is remembered.
+    await userEvent.click(screen.getByRole('radio', { name: 'Chậm' }));
+    expect(JSON.parse(stored.get('tqr.kitchen.voice') ?? '{}')).toMatchObject({ rate: 'slow' });
+
+    // The dish already on screen is not read; a released order is, once, grouped.
+    items = [
+      ...items,
+      ticket('2', { orderId: 'o2', tableName: 'Bàn 2', quantity: 2, queueAt: fresh(0) }),
+      ticket('3', { orderId: 'o2', tableName: 'Bàn 2', name: 'Trà đá', queueAt: fresh(0) }),
+    ];
+    FakeEventSource.last('/api/stream/station/hot').emit('delta', {
+      topic: 'station:hot',
+      type: 'item.status',
+      itemId: '2',
+      status: 'waiting',
+      version: 1,
+    });
+    await vi.waitFor(() => {
+      expect(spoken.map((s) => s.text)).toEqual([
+        'Đã bật đọc to',
+        'Bàn 2: hai phở bò tái, một trà đá',
+      ]);
+    });
+    // A reconnect snapshot with the same dishes reads nothing again.
+    FakeEventSource.last('/api/stream/station/hot').emit('snapshot', queue(items));
+    await screen.findByRole('region', { name: 'Đang chờ (3)' });
+    expect(spoken).toHaveLength(2);
+
+    // Off: stops reading.
+    await userEvent.click(toggle);
+    expect(JSON.parse(stored.get('tqr.kitchen.voice') ?? '{}')).toMatchObject({ enabled: false });
+    expect(screen.queryByRole('radio', { name: 'Chậm' })).toBeNull();
+  });
+
+  it('a remembered "on" reminds about an overdue dish as soon as the screen opens', async () => {
+    const spoken = installSpeech();
+    const stored = memoryStorage();
+    stored.set('tqr.kitchen.voice', JSON.stringify({ enabled: true, rate: 'normal' }));
+    const old = new Date(Date.now() - 6 * 60_000).toISOString();
+    route(() => [ticket('5', { tableName: 'Bàn 5', name: 'Phở bò', queueAt: old })], {
+      minutes: 5,
+      repeatMinutes: 5,
+    });
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    await vi.waitFor(() => {
+      expect(spoken.map((s) => s.text)).toEqual(['Bàn 5 gọi phở bò đã 6 phút, chưa ra món']);
+    });
+    expect(screen.getByText('Trễ 6 phút')).toBeTruthy();
+  });
+
+  it('says so and keeps the switch off on a browser that cannot speak', async () => {
+    memoryStorage();
+    route(() => []);
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    const toggle = await screen.findByRole('switch', { name: 'Bật đọc to' });
+    expect(toggle.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText(/Máy này không đọc to được/)).toBeTruthy();
   });
 });

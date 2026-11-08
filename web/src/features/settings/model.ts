@@ -5,11 +5,14 @@ export const PAYMENT_TIMINGS = ['pay_after', 'pay_before'] as const;
 export const SESSION_OPENINGS = ['self_check_in', 'staff_opens'] as const;
 export const ORDER_APPROVALS = ['anomalies_only', 'every_order', 'none'] as const;
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+/** TQR-028: the kitchen's spoken reminder choices, in minutes. */
+export const REMINDER_MINUTES = [5, 10, 15, 20] as const;
 
 export type PaymentTiming = (typeof PAYMENT_TIMINGS)[number];
 export type SessionOpening = (typeof SESSION_OPENINGS)[number];
 export type OrderApproval = (typeof ORDER_APPROVALS)[number];
 export type Weekday = (typeof WEEKDAYS)[number];
+export type ReminderMinutes = (typeof REMINDER_MINUTES)[number];
 
 export const RULE_LIMITS = {
   maxMainPerPerson: { min: 1, max: 10, step: 0.5 },
@@ -33,6 +36,7 @@ export interface HouseRules {
   orderApproval: OrderApproval;
   anomaly: { maxMainPerPerson: number; minMainPerPerson: number };
   booking: { enabled: boolean; slotMinutes: number; openingHours: Record<Weekday, DayHours> };
+  kitchen: { reminderMinutes: ReminderMinutes; repeatMinutes: ReminderMinutes };
 }
 
 export interface Bank {

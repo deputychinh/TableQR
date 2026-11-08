@@ -22,6 +22,8 @@ import {
   ORDER_APPROVALS,
   type OwnerSettings,
   PAYMENT_TIMINGS,
+  REMINDER_MINUTES,
+  type ReminderMinutes,
   RULE_LIMITS,
   SESSION_OPENINGS,
   bankOfDraft,
@@ -109,6 +111,32 @@ const booking = computed({
   get: () => (rules.value?.booking.enabled === false ? 'off' : 'on'),
   set: (value: 'on' | 'off') => {
     if (rules.value) rules.value.booking.enabled = value === 'on';
+  },
+});
+
+/** TQR-028: minutes as radio values (strings), each with a short explanation. */
+const minuteChoices = (group: 'reminderBody' | 'repeatBody') =>
+  computed(() =>
+    REMINDER_MINUTES.map((n) => ({
+      value: String(n),
+      title: t('settings.kitchen.choice', { n }),
+      body: t(`settings.kitchen.${group}.m${String(n)}`),
+    })),
+  );
+const reminderChoices = minuteChoices('reminderBody');
+const repeatChoices = minuteChoices('repeatBody');
+const minutesOf = (value: string): ReminderMinutes =>
+  REMINDER_MINUTES.find((n) => String(n) === value) ?? 10;
+const reminderMinutes = computed({
+  get: () => String(rules.value?.kitchen.reminderMinutes ?? 10),
+  set: (value: string) => {
+    if (rules.value) rules.value.kitchen.reminderMinutes = minutesOf(value);
+  },
+});
+const repeatMinutes = computed({
+  get: () => String(rules.value?.kitchen.repeatMinutes ?? 10),
+  set: (value: string) => {
+    if (rules.value) rules.value.kitchen.repeatMinutes = minutesOf(value);
   },
 });
 
@@ -323,6 +351,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
               :error="message('rules.anomaly.minMainPerPerson')"
             />
           </div>
+        </section>
+
+        <section class="settings-page__section" aria-labelledby="settings-kitchen">
+          <h2 id="settings-kitchen" class="settings-page__heading">
+            {{ t('settings.kitchen.title') }}
+          </h2>
+          <p class="settings-page__hint">{{ t('settings.kitchen.lead') }}</p>
+          <RadioCardGroup
+            v-model="reminderMinutes"
+            :legend="t('settings.kitchen.reminderLegend')"
+            :options="reminderChoices"
+          />
+          <RadioCardGroup
+            v-model="repeatMinutes"
+            :legend="t('settings.kitchen.repeatLegend')"
+            :options="repeatChoices"
+          />
         </section>
 
         <section class="settings-page__section" aria-labelledby="settings-booking">

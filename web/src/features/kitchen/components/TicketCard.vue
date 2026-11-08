@@ -5,17 +5,29 @@ import { AlarmClock, CircleSlash, Clock } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
 import { isLate, waitedMinutes } from '../queue-state';
 import type { Ticket } from '../services/kitchen.service';
+import { isOverdue, type ReminderRule } from '../voice/scheduler';
 
 /**
  * One kitchen ticket (AC34): table and party, quantity × dish, note, wait time. A late ticket
- * (AC33) gets a red border and background plus an alarm icon and the word "Trễ" — never colour alone.
+ * (AC33: past the station's threshold; TQR-028: past the restaurant's reminder time, the one the
+ * screen says aloud) gets a red border and background plus an alarm icon and "Trễ N phút" — never
+ * colour alone.
  */
-const props = defineProps<{ ticket: Ticket; now: number; busy: boolean }>();
+const props = defineProps<{
+  ticket: Ticket;
+  now: number;
+  busy: boolean;
+  reminder?: ReminderRule;
+}>();
 const emit = defineEmits<{ start: []; done: []; drop: [] }>();
 const { t } = useI18n();
 const id = useId();
 
-const late = computed(() => isLate(props.ticket, props.now));
+const late = computed(
+  () =>
+    isLate(props.ticket, props.now) ||
+    (props.reminder !== undefined && isOverdue(props.ticket, props.now, props.reminder)),
+);
 const waited = computed(() => waitedMinutes(props.ticket, props.now));
 const waiting = computed(() => props.ticket.status === 'waiting');
 </script>
@@ -33,7 +45,7 @@ const waiting = computed(() => props.ticket.status === 'waiting');
       </h3>
       <span v-if="late" class="ticket-card__late">
         <AlarmClock :size="22" aria-hidden="true" />
-        {{ t('kitchen.ticket.late') }}
+        {{ t('kitchen.ticket.lateFor', { n: waited }) }}
       </span>
     </header>
     <p class="ticket-card__dish">

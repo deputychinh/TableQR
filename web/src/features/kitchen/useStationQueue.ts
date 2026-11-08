@@ -1,6 +1,7 @@
 import { onScopeDispose, ref, shallowRef } from 'vue';
 import { useStream, type StreamDelta } from '@/composables/useStream';
 import { applyItemDelta, mergeServerList, type SeenStatus } from './queue-state';
+import { DEFAULT_REMINDER, type ReminderRule } from './voice/scheduler';
 import {
   getQueue,
   stationStreamUrl,
@@ -21,6 +22,7 @@ export const useStationQueue = (stationId: string) => {
   const loaded = ref(false);
   const failed = ref(false);
   const now = ref(Date.now());
+  const reminder = shallowRef<ReminderRule>(DEFAULT_REMINDER);
   const seen = new Map<string, SeenStatus>();
   let offsetMs = 0;
   let refetchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -28,6 +30,7 @@ export const useStationQueue = (stationId: string) => {
   const take = (queue: StationQueue) => {
     offsetMs = Date.parse(queue.serverTime) - Date.now();
     now.value = Date.now() + offsetMs;
+    reminder.value = queue.reminder;
     items.value = mergeServerList(queue.items, seen);
     loaded.value = true;
     failed.value = false;
@@ -86,5 +89,5 @@ export const useStationQueue = (stationId: string) => {
     if (refetchTimer) clearTimeout(refetchTimer);
   });
 
-  return { items, loaded, failed, now, status, refetch, applyLocal };
+  return { items, loaded, failed, now, reminder, status, refetch, applyLocal };
 };

@@ -13,6 +13,7 @@ export const defaultRules = (): HouseRules => ({
       WEEKDAYS.map((day) => [day, { closed: false, open: '10:00', close: '22:00' }]),
     ) as HouseRules['booking']['openingHours'],
   },
+  kitchen: { reminderMinutes: 10, repeatMinutes: 10 },
 });
 
 export const ownerSettings = (patch: Partial<OwnerSettings> = {}): OwnerSettings => ({

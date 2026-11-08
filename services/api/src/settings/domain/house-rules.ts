@@ -9,6 +9,8 @@ export const PAYMENT_TIMINGS = ['pay_after', 'pay_before'] as const;
 export const SESSION_OPENINGS = ['self_check_in', 'staff_opens'] as const;
 export const ORDER_APPROVALS = ['anomalies_only', 'every_order', 'none'] as const;
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+/** TQR-028: the kitchen screen reminds about a dish waiting this long, and repeats this often. */
+export const REMINDER_MINUTES = [5, 10, 15, 20] as const;
 
 export type Weekday = (typeof WEEKDAYS)[number];
 
@@ -31,6 +33,8 @@ const stepped = (limits: { min: number; max: number; step: number }) =>
     .min(limits.min)
     .max(limits.max)
     .refine((value) => onStep(value, limits.min, limits.step), { message: 'not_on_step' });
+
+const reminderMinutes = z.union(REMINDER_MINUTES.map((n) => z.literal(n)));
 
 const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const time = z.string().regex(TIME);
@@ -75,6 +79,8 @@ export const houseRulesSchema = z
         openingHours: openingHoursSchema,
       })
       .strict(),
+    /** TQR-028: spoken overdue reminders on the kitchen screen. */
+    kitchen: z.object({ reminderMinutes, repeatMinutes: reminderMinutes }).strict(),
   })
   .strict();
 
@@ -105,6 +111,7 @@ export const DEFAULT_RULES: HouseRules = deepFreeze({
       DayHours
     >,
   },
+  kitchen: { reminderMinutes: 10, repeatMinutes: 10 },
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

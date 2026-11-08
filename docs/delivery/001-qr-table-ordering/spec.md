@@ -9,7 +9,7 @@ Brief: `brief.md` · Status: ready · Updated: 2026-11-08
 | Release 1  | S1 sign up · S2 menu & stations · S3 tables & QR sheet · S4 house rules · S5 staff accounts | S6 open session & party size · S7 guest orders · S8 anomaly check | S9 FIFO kitchen queue · S10 serve to the right table · S11 guest live status | S12 bill + VietQR · S13 cashier confirms / pay later | S14 guest books a table · S15 staff manage bookings |
 | Later      | platform billing, menu photos upload to CDN                                                 | call-staff button, split bill                                     | printer tickets, prep-time estimates                                         | PayOS/SePay auto-confirm, card                       | deposits, SMS/Zalo reminders                        |
 
-S16 (platform admin suspends a restaurant) sits under "Set up" in release 1.
+S16 (platform admin suspends a restaurant) sits under "Set up" in release 1. S17 (kitchen voice announcements) and S18 (spoken overdue reminders) were added under "Cook & serve" after build started, as the owner's top priority (see "Changes after build started").
 
 ## Stories and acceptance criteria
 
@@ -119,6 +119,26 @@ Roles: owner, cashier, waiter, kitchen.
 
 - AC54: WHEN the admin suspends a restaurant THE SYSTEM SHALL refuse its guest pages ("Nhà hàng tạm ngưng") and staff sign-ins until reactivated.
 
+### S17 — As a cook, I want new orders read aloud, so that I can cook without looking up at the screen
+
+Owner's words (2026-11-08): "nhiệm vụ chính của chúng ta là order và hỗ trợ tương tác bằng giọng nói với bếp … bàn 1 đặt xuất ăn này bàn 2 đã order như thế này thì đầu bếp ko cần nhìn lên màn hình".
+
+- AC55: WHILE "Đọc to" is on, WHEN an order's dishes reach the station the cook is viewing (a new order, or a held order released by a waiter) THE SYSTEM SHALL say them once, in Vietnamese, as one sentence per order: table, then each dish with its quantity in words (1–20; digits above) and its note after it — e.g. "Bàn 1: hai phở bò, một trà đá"; "…hai phở bò, ghi chú: không hành; một trà đá".
+- AC56 (dedupe, negative): Dishes already on the station when the screen started listening, dishes re-sent by a reconnect snapshot, dishes another screen already started, and cancelled dishes SHALL never be read; each dish is read at most once per screen.
+- AC57: Sentences SHALL be said one at a time, never overlapping; turning "Đọc to" off SHALL stop the voice and drop what was waiting.
+- AC58: "Đọc to" is off by default and remembered per device. Turning it on is a tap that also says "Đã bật đọc to" (iOS speaks only after a tap); a remembered "on" is woken by the first tap on the page. Speed (Chậm / Vừa / Nhanh) and volume (Nhỏ / Vừa / To) can be chosen while it is on. A browser that cannot speak shows the switch disabled with "Máy này không đọc to được…".
+- AC59 (offline): Speech SHALL use the device's own speech synthesis (Vietnamese, voice "Linh" where present), with no network call and no new service.
+
+### S18 — As a cook, I want dishes waiting too long said again, so that no table is forgotten
+
+Owner's words: "khi nào có ai đợi quá 5 hay 10 phút thì nhắc lại ví dụ bàn 5 gọi món xxx đã 10 phút r chưa ra đồ".
+
+- AC60: House rule `kitchen.reminderMinutes` ∈ {5, 10, 15, 20} [10] and `kitchen.repeatMinutes` ∈ {5, 10, 15, 20} [10], chosen on the owner's settings page (S4); any other value → 422 `VALIDATION_FAILED`. Saving them follows S4's versioning (`rules_updated_at` moves only when a value changed).
+- AC61: WHILE "Đọc to" is on, WHEN a waiting or cooking dish on the viewed station has waited `reminderMinutes` since its release THE SYSTEM SHALL say "Bàn 5 gọi phở bò đã 10 phút, chưa ra món" within 15 s, and again every `repeatMinutes` until it is done, served or cancelled.
+- AC62: Dishes coming due at the same check SHALL share one sentence, oldest first, at most 3 named, then "và N món khác".
+- AC63: Wait time SHALL be counted on the server's clock (the queue's `serverTime` offset), so a device clock that is off does not move reminders.
+- AC64: A dish past `reminderMinutes` SHALL show the late highlight with "Trễ N phút", like AC33.
+
 ## Quality targets
 
 | Characteristic       | Workload                                               | Data                                                | Target                                                      | Percentile | Environment                                           | How it is checked               |
@@ -155,3 +175,4 @@ Roles: owner, cashier, waiter, kitchen.
 ## Changes after build started
 
 - 2026-11-08 (architect) Release time for pay-before-cooking orders = payment confirmation time — the kitchen cannot start earlier; ADR 0005.
+- 2026-11-08 (owner) New top priority: voice support for the kitchen — S17 (TQR-027, read new orders aloud) and S18 (TQR-028, spoken overdue reminders with house rule `kitchen.reminderMinutes` / `repeatMinutes`). Decisions: (1) the browser's own speech synthesis, not a cloud TTS — offline, free, no new service or data leaving the device, and iPad ships the Vietnamese voice "Linh"; quality depends on the device's voice. (2) The reminder rule is read as it is now, not from the order's AC12 snapshot: it is how the kitchen screen behaves, not a judgement of the order (money, approval), so a change applies on the next queue read. (3) Voice covers the station tab the cook is viewing; there is no "Tất cả khu" view yet, so a kitchen with several stations on one iPad hears only the open tab. (4) Voice commands from the cook (speech recognition) are not in scope: browser speech recognition for vi-VN on iPad sends audio to Apple's servers and is unreliable in a noisy kitchen — candidate TQR-030. (5) The waiter screen `/phuc-vu` stays silent and unchanged.

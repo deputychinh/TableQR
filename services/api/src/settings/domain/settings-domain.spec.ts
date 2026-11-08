@@ -211,6 +211,38 @@ describe('house rules validation', () => {
   });
 });
 
+describe('TQR-028 kitchen reminder rules', () => {
+  it('default to a reminder after 10 minutes, repeated every 10 minutes', () => {
+    expect(DEFAULT_RULES.kitchen).toEqual({ reminderMinutes: 10, repeatMinutes: 10 });
+  });
+
+  it.each([5, 10, 15, 20])('accept %i minutes for both', (minutes) => {
+    expect(
+      failingPaths(
+        rules((r) => (r.kitchen = { reminderMinutes: minutes as 5, repeatMinutes: minutes as 5 })),
+      ),
+    ).toEqual([]);
+  });
+
+  it.each([0, 4, 7, 25, '10'])('refuse %s minutes', (minutes) => {
+    const bad = rules() as unknown as { kitchen: Record<string, unknown> };
+    bad.kitchen.reminderMinutes = minutes;
+    bad.kitchen.repeatMinutes = minutes;
+    expect(failingPaths(bad)).toEqual(['kitchen.reminderMinutes', 'kitchen.repeatMinutes']);
+  });
+
+  it('fill the defaults on a row saved before the rule existed, keep a stored choice', () => {
+    expect(readStoredRules({ paymentTiming: 'pay_before' }).kitchen).toEqual({
+      reminderMinutes: 10,
+      repeatMinutes: 10,
+    });
+    expect(readStoredRules({ kitchen: { reminderMinutes: 5 } }).kitchen).toEqual({
+      reminderMinutes: 5,
+      repeatMinutes: 10,
+    });
+  });
+});
+
 describe('readStoredRules', () => {
   it('gives the defaults for a new restaurant (rules = {}) or null', () => {
     expect(readStoredRules({})).toEqual(DEFAULT_RULES);
