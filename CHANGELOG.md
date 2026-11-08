@@ -12,6 +12,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 ### Fixed
 
 - A cancelled dish now re-syncs the table's open bill in the same transaction: the bill is superseded with the new amount (or no new bill when nothing is due) and the guest bill page updates live (TQR-025).
+- `make bench` no longer fails when run right after other local traffic: setup requests that meet a per-address limit (429) wait for the window with backoff and retry, and the result reports `setup_429_retries` / `setup_429_wait_s`; production limits are unchanged (TQR-026).
 
 ## [0.5.0] - 2026-11-08
 
