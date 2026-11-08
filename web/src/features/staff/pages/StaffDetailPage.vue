@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ArrowLeft, CircleCheck, KeyRound, Lock, LockOpen } from 'lucide-vue-next';
+import { ArrowLeft, KeyRound, Lock, LockOpen } from 'lucide-vue-next';
 import OwnerShell from '@/app/layouts/OwnerShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
@@ -23,6 +23,7 @@ import {
   type StaffMember,
 } from '@/features/staff/services/staff.service';
 import { useSessionStore } from '@/stores/session';
+import { useToastStore } from '@/stores/toast';
 
 const MIN_PASSWORD = 10;
 
@@ -33,7 +34,7 @@ const session = useSessionStore();
 const member = ref<StaffMember>();
 const loadError = ref<string>();
 const role = ref<RestaurantRole | ''>('');
-const notice = ref<string>();
+const toast = useToastStore();
 const actionError = ref<string>();
 const busy = ref<'role' | 'access' | 'password'>();
 const sheet = ref<'disable' | 'password'>();
@@ -64,10 +65,9 @@ onMounted(load);
 
 const run = async (kind: 'role' | 'access' | 'password', action: () => Promise<string>) => {
   busy.value = kind;
-  notice.value = undefined;
   actionError.value = undefined;
   try {
-    notice.value = await action();
+    toast.show(await action());
     sheet.value = undefined;
   } catch (error: unknown) {
     actionError.value = t(describeStaffError(error));
@@ -148,10 +148,6 @@ const savePassword = async () => {
         </span>
       </header>
 
-      <p v-if="notice" class="staff-detail__notice" role="status">
-        <CircleCheck :size="20" aria-hidden="true" />
-        {{ notice }}
-      </p>
       <FormAlert v-if="actionError" :message="actionError" />
       <p v-if="isSelf" class="staff-detail__note">{{ t('staff.detail.selfNote') }}</p>
 
@@ -291,16 +287,6 @@ const savePassword = async () => {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-block-start: var(--space-1);
-}
-
-.staff-detail__notice {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  margin-block: 0 var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-1);
-  background: var(--color-success-bg);
 }
 
 .staff-detail__note {

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { LayoutDashboard, LogOut, QrCode, Settings, Users, UtensilsCrossed } from 'lucide-vue-next';
 import BrandMark from '@/components/BrandMark.vue';
+import ToastRegion from '@/components/ToastRegion.vue';
 import { roleHome } from '@/features/roles/role-home';
 import { ROLE_ICONS } from '@/features/roles/role-icons';
 import { useSessionStore } from '@/stores/session';
@@ -76,6 +77,7 @@ const signOut = async () => {
     <main class="owner-shell__main">
       <slot />
     </main>
+    <ToastRegion />
   </div>
 </template>
 

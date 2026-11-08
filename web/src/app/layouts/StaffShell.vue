@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { LogOut, QrCode } from 'lucide-vue-next';
 import BrandMark from '@/components/BrandMark.vue';
+import ToastRegion from '@/components/ToastRegion.vue';
 import { useSessionStore } from '@/stores/session';
 import { useReachable } from './reachable';
 
@@ -44,6 +45,7 @@ const signOut = async () => {
     <main class="staff-shell__main">
       <slot />
     </main>
+    <ToastRegion />
   </div>
 </template>
 

@@ -102,7 +102,7 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText('Giờ mở cửa ngày Thứ Hai')).toBeTruthy();
     expect(screen.getByText('Hoá đơn sẽ ghi “Thanh toán tại quầy”.')).toBeTruthy();
     expect(saveButton().disabled).toBe(true);
-    expect(screen.getByRole('status').textContent).toContain('Chưa có thay đổi');
+    expect(screen.getByText(/Chưa có thay đổi/)).toBeTruthy();
   });
 
   it('saves changed rules without asking when the bank stays the same', async () => {
@@ -112,7 +112,7 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByText('Duyệt mọi đơn'));
     await userEvent.click(screen.getByRole('button', { name: 'Tăng Tối đa món chính mỗi người' }));
     await userEvent.click(screen.getByLabelText('Nghỉ ngày Thứ Hai'));
-    expect(screen.getByRole('status').textContent).toContain('Bạn có thay đổi chưa lưu');
+    expect(screen.getByText(/Bạn có thay đổi chưa lưu/)).toBeTruthy();
     await userEvent.click(saveButton());
     const put = calls.find((c) => c.method === 'PUT');
     expect(put?.url).toBe('/api/restaurant/settings');
@@ -244,7 +244,7 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByText('Nhân viên mở bàn'));
     await userEvent.click(saveButton());
     expect(await screen.findByText('Có lỗi xảy ra. Vui lòng thử lại.')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toContain('Bạn có thay đổi chưa lưu');
+    expect(screen.getByText(/Bạn có thay đổi chưa lưu/)).toBeTruthy();
   });
 
   it('a network failure while saving says to check the connection', async () => {
@@ -304,7 +304,7 @@ describe('SettingsPage', () => {
       ),
     );
     await renderWithApp(SettingsPage, { paths: PATHS, at: '/quan-ly/cai-dat' });
-    expect(screen.getByRole('status').textContent).toContain('Đang tải cài đặt');
+    expect(screen.getByText(/Đang tải cài đặt/)).toBeTruthy();
     expect(await screen.findByText('Không tải được cài đặt.')).toBeTruthy();
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));

@@ -80,6 +80,17 @@ export const menu = {
       soldOut: 'Hết món',
       empty: 'Thực đơn chưa có món nào để khách xem.',
     },
+    toast: {
+      itemCreated: 'Đã thêm món {name}.',
+      itemSaved: 'Đã lưu món {name}.',
+      categoryCreated: 'Đã thêm nhóm {name}.',
+      categorySaved: 'Đã lưu nhóm {name}.',
+      stationCreated: 'Đã thêm khu {name}.',
+      stationSaved: 'Đã lưu khu {name}.',
+      deleted: 'Đã xoá {name}.',
+      available: '{name} đã còn món.',
+      soldOut: '{name} đã hết món.',
+    },
     errors: {
       name: 'Tên cần từ 1 đến {max} ký tự.',
       nameTaken: 'Tên này đã có. Hãy chọn tên khác.',

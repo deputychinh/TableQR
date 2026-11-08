@@ -11,6 +11,7 @@ import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import NumberStepper from '@/components/NumberStepper.vue';
 import RadioCardGroup from '@/components/RadioCardGroup.vue';
+import { useToastStore } from '@/stores/toast';
 import BankAccountSection from './components/BankAccountSection.vue';
 import OpeningHoursEditor from './components/OpeningHoursEditor.vue';
 import {
@@ -38,7 +39,7 @@ const rules = ref<HouseRules>();
 const bank = ref<BankDraft>({ bin: '', accountNumber: '', accountName: '' });
 const errors = ref<FieldErrors>({});
 const formError = ref<string>();
-const notice = ref<string>();
+const toast = useToastStore();
 const busy = ref(false);
 const confirmBank = ref(false);
 const confirmLeave = ref(false);
@@ -121,7 +122,7 @@ const save = async () => {
   formError.value = undefined;
   try {
     apply(await saveSettings({ rules: rules.value, bank: newBank.value }));
-    notice.value = t('settings.saved');
+    toast.show(t('settings.saved'));
   } catch (error: unknown) {
     if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
       errors.value = Object.fromEntries(error.fields.map((f) => [f.path, messageForPath(f.path)]));
@@ -141,7 +142,6 @@ const save = async () => {
 
 const requestSave = async () => {
   if (!rules.value || !dirty.value) return;
-  notice.value = undefined;
   errors.value = checkDraft(rules.value, bank.value);
   if (Object.keys(errors.value).length > 0) {
     formError.value = 'settings.fixErrors';
@@ -311,11 +311,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
         <div class="settings-page__bar">
           <FormAlert v-if="formError" :message="t(formError)" />
           <div class="settings-page__bar-row">
-            <p class="settings-page__status" role="status">
-              <template v-if="notice && !dirty">{{ notice }}</template>
-              <template v-else>{{
-                dirty ? t('settings.unsaved') : t('settings.noChanges')
-              }}</template>
+            <p class="settings-page__status" aria-live="polite">
+              {{ dirty ? t('settings.unsaved') : t('settings.noChanges') }}
             </p>
             <BaseButton type="submit" size="lg" :loading="busy" :disabled="!dirty">
               {{ t('settings.save') }}

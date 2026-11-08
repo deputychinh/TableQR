@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ChevronRight, CircleCheck, Lock, UserPlus } from 'lucide-vue-next';
+import { ChevronRight, Lock, UserPlus } from 'lucide-vue-next';
 import OwnerShell from '@/app/layouts/OwnerShell.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
@@ -21,10 +21,6 @@ const session = useSessionStore();
 const members = ref<StaffMember[]>();
 const loadError = ref<string>();
 const loading = ref(false);
-/** Set by the add page through history state, so the name never goes into the URL. */
-const added = ref<string | undefined>(
-  typeof window.history.state?.added === 'string' ? window.history.state.added : undefined,
-);
 
 const others = computed(() => members.value?.filter((m) => m.id !== session.me?.user.id) ?? []);
 
@@ -56,11 +52,6 @@ onMounted(load);
         {{ t('staff.add') }}
       </RouterLink>
     </div>
-
-    <p v-if="added" class="staff-list__added" role="status">
-      <CircleCheck :size="20" aria-hidden="true" />
-      {{ t('staff.added', { name: added }) }}
-    </p>
 
     <LoadingState v-if="loading && !members" :label="t('staff.loading')" />
 
@@ -161,17 +152,6 @@ onMounted(load);
   .staff-list__item:hover {
     border-color: var(--color-primary);
   }
-}
-
-.staff-list__added {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  margin-block: 0 var(--space-4);
-  padding: var(--space-3);
-  border-radius: var(--radius-1);
-  color: var(--color-text);
-  background: var(--color-success-bg);
 }
 
 .staff-list__items {

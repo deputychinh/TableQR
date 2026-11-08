@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import { CircleSlash, Pencil } from 'lucide-vue-next';
+import IconButton from '@/components/IconButton.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import { formatVnd } from '../price';
@@ -33,15 +34,12 @@ const { t } = useI18n();
         :state-text="item.available ? t('menu.item.available') : t('menu.item.soldOut')"
         @update:model-value="emit('toggle', $event)"
       />
-      <button
+      <IconButton
         v-if="canEdit"
-        type="button"
-        class="menu-item-row__edit"
-        :aria-label="t('menu.item.edit', { name: item.name })"
+        :icon="Pencil"
+        :label="t('menu.item.edit', { name: item.name })"
         @click="emit('edit')"
-      >
-        <Pencil :size="20" aria-hidden="true" />
-      </button>
+      />
     </div>
   </li>
 </template>
@@ -99,23 +97,5 @@ const { t } = useI18n();
   gap: var(--space-1);
   align-items: center;
   margin-inline-start: auto;
-}
-
-.menu-item-row__edit {
-  display: grid;
-  place-items: center;
-  inline-size: var(--target-min);
-  block-size: var(--target-min);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-2);
-  color: var(--color-text);
-  background: var(--color-surface);
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .menu-item-row__edit:hover {
-    border-color: var(--color-primary);
-  }
 }
 </style>

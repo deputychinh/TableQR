@@ -20,6 +20,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Fixed
 
+- One shared `IconButton` replaces the menu's three hand-rolled icon-button styles; one queued `Toast` (`ToastRegion` in both shells + `useToastStore`, polite live region) replaces the five page-local success notices (settings, tables, admin, staff list, staff detail) and gives the menu page success feedback; the menu page's header actions stack full width on phones like tables and staff (TQR-006, TQR-008).
 - Floor staff on "Bàn & QR" no longer see owner navigation or print buttons that bounce them: the print sheet is open to owner, cashier and waiter, the owner-area navigation lists only pages the role can open, and the waiter / cashier homes link to "Bàn & QR" (TQR-007).
 - Menu caps per restaurant: 20 stations, 50 categories, 500 items → 409 `STATION_LIMIT_REACHED` / `CATEGORY_LIMIT_REACHED` / `ITEM_LIMIT_REACHED`, creation serialised per restaurant; the staff and guest menu reads stay bounded by them (TQR-006).
 - AC54 guest half: `GET /api/g/t/:token` and `GET /api/g/r/:slug/menu` answer 403 `RESTAURANT_SUSPENDED` for a suspended restaurant (was 404) and the guest table page now really shows "Nhà hàng tạm ngưng" (TQR-009).
