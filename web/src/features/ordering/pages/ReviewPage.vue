@@ -9,6 +9,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
+import { staffStream } from '@/composables/staff-stream';
 import { useStream } from '@/composables/useStream';
 import { FLOOR_STREAM_URL, reviewApi, type ReviewOrder } from '../api';
 import ReviewCard from '../components/ReviewCard.vue';
@@ -35,12 +36,16 @@ const load = async (quiet = false) => {
   }
 };
 
-useStream(FLOOR_STREAM_URL, {
-  onSnapshot: () => void load(true),
-  onDelta: (delta) => {
-    if (delta.type === 'order.status') void load(true);
+useStream(
+  FLOOR_STREAM_URL,
+  {
+    onSnapshot: () => void load(true),
+    onDelta: (delta) => {
+      if (delta.type === 'order.status') void load(true);
+    },
   },
-});
+  staffStream,
+);
 
 const act = async (
   order: ReviewOrder,

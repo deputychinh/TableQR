@@ -25,9 +25,6 @@ export const servingLocale = {
       doneAt: 'Xong lúc {time}',
       serve: 'Đã ra bàn',
     },
-    live: {
-      reconnecting: 'Mất kết nối, đang kết nối lại…',
-    },
     served: 'Đã ra bàn: {dish} cho {table}.',
     errors: {
       changed: 'Món này vừa được cập nhật ở máy khác. Danh sách đã được làm mới.',

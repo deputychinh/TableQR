@@ -44,9 +44,6 @@ export const kitchenLocale = {
       cancel: 'Huỷ',
       done: 'Đã bỏ {dish} của {table}. Hoá đơn của bàn đã được cập nhật.',
     },
-    live: {
-      reconnecting: 'Mất kết nối, đang kết nối lại…',
-    },
     skip: {
       title: 'Có bàn gọi món này trước',
       body: '{tables} gọi {dish} trước bàn này. Ghi lý do nếu bạn vẫn làm bàn này trước.',
@@ -72,6 +69,8 @@ export const kitchenLocale = {
       hint: 'Máy đọc món mới và nhắc món chờ lâu, bạn không cần nhìn màn hình.',
       unsupported: 'Máy này không đọc to được. Hãy mở trang bằng Safari hoặc Chrome bản mới.',
       enabled: 'Đã bật đọc to',
+      lost: 'Mất kết nối máy chủ',
+      back: 'Đã kết nối lại',
       rate: { legend: 'Tốc độ đọc', slow: 'Chậm', normal: 'Vừa', fast: 'Nhanh' },
       volume: { legend: 'Âm lượng', low: 'Nhỏ', medium: 'Vừa', high: 'To' },
     },

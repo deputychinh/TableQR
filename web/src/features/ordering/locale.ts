@@ -70,7 +70,6 @@ export const orderingLocale = {
       rejected: 'Nhân viên đã huỷ đơn này. Bạn hỏi nhân viên nếu cần nhé.',
       live: 'Đang cập nhật trực tiếp',
       bill: 'Xem hoá đơn / Thanh toán',
-      reconnecting: 'Mất kết nối, đang thử lại…',
     },
     closed: {
       title: 'Bàn đã đóng',

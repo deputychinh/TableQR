@@ -1,4 +1,5 @@
 import { onScopeDispose, ref, shallowRef } from 'vue';
+import { staffStream } from '@/composables/staff-stream';
 import { useStream, type StreamDelta } from '@/composables/useStream';
 import { applyItemDelta, mergeServerList, type SeenStatus } from './queue-state';
 import { DEFAULT_REMINDER, type ReminderRule } from './voice/scheduler';
@@ -74,10 +75,14 @@ export const useStationQueue = (stationId: string) => {
     });
   };
 
-  const { status } = useStream<StationQueue>(stationStreamUrl(stationId), {
-    onSnapshot: take,
-    onDelta,
-  });
+  const { status } = useStream<StationQueue>(
+    stationStreamUrl(stationId),
+    {
+      onSnapshot: take,
+      onDelta,
+    },
+    staffStream,
+  );
 
   // The first read also covers a stream that cannot open (it would only say "reconnecting").
   void refetch();

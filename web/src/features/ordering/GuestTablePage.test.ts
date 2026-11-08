@@ -578,7 +578,7 @@ describe('guest live status (S11)', () => {
     const stream = FakeEventSource.last;
     if (!stream) throw new Error('no stream');
     stream.emit('error');
-    expect(await screen.findByText('Mất kết nối, đang thử lại…')).toBeTruthy();
+    expect(await screen.findByText('Mất kết nối — đang kết nối lại…')).toBeTruthy();
     stream.emit(
       'snapshot',
       session([order({ items: [{ ...order().items[0]!, status: 'served', version: 4 }] })]),

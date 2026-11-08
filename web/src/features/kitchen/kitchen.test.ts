@@ -1,10 +1,13 @@
+import { effectScope } from 'vue';
 import { render, screen, within } from '@testing-library/vue';
 import userEvent from '@testing-library/user-event';
+import { setUnauthorizedHandler } from '@/api/client';
 import { i18n } from '@/locales';
 import { jsonResponse, renderWithApp } from '@/test/render';
 import { FakeEventSource, installFakeEventSource } from '@/test/fake-event-source';
 import TicketCard from './components/TicketCard.vue';
 import KitchenPage from './pages/KitchenPage.vue';
+import { useStationQueue } from './useStationQueue';
 import {
   applyItemDelta,
   isLate,
@@ -372,6 +375,42 @@ describe('KitchenPage (S9)', () => {
   });
 });
 
+describe('useStationQueue clock (AC63: the iPad clock is off)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    ['7 minutes behind', -7],
+    ['7 minutes ahead', 7],
+  ])('counts on the server clock when the iPad is %s', async (_label, skewMinutes) => {
+    vi.useFakeTimers({ now: NOW });
+    // The server's clock is right; the iPad's is off by `skewMinutes`.
+    const serverNow = NOW - skewMinutes * 60_000;
+    const body: StationQueue = {
+      station: { id: 'hot', name: 'Bếp nóng', lateAfterMinutes: 15 },
+      serverTime: new Date(serverNow).toISOString(),
+      reminder: { minutes: 10, repeatMinutes: 10 },
+      items: [ticket('1', { queueAt: new Date(serverNow - 9.5 * 60_000).toISOString() })],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(body))),
+    );
+    const scope = effectScope();
+    const queue = scope.run(() => useStationQueue('hot'));
+    if (!queue) throw new Error('not created');
+    await vi.waitFor(() => {
+      expect(queue.loaded.value).toBe(true);
+    });
+    expect(Math.abs(queue.now.value - serverNow)).toBeLessThan(1000);
+    expect(waitedMinutes(queue.items.value[0] as Ticket, queue.now.value)).toBe(9);
+    // A minute later on the clock tick, still on the server's time: 10 minutes → overdue.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(Math.abs(queue.now.value - (serverNow + 60_000))).toBeLessThan(1000);
+    expect(waitedMinutes(queue.items.value[0] as Ticket, queue.now.value)).toBe(10);
+    scope.stop();
+  });
+});
+
 describe('KitchenPage voice (TQR-027/028)', () => {
   const stations = [{ id: 'hot', name: 'Bếp nóng', lateAfterMinutes: 15, waiting: 1, cooking: 0 }];
   const queue = (items: Ticket[], reminder = { minutes: 10, repeatMinutes: 10 }): StationQueue => ({
@@ -490,6 +529,140 @@ describe('KitchenPage voice (TQR-027/028)', () => {
       expect(spoken.map((s) => s.text)).toEqual(['Bàn 5 gọi phở bò đã 6 phút, chưa ra món']);
     });
     expect(screen.getByText('Trễ 6 phút')).toBeTruthy();
+  });
+
+  it('AC57 turning "Đọc to" off stops the sentence being said and drops the one waiting', async () => {
+    // A voice that keeps talking until the test ends the sentence.
+    const spoken: string[] = [];
+    const talking: { onend: (() => void) | null }[] = [];
+    const cancel = vi.fn<() => void>();
+    vi.stubGlobal(
+      'SpeechSynthesisUtterance',
+      class {
+        lang = '';
+        voice = null;
+        rate = 1;
+        volume = 1;
+        onend: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(readonly text: string) {}
+      },
+    );
+    vi.stubGlobal('speechSynthesis', {
+      speak: (u: { text: string; onend: (() => void) | null }) => {
+        if (u.text === '') return;
+        spoken.push(u.text);
+        talking.push(u);
+      },
+      cancel,
+      getVoices: () => [],
+    });
+    memoryStorage();
+    let items = [ticket('1', { queueAt: new Date().toISOString() })];
+    route(() => items);
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    const toggle = await screen.findByRole('switch', { name: 'Bật đọc to' });
+    await screen.findByRole('region', { name: 'Đang chờ (1)' });
+    await userEvent.click(toggle);
+    expect(spoken).toEqual(['Đã bật đọc to']);
+    // A new order comes in while "Đã bật đọc to" is still being said: it waits its turn.
+    items = [...items, ticket('2', { orderId: 'o2', tableName: 'Bàn 2' })];
+    FakeEventSource.last('/api/stream/station/hot').emit('snapshot', queue(items));
+    await screen.findByRole('region', { name: 'Đang chờ (2)' });
+    expect(spoken).toEqual(['Đã bật đọc to']);
+
+    await userEvent.click(toggle);
+    expect(cancel).toHaveBeenCalled();
+    // The browser ends the cancelled sentence; the waiting one must never start.
+    for (const u of talking) u.onend?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(spoken).toEqual(['Đã bật đọc to']);
+  });
+
+  it('TQR-031 a dead stream shows the banner and the voice says so once, then that it is back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const spoken = installSpeech();
+      const stored = memoryStorage();
+      stored.set('tqr.kitchen.voice', JSON.stringify({ enabled: true, rate: 'normal' }));
+      let items = [ticket('1', { queueAt: new Date().toISOString() })];
+      route(() => items);
+      await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+      await screen.findByRole('region', { name: 'Đang chờ (1)' });
+      const first = FakeEventSource.last('/api/stream/station/hot');
+      first.emit('snapshot', queue(items));
+      first.emit('heartbeat', { intervalMs: 1000 });
+      expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+
+      // Nothing at all for 2.5 heartbeats: the screen says so while it reconnects (and fails).
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(first.closed).toBe(true);
+      const banner = await screen.findByText('Mất kết nối — đang kết nối lại…');
+      expect(banner.closest('[role="status"]')).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(5000);
+      await vi.waitFor(() => {
+        expect(spoken.map((s) => s.text)).toEqual(['Mất kết nối máy chủ']);
+      });
+      // Retrying does not repeat the warning.
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(spoken.map((s) => s.text)).toEqual(['Mất kết nối máy chủ']);
+
+      // Back (L6): the snapshot repairs the queue with a dish released during the outage; it is
+      // read once, the dish already on screen is not read again, the banner goes.
+      const isOpen = (s: FakeEventSource) => s.url === '/api/stream/station/hot' && !s.closed;
+      const reopen = async () => {
+        while (!FakeEventSource.instances.some(isOpen)) await vi.advanceTimersByTimeAsync(500);
+        return FakeEventSource.last('/api/stream/station/hot');
+      };
+      items = [
+        ...items,
+        ticket('2', { orderId: 'o2', tableName: 'Bàn 2', queueAt: new Date().toISOString() }),
+      ];
+      (await reopen()).emit('snapshot', queue(items));
+      await vi.waitFor(() => {
+        expect(spoken.map((s) => s.text)).toContain('Đã kết nối lại');
+      });
+      await screen.findByRole('region', { name: 'Đang chờ (2)' });
+      await vi.waitFor(() => {
+        expect(spoken.map((s) => s.text).sort()).toEqual(
+          ['Bàn 2: một phở bò tái', 'Mất kết nối máy chủ', 'Đã kết nối lại'].sort(),
+        );
+      });
+      expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+      // Another reconnect with the same dishes reads nothing again.
+      (await reopen()).emit('bye', {});
+      (await reopen()).emit('snapshot', queue(items));
+      await vi.advanceTimersByTimeAsync(100);
+      expect(spoken.filter((s) => s.text.startsWith('Bàn '))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('TQR-031 a revoked stream (signed out, disabled) goes to sign-in instead of "Mất kết nối"', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const signedOut = vi.fn<() => void>();
+    setUnauthorizedHandler(signedOut);
+    try {
+      const spoken = installSpeech();
+      const stored = memoryStorage();
+      stored.set('tqr.kitchen.voice', JSON.stringify({ enabled: true, rate: 'normal' }));
+      const items = [ticket('1', { queueAt: new Date().toISOString() })];
+      route(() => items);
+      await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+      await screen.findByRole('region', { name: 'Đang chờ (1)' });
+      const stream = FakeEventSource.last('/api/stream/station/hot');
+      stream.emit('snapshot', queue(items));
+      stream.emit('revoked', {});
+      expect(signedOut).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(FakeEventSource.instances.filter((s) => s.url === stream.url)).toHaveLength(1);
+      expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+      expect(spoken.map((s) => s.text)).not.toContain('Mất kết nối máy chủ');
+    } finally {
+      setUnauthorizedHandler(undefined);
+      vi.useRealTimers();
+    }
   });
 
   it('says so and keeps the switch off on a browser that cannot speak', async () => {

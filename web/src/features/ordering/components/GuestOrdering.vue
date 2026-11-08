@@ -2,12 +2,13 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { DoorClosed, ReceiptText, ShoppingBasket, Wifi, WifiOff } from 'lucide-vue-next';
+import { DoorClosed, ReceiptText, ShoppingBasket, Wifi } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
+import StreamBanner from '@/components/StreamBanner.vue';
 import { useStream } from '@/composables/useStream';
 import { formatVnd } from '@/features/menu/price';
 import GuestMenuList from '@/features/menu/components/GuestMenuList.vue';
@@ -153,18 +154,10 @@ onMounted(ordering.loadMenu);
 
     <template v-else-if="!closed">
       <h1 class="guest-ordering__title">{{ t('ordering.tabs.orders') }}</h1>
-      <p
-        class="guest-ordering__live"
-        :class="{ 'guest-ordering__live--off': streamStatus === 'reconnecting' }"
-        role="status"
-      >
-        <WifiOff v-if="streamStatus === 'reconnecting'" :size="16" aria-hidden="true" />
-        <Wifi v-else :size="16" aria-hidden="true" />
-        {{
-          streamStatus === 'reconnecting'
-            ? t('ordering.orders.reconnecting')
-            : t('ordering.orders.live')
-        }}
+      <StreamBanner :status="streamStatus" />
+      <p v-if="streamStatus !== 'reconnecting'" class="guest-ordering__live" role="status">
+        <Wifi :size="16" aria-hidden="true" />
+        {{ t('ordering.orders.live') }}
       </p>
       <EmptyState v-if="orderCount === 0" :title="t('ordering.orders.empty')">
         <template #action>
@@ -277,10 +270,6 @@ onMounted(ordering.loadMenu);
   margin: 0;
   font-size: var(--font-size-small);
   color: var(--color-text-muted);
-}
-
-.guest-ordering__live--off {
-  color: var(--color-warning);
 }
 
 .guest-ordering__bar {

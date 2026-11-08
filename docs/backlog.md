@@ -20,16 +20,19 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-014 | Kitchen station queue (FIFO, skip reason, late highlight)                  | done   |
 | TQR-015 | Waiter ready list and serve                                                | done   |
 | TQR-016 | Guest live dish status + realtime and rush-replay benchmarks               | done   |
-| TQR-017 | Tenant isolation and role e2e matrix                                       | review |
+| TQR-017 | Tenant isolation and role e2e matrix                                       | done   |
 | TQR-018 | Bill with VietQR payload                                                   | done   |
 | TQR-019 | Cashier confirm, close session, pay-before-cooking                         | done   |
 | TQR-020 | Guest table booking (exclusion constraint)                                 | done   |
 | TQR-021 | Staff booking list: confirm, seat, cancel, late                            | done   |
-| TQR-022 | Production security headers and X-Powered-By removal (before first deploy) | review |
-| TQR-023 | Step-up auth (current password) for bank account changes                   | review |
-| TQR-024 | Archive ("Ẩn bàn") tables with history                                     | review |
-| TQR-025 | Re-sync the open bill when the kitchen cancels an item                     | review |
-| TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | review |
-| TQR-027 | Kitchen voice: read new orders aloud on `/bep` (browser speech, vi-VN)     | review |
-| TQR-028 | Spoken overdue reminders (house rule `kitchen.reminderMinutes`)            | review |
-| TQR-029 | QR payment as a per-restaurant option (default off)                        | review |
+| TQR-022 | Production security headers and X-Powered-By removal (before first deploy) | done   |
+| TQR-023 | Step-up auth (current password) for bank account changes                   | done   |
+| TQR-024 | Archive ("Ẩn bàn") tables with history                                     | done   |
+| TQR-025 | Re-sync the open bill when the kitchen cancels an item                     | done   |
+| TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | done   |
+| TQR-027 | Kitchen voice: read new orders aloud on `/bep` (browser speech, vi-VN)     | done   |
+| TQR-028 | Spoken overdue reminders (house rule `kitchen.reminderMinutes`)            | done   |
+| TQR-029 | QR payment as a per-restaurant option (default off)                        | done   |
+| TQR-030 | Cook voice commands (speech recognition) — deferred, see ADR 0009          | later  |
+| TQR-031 | Client stream liveness: named heartbeat, dead-stream banner and voice      | done   |
+| TQR-032 | Graceful API shutdown with open SSE streams (`bye`)                        | done   |

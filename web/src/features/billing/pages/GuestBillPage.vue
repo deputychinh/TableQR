@@ -7,6 +7,7 @@ import { ApiError } from '@/api/client';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
+import StreamBanner from '@/components/StreamBanner.vue';
 import { useStream } from '@/composables/useStream';
 import GuestBill from '../components/GuestBill.vue';
 import { GUEST_BILL_STREAM, getGuestBill, requestGuestBill, type SessionBill } from '../api';
@@ -63,7 +64,7 @@ const refresh = async () => {
   }
 };
 
-useStream<SessionBill>(GUEST_BILL_STREAM, {
+const { status: streamStatus } = useStream<SessionBill>(GUEST_BILL_STREAM, {
   onSnapshot: (snapshot) => {
     if (state.value.kind === 'ready') apply(snapshot);
   },
@@ -82,6 +83,7 @@ onMounted(load);
     <main class="guest-bill-page__main">
       <LoadingState v-if="state.kind === 'loading'" :label="t('billing.guest.loading')" :rows="3" />
       <template v-else-if="state.kind === 'ready'">
+        <StreamBanner :status="streamStatus" />
         <GuestBill :bill="state.bill" :changed="changed" :table-url="tableUrl" @request="load" />
       </template>
       <EmptyState

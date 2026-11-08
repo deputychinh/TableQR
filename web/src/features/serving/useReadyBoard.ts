@@ -1,4 +1,5 @@
 import { onScopeDispose, ref, shallowRef } from 'vue';
+import { staffStream } from '@/composables/staff-stream';
 import { useStream, type StreamDelta } from '@/composables/useStream';
 import { applyReadyDelta } from './board-state';
 import {
@@ -64,13 +65,17 @@ export const useReadyBoard = () => {
     applyChange({ itemId, status, version });
   };
 
-  const { status } = useStream<FloorSnapshot>(FLOOR_STREAM_URL, {
-    onSnapshot: (snapshot) => {
-      reads += 1; // the snapshot is the truth; any read still in flight is older
-      if (snapshot.ready) take(snapshot.ready);
+  const { status } = useStream<FloorSnapshot>(
+    FLOOR_STREAM_URL,
+    {
+      onSnapshot: (snapshot) => {
+        reads += 1; // the snapshot is the truth; any read still in flight is older
+        if (snapshot.ready) take(snapshot.ready);
+      },
+      onDelta,
     },
-    onDelta,
-  });
+    staffStream,
+  );
 
   void refetch();
   onScopeDispose(() => {

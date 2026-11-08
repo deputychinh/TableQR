@@ -166,6 +166,6 @@ describe('ServingPage (S10)', () => {
     await renderWithApp(ServingPage, { paths: ['/phuc-vu'], at: '/phuc-vu' });
     await screen.findByText('Chưa có món nào xong');
     FakeEventSource.last('/api/stream/floor').emit('error');
-    expect(await screen.findByText('Mất kết nối, đang kết nối lại…')).toBeTruthy();
+    expect(await screen.findByText('Mất kết nối — đang kết nối lại…')).toBeTruthy();
   });
 });

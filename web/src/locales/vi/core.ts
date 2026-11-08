@@ -13,6 +13,9 @@ export const core = {
   sheet: {
     cancel: 'Huỷ',
   },
+  stream: {
+    lost: 'Mất kết nối — đang kết nối lại…',
+  },
   form: {
     showPassword: 'Hiện mật khẩu',
     hidePassword: 'Ẩn mật khẩu',

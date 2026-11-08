@@ -89,6 +89,48 @@ describe('openStream', () => {
     expect(f.response.ended).toBe(true);
   });
 
+  it('TQR-031 sends a named heartbeat event with its interval after the snapshot and on every beat', async () => {
+    vi.useFakeTimers();
+    const f = fakes();
+    await openStream(f.hub, f.request, f.response as unknown as Response, {
+      ...options({ heartbeatMs: 100 }),
+    });
+    const beat = 'event: heartbeat\ndata: {"intervalMs":100}\n\n';
+    expect(f.written.filter((w) => w === beat)).toHaveLength(1);
+    expect(f.written.indexOf(beat)).toBeGreaterThan(
+      f.written.findIndex((w) => w.startsWith('event: snapshot')),
+    );
+    await vi.advanceTimersByTimeAsync(200);
+    expect(f.written.filter((w) => w === beat)).toHaveLength(3);
+    f.request.emit('close');
+  });
+
+  it('TQR-032 ends with `bye` when the server shuts down, and only once', async () => {
+    const f = fakes();
+    const onClose = vi.fn();
+    const shutdown = new AbortController();
+    await openStream(f.hub, f.request, f.response as unknown as Response, {
+      ...options({ onClose, stop: shutdown.signal }),
+    });
+    shutdown.abort();
+    expect(f.written.at(-1)).toContain('event: bye');
+    expect(f.response.ended).toBe(true);
+    expect(f.unsubscribe).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('TQR-032 ends at once when it opens after the shutdown began', async () => {
+    const f = fakes();
+    const shutdown = new AbortController();
+    shutdown.abort();
+    await openStream(f.hub, f.request, f.response as unknown as Response, {
+      ...options({ stop: shutdown.signal }),
+    });
+    expect(f.written.join('')).toContain('event: bye');
+    expect(f.written.join('')).not.toContain('event: snapshot');
+    expect(f.response.ended).toBe(true);
+  });
+
   it('keeps the stream and reports when the heartbeat check itself fails', async () => {
     vi.useFakeTimers();
     const f = fakes();

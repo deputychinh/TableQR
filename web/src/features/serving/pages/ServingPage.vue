@@ -9,6 +9,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import StatusChip from '@/components/StatusChip.vue';
+import StreamBanner from '@/components/StreamBanner.vue';
 import { useToastStore } from '@/stores/toast';
 import ReadyTableCard from '../components/ReadyTableCard.vue';
 import { serveItem, type FloorTable, type ReadyItem } from '../services/serving.service';
@@ -51,9 +52,7 @@ const serve = async (table: FloorTable, item: ReadyItem) => {
         </RouterLink>
       </div>
       <!-- Live connection state only; action outcomes go to the shell's toast. -->
-      <p class="serving-page__message" aria-live="polite">
-        <template v-if="status === 'reconnecting'">{{ t('serving.live.reconnecting') }}</template>
-      </p>
+      <StreamBanner :status="status" />
       <LoadingState v-if="!loaded && !failed" :label="t('serving.loading')" :rows="3" />
       <ErrorState
         v-else-if="failed"
@@ -139,12 +138,6 @@ const serve = async (table: FloorTable, item: ReadyItem) => {
   color: var(--color-text);
   text-decoration: none;
   background: var(--color-surface);
-}
-
-.serving-page__message {
-  min-block-size: 1.5em;
-  margin: 0;
-  color: var(--color-text-muted);
 }
 
 .serving-page__list {

@@ -10,6 +10,7 @@ import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import TextAreaField from '@/components/TextAreaField.vue';
+import { staffStream } from '@/composables/staff-stream';
 import { useStream } from '@/composables/useStream';
 import { formatVnd } from '@/features/menu/price';
 import { useToastStore } from '@/stores/toast';
@@ -56,7 +57,7 @@ const reloadSoon = () => {
   pendingReload = setTimeout(() => void load(), 150);
 };
 
-useStream(FLOOR_STREAM, { onSnapshot: reloadSoon, onDelta: reloadSoon });
+useStream(FLOOR_STREAM, { onSnapshot: reloadSoon, onDelta: reloadSoon }, staffStream);
 onMounted(load);
 
 const describe = (error: unknown): string => {

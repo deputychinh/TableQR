@@ -314,10 +314,13 @@ test('TQR-027/028 the kitchen hears new orders and overdue reminders until the d
     .getByRole('button', { name: 'Xong' })
     .click();
   await expect(page.getByText('Chưa có món nào cần làm')).toBeVisible();
-  const before = (await spokenOn(page)).length;
+  // (21 browser minutes with no real time passing also look like a dead stream — TQR-031 says
+  // "Mất kết nối máy chủ" — so only reminders are counted here.)
+  const reminders = async () => (await spokenOn(page)).filter((s) => s.includes(' gọi '));
+  const before = (await reminders()).length;
   await page.clock.fastForward('21:00');
   await page.clock.runFor(1_000);
-  expect(await spokenOn(page)).toHaveLength(before);
+  expect(await reminders()).toHaveLength(before);
 
   // The choice is remembered on this iPad.
   await page.reload();
@@ -325,6 +328,50 @@ test('TQR-027/028 the kitchen hears new orders and overdue reminders until the d
     'aria-checked',
     'true',
   );
+});
+
+test('TQR-031 a silently dead stream shows "Mất kết nối" and is said aloud, then recovers', async ({
+  page,
+}, info) => {
+  const r = await setUpRestaurant(page, `dead-${info.project.name}`);
+  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await recordSpeech(page);
+  await page.clock.install();
+  await signIn(page, r.kitchenEmail, STAFF_PASSWORD);
+  await expect(page).toHaveURL(/\/bep$/);
+  releaseOrder({
+    restaurantId: r.id,
+    tableName: 'Bàn 1',
+    items: [{ menuItemName: 'Phở bò tái', quantity: 1 }],
+  });
+  await expect(page.getByRole('article', { name: 'Bàn 1 · 2 khách' })).toBeVisible();
+  await page.getByRole('switch', { name: 'Bật đọc to' }).click();
+  await expect.poll(() => spokenOn(page)).toEqual(['vi-VN|Đã bật đọc to']);
+  const banner = page.getByRole('status').filter({ hasText: 'Mất kết nối — đang kết nối lại…' });
+  await expect(banner).toHaveCount(0);
+
+  // The API goes away behind the proxy: the open stream stays "open" but nothing arrives, and
+  // every new attempt fails. 2.5 heartbeats (15 s each) of silence later the screen says so.
+  await page.route('**/api/stream/station/**', (route) => route.abort());
+  await page.clock.fastForward('00:40');
+  await expect(banner).toBeVisible();
+  await page.clock.fastForward('00:06');
+  await expect.poll(() => spokenOn(page)).toContain('vi-VN|Mất kết nối máy chủ');
+  // Said once, however long it stays down.
+  await page.clock.fastForward('01:00');
+  expect((await spokenOn(page)).filter((s) => s.endsWith('Mất kết nối máy chủ'))).toHaveLength(1);
+
+  // The API is back: the next attempt gets a snapshot, the banner goes, the voice says so and
+  // the dish already on screen is not read again.
+  await page.unroute('**/api/stream/station/**');
+  await expect
+    .poll(async () => {
+      await page.clock.fastForward('00:05');
+      return spokenOn(page);
+    })
+    .toContain('vi-VN|Đã kết nối lại');
+  await expect(banner).toHaveCount(0);
+  expect((await spokenOn(page)).filter((s) => s.includes('Bàn 1: '))).toHaveLength(0);
 });
 
 // Evidence for review, not part of CI: E2E_SCREENSHOTS=1 npx playwright test kitchen --project=ipad

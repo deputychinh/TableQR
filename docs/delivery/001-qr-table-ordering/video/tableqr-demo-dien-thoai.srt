@@ -1,0 +1,119 @@
+1
+00:00:00,500 --> 00:00:06,900
+Xin chào anh chị chủ quán! Đây là TableQR: khách quét mã QR trên bàn để tự gọi món.
+
+2
+00:00:07,404 --> 00:00:13,434
+Đầu tiên, chủ quán đăng ký ngay trên điện thoại: tên quán, email và mật khẩu.
+
+3
+00:00:14,836 --> 00:00:19,649
+Bấm “Tạo nhà hàng” là xong. Trang Tổng quan chỉ ba bước để bắt đầu.
+
+4
+00:00:20,101 --> 00:00:25,761
+Bước 1: thêm thực đơn. Quán có sẵn một khu bếp, mình tạo nhóm “Món chính”.
+
+5
+00:00:26,213 --> 00:00:30,399
+Thêm món và giá bán: Bún chả, 45.000 đồng.
+
+6
+00:00:30,852 --> 00:00:36,222
+Thêm tiếp Phở bò, Nem rán, Trà đá… là thực đơn đã sẵn sàng.
+
+7
+00:00:36,675 --> 00:00:40,663
+Bước 2: thêm bàn. Mỗi bàn có một mã QR riêng.
+
+8
+00:00:44,400 --> 00:00:48,620
+Bấm “In tất cả mã QR”, in ra rồi dán lên từng bàn.
+
+9
+00:00:49,534 --> 00:00:55,600
+Bước 3: chọn cách quán vận hành. Ví dụ: món chờ quá 10 phút thì bếp được nhắc.
+
+10
+00:00:56,053 --> 00:01:01,609
+Chuyển khoản QR đang tắt: khách trả tiền tại quầy. Muốn dùng thì bật sau.
+
+11
+00:01:02,061 --> 00:01:07,397
+Tạo tài khoản cho bếp: tên, email, mật khẩu, chọn vai trò “Bếp”.
+
+12
+00:01:14,139 --> 00:01:18,323
+Đầu bếp đăng nhập trên điện thoại của bếp bằng tài khoản vừa tạo.
+
+13
+00:01:19,164 --> 00:01:22,758
+Bấm “Bật đọc to”: có món mới là máy đọc lên.
+
+14
+00:01:23,558 --> 00:01:24,888
+[Máy ở bếp đọc] Đã bật đọc to
+
+15
+00:01:25,204 --> 00:01:29,302
+Khách ngồi Bàn 1, quét mã QR bằng camera điện thoại.
+
+16
+00:01:30,741 --> 00:01:35,101
+Trang gọi món mở ngay, không cần cài app. Khách chọn số người.
+
+17
+00:01:36,512 --> 00:01:40,796
+Khách gọi 2 phở bò và 1 trà đá, rồi bấm “Gửi món”.
+
+18
+00:01:42,197 --> 00:01:44,820
+Khách thấy từng món đang chờ bếp làm.
+
+19
+00:01:46,389 --> 00:01:49,587
+[Máy ở bếp đọc] Bàn 1: hai phở bò, một trà đá
+
+20
+00:01:49,906 --> 00:01:54,066
+Đầu bếp không cần nhìn màn hình: máy đọc to bàn và món.
+
+21
+00:01:54,517 --> 00:01:55,753
+10 phút sau…
+
+22
+00:01:55,958 --> 00:02:02,326
+[Máy ở bếp đọc] Bàn 1 gọi hai phở bò đã 10 phút, Bàn 1 gọi trà đá đã 10 phút, chưa ra món
+
+23
+00:02:02,632 --> 00:02:07,084
+Món chờ quá 10 phút: máy nhắc lại, phiếu món hiện “Trễ”.
+
+24
+00:02:07,537 --> 00:02:10,654
+Bếp bấm “Bắt đầu nấu”, nấu xong bấm “Xong”.
+
+25
+00:02:14,003 --> 00:02:18,493
+Phục vụ thấy món đã xong, bưng ra rồi bấm “Đã ra bàn”.
+
+26
+00:02:26,937 --> 00:02:30,169
+Điện thoại của khách tự cập nhật: “Đã ra bàn”.
+
+27
+00:02:30,621 --> 00:02:34,940
+Ăn xong, khách bấm “Xem hoá đơn / Thanh toán”: thanh toán tại quầy.
+
+28
+00:02:35,403 --> 00:02:38,103
+Thu ngân nhận tiền, bấm “Đã nhận tiền”.
+
+29
+00:02:42,852 --> 00:02:48,587
+Khách thấy “Đã thanh toán”. Quán cũng có thể bật chuyển khoản QR trong Cài đặt.
+
+30
+00:02:50,233 --> 00:02:58,006
+Mỗi quán một tài khoản, cách vận hành riêng. Dùng ngay trên điện thoại!

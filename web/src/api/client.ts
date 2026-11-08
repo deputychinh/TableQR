@@ -29,6 +29,11 @@ export const setUnauthorizedHandler = (handler: UnauthorizedHandler | undefined)
   unauthorizedHandler = handler;
 };
 
+/** For callers that learn of an ended session without a 401 answer (a revoked event stream). */
+export const reportUnauthorized = (): void => {
+  unauthorizedHandler?.();
+};
+
 const SELF_HANDLED_401 = ['/auth/', '/me'];
 
 const toApiError = async (response: Response): Promise<ApiError> => {
