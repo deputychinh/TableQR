@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, eq, gt, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gt, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
@@ -303,7 +303,14 @@ export class BookingService {
         const [table] = await tx
           .select({ seats: diningTables.seats })
           .from(diningTables)
-          .where(and(eq(diningTables.restaurantId, tenant), eq(diningTables.id, tableId)))
+          .where(
+            and(
+              eq(diningTables.restaurantId, tenant),
+              eq(diningTables.id, tableId),
+              // A hidden table (TQR-024) takes no bookings.
+              isNull(diningTables.archivedAt),
+            ),
+          )
           .limit(1);
         if (!table) throw notFound();
         if (table.seats < current.partySize) {
@@ -462,7 +469,13 @@ export class BookingService {
     const tables = await executor
       .select({ id: diningTables.id, seats: diningTables.seats })
       .from(diningTables)
-      .where(and(eq(diningTables.restaurantId, tenant), gte(diningTables.seats, partySize)))
+      .where(
+        and(
+          eq(diningTables.restaurantId, tenant),
+          gte(diningTables.seats, partySize),
+          isNull(diningTables.archivedAt),
+        ),
+      )
       .orderBy(asc(diningTables.seats), asc(diningTables.name), asc(diningTables.id));
     const candidates = candidateTables(tables, partySize);
     if (candidates.length === 0) return { candidates, held: [] };

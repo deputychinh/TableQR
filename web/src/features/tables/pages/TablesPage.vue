@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { Plus, Printer, QrCode } from 'lucide-vue-next';
+import { ChevronDown, EyeOff, Plus, Printer, QrCode, Users } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
 import RoleShell from '@/app/layouts/RoleShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
@@ -11,6 +11,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
+import StatusChip from '@/components/StatusChip.vue';
 import { useSessionStore } from '@/stores/session';
 import { useToastStore } from '@/stores/toast';
 import type { TableInput, TableItem } from '../api';
@@ -21,7 +22,10 @@ import { useTables } from '../composables/useTables';
 const { t } = useI18n();
 const router = useRouter();
 const session = useSessionStore();
-const { items, status, load, add, update, rotate, remove } = useTables();
+const { items, archived, status, load, add, update, rotate, remove, archive, unarchive } =
+  useTables();
+const showArchived = ref(false);
+const showingId = ref<string>();
 const canManage = computed(() => session.me?.user.role === 'owner');
 const origin = window.location.origin;
 const toast = useToastStore();
@@ -54,15 +58,14 @@ const save = async (input: TableInput) => {
 const confirmAction = async () => {
   const pending = confirming.value;
   if (!pending) return;
-  if (pending.kind === 'refused') {
-    confirming.value = undefined;
-    openEdit(pending.table);
-    return;
-  }
   confirmBusy.value = true;
   actionError.value = undefined;
   try {
-    if (pending.kind === 'rotate') {
+    if (pending.kind === 'refused') {
+      // TQR-024: a table with history is hidden instead ("Ẩn bàn"); "Bàn đã ẩn" lists it.
+      await archive(pending.table.id);
+      toast.show(t('tables.archive.done', { name: pending.table.name }));
+    } else if (pending.kind === 'rotate') {
       await rotate(pending.table.id);
       toast.show(t('tables.rotate.done', { name: pending.table.name }));
     } else {
@@ -75,18 +78,41 @@ const confirmAction = async () => {
     if (error instanceof ApiError && error.code === 'TABLE_HAS_HISTORY') {
       // Keep the sheet and say why (TQR-007 review): the table carries paid bills and bookings.
       confirming.value = { kind: 'refused', table: pending.table };
-    } else if (error instanceof ApiError && error.code === 'NOT_FOUND') {
-      actionError.value = t('tables.errors.gone');
-      await load();
     } else {
-      actionError.value = t(
-        error instanceof ApiError && error.code === 'NETWORK'
-          ? 'errors.network'
-          : 'errors.unexpected',
-      );
+      await showError(error);
     }
   } finally {
     confirmBusy.value = false;
+  }
+};
+
+/** One message for a failed table action, under the page title. */
+const showError = async (error: unknown) => {
+  if (error instanceof ApiError && error.code === 'TABLE_IN_USE') {
+    actionError.value = t('tables.archive.inUse');
+  } else if (error instanceof ApiError && error.code === 'NOT_FOUND') {
+    actionError.value = t('tables.errors.gone');
+    await load();
+  } else {
+    actionError.value = t(
+      error instanceof ApiError && error.code === 'NETWORK'
+        ? 'errors.network'
+        : 'errors.unexpected',
+    );
+  }
+};
+
+/** "Hiện lại": reversible, so no confirmation; the table is back in the list and printable. */
+const showAgain = async (table: TableItem) => {
+  showingId.value = table.id;
+  actionError.value = undefined;
+  try {
+    await unarchive(table.id);
+    toast.show(t('tables.archived.shown', { name: table.name }));
+  } catch (error: unknown) {
+    await showError(error);
+  } finally {
+    showingId.value = undefined;
   }
 };
 
@@ -156,6 +182,56 @@ const printAll = () => router.push('/quan-ly/ban/in');
           </li>
         </ul>
       </template>
+
+      <section
+        v-if="canManage && status === 'ready' && archived.length > 0"
+        class="tables-page__archived"
+        aria-labelledby="tables-archived-toggle"
+      >
+        <h2 class="tables-page__archived-heading">
+          <button
+            id="tables-archived-toggle"
+            type="button"
+            class="tables-page__archived-toggle"
+            :aria-expanded="showArchived"
+            aria-controls="tables-archived-list"
+            @click="showArchived = !showArchived"
+          >
+            <EyeOff :size="20" aria-hidden="true" />
+            <span>{{ t('tables.archived.toggle', { n: archived.length }) }}</span>
+            <ChevronDown
+              :size="20"
+              aria-hidden="true"
+              class="tables-page__archived-chevron"
+              :class="{ 'tables-page__archived-chevron--open': showArchived }"
+            />
+          </button>
+        </h2>
+        <div v-show="showArchived" id="tables-archived-list" class="tables-page__archived-body">
+          <p class="tables-page__archived-lead">{{ t('tables.archived.lead') }}</p>
+          <ul class="tables-page__archived-list">
+            <li v-for="table in archived" :key="table.id" class="tables-page__archived-item">
+              <div class="tables-page__archived-info">
+                <span class="tables-page__archived-name">{{ table.name }}</span>
+                <span class="tables-page__archived-meta">
+                  <Users :size="16" aria-hidden="true" />
+                  {{ t('tables.seats', { n: table.seats }) }}
+                </span>
+                <StatusChip :label="t('tables.archived.badge')" :icon="EyeOff" />
+              </div>
+              <BaseButton
+                variant="secondary"
+                class="tables-page__archived-show"
+                :loading="showingId === table.id"
+                :aria-label="t('tables.archived.showFor', { name: table.name })"
+                @click="showAgain(table)"
+              >
+                {{ t('tables.archived.show') }}
+              </BaseButton>
+            </li>
+          </ul>
+        </div>
+      </section>
     </div>
 
     <TableFormSheet :open="formOpen" :table="editing" :save="save" @close="formOpen = false" />
@@ -217,6 +293,113 @@ const printAll = () => router.push('/quan-ly/ban/in');
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.tables-page__archived {
+  display: grid;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.tables-page__archived-heading {
+  margin: 0;
+  font-size: var(--font-size-lead);
+}
+
+.tables-page__archived-toggle {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: var(--target-min);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-2);
+  font: inherit;
+  color: var(--color-text);
+  background: none;
+  cursor: pointer;
+}
+
+.tables-page__archived-toggle:hover {
+  background: var(--color-surface-muted);
+}
+
+.tables-page__archived-toggle:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.tables-page__archived-chevron {
+  margin-inline-start: auto;
+  transition: transform var(--duration-fast);
+}
+
+.tables-page__archived-chevron--open {
+  transform: rotate(180deg);
+}
+
+.tables-page__archived-body {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tables-page__archived-lead {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.tables-page__archived-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tables-page__archived-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-3);
+  background: var(--color-surface);
+}
+
+.tables-page__archived-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.tables-page__archived-name {
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-lead);
+  font-weight: var(--font-weight-bold);
+}
+
+.tables-page__archived-meta {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+/* Full width under the name on phones (thumb reach); beside it once there is room. */
+.tables-page__archived-show {
+  flex: 1 1 100%;
+}
+
+@media (width >= 600px) {
+  .tables-page__archived-show {
+    flex: 0 0 auto;
+  }
 }
 
 @media (width >= 840px) {

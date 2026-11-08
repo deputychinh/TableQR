@@ -40,7 +40,7 @@ Navigation comes from one table, `web/src/app/layouts/navigation.ts` (`ROLE_NAV`
 
 ### Sheets and their buttons
 
-`BaseSheet` keeps its title and buttons fixed and scrolls only the body, so actions such as "Xoá món" are always on screen on a phone. The cancel button of every sheet reads **"Huỷ"**; **"Đóng"** only where the sheet changes nothing (an explanation, the "Thêm" sheet, a refusal such as "Không xoá được Bàn 1"). A refused destructive action keeps its sheet open, says why in plain words and offers the safe alternative (rename the table; "Ngừng bán" a dish).
+`BaseSheet` keeps its title and buttons fixed and scrolls only the body, so actions such as "Xoá món" are always on screen on a phone. The cancel button of every sheet reads **"Huỷ"**; **"Đóng"** only where the sheet changes nothing (an explanation, the "Thêm" sheet, a refusal such as "Không xoá được Bàn 1"). A refused destructive action keeps its sheet open, says why in plain words and offers the safe alternative as its primary button ("Ẩn bàn" for a table with history, TQR-024; "Ngừng bán" a dish). Hidden items sit in a collapsed section at the end of their list ("Bàn đã ẩn (n)", a disclosure button with `aria-expanded`) with an "Đã ẩn" chip and a "Hiện lại" button.
 
 ## Components (one each, reused)
 

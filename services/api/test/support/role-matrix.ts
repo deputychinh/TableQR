@@ -185,6 +185,9 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     body: () => ({ seats: 6 }),
   },
   { method: 'post', path: (f) => `/api/tables/${f.tableId}/rotate-qr`, allowed: OWNER },
+  // archive (TQR-024): hide then show again, so the table stays usable for the rows after it
+  { method: 'post', path: (f) => `/api/tables/${f.tableId}/archive`, allowed: OWNER },
+  { method: 'post', path: (f) => `/api/tables/${f.tableId}/unarchive`, allowed: OWNER },
   { method: 'delete', path: (f) => `/api/tables/${f.spareTableId}`, allowed: OWNER },
   // billing (TQR-018/019)
   { method: 'get', path: () => '/api/bills/overview', allowed: CASHIER },

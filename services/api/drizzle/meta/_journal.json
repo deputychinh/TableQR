@@ -57,6 +57,13 @@
       "when": 1794112553071,
       "tag": "0007_restrict_table_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794134371457,
+      "tag": "0008_archive_tables",
+      "breakpoints": true
     }
   ]
 }

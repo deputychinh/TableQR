@@ -6,6 +6,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Added
 
+- "Ẩn bàn": a table with history (that cannot be deleted) can be hidden from the refused-delete sheet — `POST /api/tables/:id/archive` / `unarchive` (owner only; 409 `TABLE_IN_USE` while guests sit at it), migration `0008_archive_tables` (`dining_tables.archived_at`); hidden tables leave the list (`GET /api/tables` → `{items, archived}`), the print sheet and booking assignment, their QR codes (current and old) answer "Không tìm thấy bàn", and "Bàn đã ẩn" lists them with "Hiện lại"; guest tokens resolve in one place (`TablesService.findLiveByToken`) (TQR-024).
 - Kitchen "Bỏ món": `POST /api/kitchen/items/:id/cancel` (waiting or cooking → cancelled, owner and kitchen) with a confirm sheet on `/bep`; the guest sees "Đã huỷ" (TQR-025).
 
 ### Fixed

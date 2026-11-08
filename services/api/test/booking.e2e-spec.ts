@@ -153,6 +153,28 @@ describe('table booking (e2e, spec S14–S15, ADR 0007)', () => {
       });
     });
 
+    it('TQR-024 never books a hidden table, and staff cannot move a booking onto one', async () => {
+      const o = await owner();
+      const hidden = await addTable(o, 'Bàn 2', 2);
+      const four = await addTable(o, 'Bàn 4', 4);
+      await http()
+        .post(`/api/tables/${hidden}/archive`)
+        .set('origin', ORIGIN)
+        .set('cookie', o.cookie)
+        .expect(200);
+      const date = day(2);
+      const created = await book(o.slug, { date, time: '12:00', partySize: 2 }).expect(201);
+      const [row] = await list(o, date);
+      expect(row).toMatchObject({ id: created.body.id, tableId: four });
+      const moved = await act(o, created.body.id as string, 'confirm', { tableId: hidden }).expect(
+        404,
+      );
+      expect(moved.body.code).toBe('NOT_FOUND');
+      // With the only fitting table taken, the hidden one is still not offered.
+      const refused = await book(o.slug, { date, time: '12:00', partySize: 2 }).expect(409);
+      expect(refused.body.code).toBe('NO_TABLE_FREE');
+    });
+
     it('AC48 offers the nearest free start times when no table is free, and back-to-back slots fit', async () => {
       const o = await owner();
       await addTable(o, 'Bàn 1', 4);

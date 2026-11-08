@@ -344,6 +344,152 @@ describe('tables and QR codes (e2e)', () => {
     });
   });
 
+  describe('TQR-024 hide a table with history ("Ẩn bàn") and show it again', () => {
+    const action = (cookie: string, id: string, verb: 'archive' | 'unarchive') =>
+      http().post(`/api/tables/${id}/${verb}`).set('origin', ORIGIN).set('cookie', cookie);
+    const listOf = async (cookie: string) =>
+      (await http().get('/api/tables').set('cookie', cookie).expect(200)).body as {
+        items: { id: string }[];
+        archived: { id: string; archivedAt: string }[];
+      };
+    const closedSessionWithPaidBill = async (restaurantId: string, tableId: string) => {
+      const [session] = await db
+        .insert(tableSessions)
+        .values({
+          restaurantId,
+          tableId,
+          partySize: 2,
+          openedBy: 'staff',
+          status: 'closed',
+          closedAt: new Date(),
+        })
+        .returning({ id: tableSessions.id });
+      const sessionId = session?.id ?? '';
+      await db.insert(bills).values({
+        restaurantId,
+        sessionId,
+        code: 'ZZ12C',
+        amountVnd: 90_000,
+        status: 'paid',
+        paidAt: new Date(),
+        method: 'cash',
+      });
+      return sessionId;
+    };
+    const checkInNext = (token: string) =>
+      http().get(`/api/g/check-in?qr=${encodeURIComponent(token)}`);
+    const checkIn = (token: string) =>
+      http().post('/api/g/session').set('origin', ORIGIN).send({ qrToken: token, partySize: 2 });
+
+    it('hides a table with a paid bill: out of the list, in "archived", history kept, its QR codes (current and old) answer "not found"', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie, 'Bàn cũ');
+      const other = await addTable(a.cookie, 'Bàn 2');
+      const rotated = await http()
+        .post(`/api/tables/${table.id}/rotate-qr`)
+        .set('origin', ORIGIN)
+        .set('cookie', a.cookie)
+        .expect(200);
+      const current = rotated.body.qrToken as string;
+      const sessionId = await closedSessionWithPaidBill(a.restaurantId, table.id);
+
+      const response = await action(a.cookie, table.id, 'archive').expect(200);
+      expect(response.body).toMatchObject({ id: table.id, name: 'Bàn cũ' });
+      expect(Date.parse(response.body.archivedAt as string)).not.toBeNaN();
+
+      const list = await listOf(a.cookie);
+      expect(list.items.map((i) => i.id)).toEqual([other.id]);
+      expect(list.archived).toEqual([response.body]);
+      await http().get(`/api/tables/${table.id}`).set('cookie', a.cookie).expect(200);
+      expect(await db.select().from(bills).where(eq(bills.sessionId, sessionId))).toHaveLength(1);
+      expect(
+        await db.select().from(tableSessions).where(eq(tableSessions.id, sessionId)),
+      ).toHaveLength(1);
+
+      for (const token of [current, table.qrToken]) {
+        const guestView = await guest(token).expect(404);
+        expect(guestView.body).toMatchObject({
+          code: 'TABLE_NOT_FOUND',
+          detail: 'Không tìm thấy bàn',
+        });
+        expect((await checkInNext(token).expect(404)).body.code).toBe('TABLE_NOT_FOUND');
+        expect((await checkIn(token).expect(404)).body.code).toBe('TABLE_NOT_FOUND');
+      }
+      expect(
+        await db.select().from(tableSessions).where(eq(tableSessions.tableId, table.id)),
+      ).toHaveLength(1);
+      await guest(other.qrToken).expect(200);
+    });
+
+    it('"Hiện lại" brings it back: listed, its current code works again (old ones stay expired)', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      const rotated = await http()
+        .post(`/api/tables/${table.id}/rotate-qr`)
+        .set('origin', ORIGIN)
+        .set('cookie', a.cookie)
+        .expect(200);
+      await action(a.cookie, table.id, 'archive').expect(200);
+      const shown = await action(a.cookie, table.id, 'unarchive').expect(200);
+      expect(shown.body.archivedAt).toBeNull();
+      const list = await listOf(a.cookie);
+      expect(list.items.map((i) => i.id)).toEqual([table.id]);
+      expect(list.archived).toEqual([]);
+      await guest(rotated.body.qrToken as string).expect(200);
+      expect((await guest(table.qrToken).expect(410)).body.code).toBe('QR_EXPIRED');
+      await checkIn(rotated.body.qrToken as string).expect(201);
+    });
+
+    it('refuses a table with guests at it (open session) with 409 TABLE_IN_USE and leaves it listed', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      await checkIn(table.qrToken).expect(201);
+      const response = await action(a.cookie, table.id, 'archive').expect(409);
+      expect(response.body).toMatchObject({ code: 'TABLE_IN_USE' });
+      expect(response.body.detail).toMatch(/đang có khách/);
+      expect((await listOf(a.cookie)).items.map((i) => i.id)).toEqual([table.id]);
+      await guest(table.qrToken).expect(200);
+    });
+
+    it('hiding twice keeps the first time; staff cannot open a hidden table; a table without history can still be deleted once hidden', async () => {
+      const a = await owner();
+      const table = await addTable(a.cookie);
+      const first = await action(a.cookie, table.id, 'archive').expect(200);
+      t.clock.advance(60_000);
+      const second = await action(a.cookie, table.id, 'archive').expect(200);
+      expect(second.body.archivedAt).toBe(first.body.archivedAt);
+      const opened = await http()
+        .post('/api/sessions')
+        .set('origin', ORIGIN)
+        .set('cookie', a.cookie)
+        .send({ tableId: table.id, partySize: 2 })
+        .expect(404);
+      expect(opened.body.code).toBe('NOT_FOUND');
+      await http()
+        .delete(`/api/tables/${table.id}`)
+        .set('origin', ORIGIN)
+        .set('cookie', a.cookie)
+        .expect(204);
+    });
+
+    it('only the owner hides or shows tables; another restaurant’s owner gets 404 and nothing changes', async () => {
+      const a = await owner();
+      const b = await owner('Quán Khác');
+      const table = await addTable(a.cookie);
+      for (const role of ['cashier', 'waiter', 'kitchen'] as const) {
+        const cookie = await staff(a.restaurantId, role);
+        for (const verb of ['archive', 'unarchive'] as const) {
+          expect((await action(cookie, table.id, verb).expect(403)).body.code).toBe('FORBIDDEN');
+        }
+      }
+      for (const verb of ['archive', 'unarchive'] as const) {
+        await action(b.cookie, table.id, verb).expect(404);
+      }
+      await action(a.cookie, 'not-a-uuid', 'archive').expect(404);
+      expect((await listOf(a.cookie)).archived).toEqual([]);
+    });
+  });
+
   describe('AC10 regenerate a QR code', () => {
     it('issues a new token; the old one answers 410 "Mã QR đã hết hạn", the new one works', async () => {
       const a = await owner();
