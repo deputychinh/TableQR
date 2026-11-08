@@ -1,5 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
+import { sql } from './support/db.js';
 
 const expectNoSeriousA11yIssues = async (page: Page) => {
   // axe's target-size rule counts a button scrolled under the sticky bottom nav as "obscured";
@@ -105,4 +106,59 @@ test('owner adds tables, prints the QR sheet, regenerates a code and the old cod
   await guest.goto('/t/AAAAAAAAAAAAAAAAAAAAAA');
   await expect(guest.getByRole('heading', { level: 1, name: 'Không tìm thấy bàn' })).toBeVisible();
   await expectNoSeriousA11yIssues(guest);
+});
+
+test('a table with a paid bill cannot be deleted; a table without history can (TQR-007 review)', async ({
+  page,
+}, info) => {
+  await page.goto('/dang-ky');
+  await page.getByLabel('Tên nhà hàng').fill('Quán Giữ Lịch Sử Thu Tiền Của Bàn Ăn Phố Cổ');
+  const email = `keep-${info.project.name}-${Date.now()}@example.com`;
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('mat-khau-dai-123');
+  await page.getByRole('button', { name: 'Tạo nhà hàng' }).click();
+  await expect(page).toHaveURL(/\/quan-ly$/);
+  await page.goto('/quan-ly/ban');
+  await page.getByRole('button', { name: 'Thêm bàn đầu tiên' }).click();
+  await addTable(page, 'Bàn 1', 0);
+  await page.getByRole('button', { name: 'Thêm bàn', exact: true }).click();
+  await addTable(page, 'Bàn 2', 0);
+
+  // Bàn 1 served a party that paid (closed session + paid bill).
+  sql(`
+    with t as (
+      select d.id, d.restaurant_id from dining_tables d
+        join users u on u.restaurant_id = d.restaurant_id
+      where u.email = '${email}' and d.name = 'Bàn 1'
+    ), s as (
+      insert into table_sessions (restaurant_id, table_id, party_size, opened_by, status, closed_at)
+      select restaurant_id, id, 2, 'staff', 'closed', now() from t returning id, restaurant_id
+    )
+    insert into bills (restaurant_id, session_id, code, amount_vnd, status, paid_at, method)
+    select restaurant_id, id, 'KEEP1', 150000, 'paid', now(), 'cash' from s;
+  `);
+  const paidBills = () =>
+    sql(`select count(*) from bills b join users u on u.restaurant_id = b.restaurant_id
+         where u.email = '${email}' and b.status = 'paid'`);
+  expect(paidBills()).toBe('1');
+
+  await page.getByRole('button', { name: 'Xoá Bàn 1' }).click();
+  await page
+    .getByRole('dialog', { name: 'Xoá Bàn 1?' })
+    .getByRole('button', { name: 'Xoá bàn' })
+    .click();
+  const refused = page.getByRole('dialog', { name: 'Không xoá được Bàn 1' });
+  await expect(refused).toContainText('giữ lịch sử thu tiền');
+  await expectNoSeriousA11yIssues(page);
+  await refused.getByRole('button', { name: 'Đóng' }).click();
+  await expect(page.getByRole('heading', { name: 'Bàn 1' })).toBeVisible();
+  expect(paidBills()).toBe('1');
+
+  await page.getByRole('button', { name: 'Xoá Bàn 2' }).click();
+  await page
+    .getByRole('dialog', { name: 'Xoá Bàn 2?' })
+    .getByRole('button', { name: 'Xoá bàn' })
+    .click();
+  await expect(page.getByRole('status')).toContainText('Đã xoá Bàn 2.');
+  await expect(page.getByRole('heading', { name: 'Bàn 2' })).toHaveCount(0);
 });

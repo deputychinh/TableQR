@@ -3,6 +3,7 @@ export const kitchenLocale = {
   kitchen: {
     title: 'Bếp',
     stations: 'Khu bếp',
+    tabWaiting: '{n} món đang chờ',
     loading: 'Đang tải hàng chờ…',
     loadFailed: 'Không tải được hàng chờ của bếp.',
     retry: 'Thử lại',
@@ -42,6 +43,8 @@ export const kitchenLocale = {
       title: 'Có bàn gọi món này trước',
       body: '{tables} gọi {dish} trước bàn này. Ghi lý do nếu bạn vẫn làm bàn này trước.',
       bodyOther: 'Có bàn khác gọi {dish} trước bàn này. Ghi lý do nếu bạn vẫn làm bàn này trước.',
+      bodySameTable:
+        'Bàn này có một phần {dish} gọi trước món này. Ghi lý do nếu bạn vẫn làm món này trước.',
       reason: 'Lý do làm bàn này trước',
       hint: 'Ví dụ: Bàn này có trẻ nhỏ, khách giục. Tối đa 140 ký tự.',
       required: 'Hãy ghi lý do.',

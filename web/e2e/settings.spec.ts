@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const expectNoSeriousA11yIssues = async (page: Page) => {
@@ -66,7 +66,48 @@ test('leaving with unsaved changes asks first', async ({ page }, info) => {
   await page.getByRole('link', { name: 'Tổng quan' }).click();
   const sheet = page.getByRole('dialog', { name: 'Rời trang khi chưa lưu?' });
   await expect(sheet).toBeVisible();
-  await sheet.getByRole('button', { name: 'Ở lại' }).click();
+  await sheet.getByRole('button', { name: 'Huỷ' }).click();
   await expect(page).toHaveURL(/\/quan-ly\/cai-dat$/);
   await expect(page.getByRole('radio', { name: /Nhân viên mở bàn/ })).toBeChecked();
+});
+
+test('the field to fix is focused in view, never under the sticky save bar (r2 review)', async ({
+  page,
+}, info) => {
+  await page.goto('/dang-ky');
+  await page.getByLabel('Tên nhà hàng').fill('Nhà hàng Lẩu Nấm Ashima Phố Cổ Hà Nội Chi Nhánh Một');
+  await page
+    .getByLabel('Email', { exact: true })
+    .fill(`invalid-${info.project.name}-${Date.now()}@example.com`);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('mat-khau-dai-123');
+  await page.getByRole('button', { name: 'Tạo nhà hàng' }).click();
+  await expect(page).toHaveURL(/\/quan-ly$/);
+  await page.goto('/quan-ly/cai-dat');
+  await page.getByLabel('Ngân hàng').selectOption({ label: 'Vietcombank' });
+  await page.getByLabel('Số tài khoản').fill('123');
+  await page.getByLabel('Tên chủ tài khoản').fill('Nguyễn Văn Ánh');
+  // Back to the top, so saving has to bring the wrong field into view.
+  await page.locator('main').evaluate((main) => main.scrollTo(0, 0));
+  await page.getByRole('button', { name: 'Lưu thay đổi' }).click();
+
+  const field = page.getByLabel('Số tài khoản');
+  await expect(field).toBeFocused();
+  await expect(field).toHaveAttribute('aria-invalid', 'true');
+  // Fully between the header and the save bar (polled until the scroll settles).
+  await expect
+    .poll(async () => {
+      const [box, bar, header] = await Promise.all([
+        field.boundingBox(),
+        page.locator('.settings-page__bar').boundingBox(),
+        page.locator('header').first().boundingBox(),
+      ]);
+      return (
+        box !== null &&
+        bar !== null &&
+        header !== null &&
+        box.y >= header.y + header.height &&
+        box.y + box.height <= bar.y
+      );
+    })
+    .toBe(true);
 });

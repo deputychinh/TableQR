@@ -158,14 +158,14 @@ describe('SettingsPage', () => {
     expect(await screen.findByText(/Tài khoản đổi lần cuối lúc/)).toBeTruthy();
   });
 
-  it('"Xem lại" closes the bank sheet without saving', async () => {
+  it('"Huỷ" closes the bank sheet without saving', async () => {
     const calls = stubApi(ownerSettings());
     await renderPage();
     await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970422');
     await userEvent.type(screen.getByLabelText('Số tài khoản'), '123456');
     await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'An');
     await userEvent.click(saveButton());
-    await userEvent.click(screen.getByRole('button', { name: 'Xem lại' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Huỷ' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
   });
@@ -196,6 +196,8 @@ describe('SettingsPage', () => {
   });
 
   it('checks the form before sending and focuses the first wrong field', async () => {
+    const scrolled = vi.fn<(options?: ScrollIntoViewOptions) => void>();
+    Element.prototype.scrollIntoView = scrolled;
     const calls = stubApi(ownerSettings());
     await renderPage();
     await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970436');
@@ -205,6 +207,8 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Số tài khoản gồm 6 đến 19 chữ số.')).toBeTruthy();
     expect(screen.getByText('Kiểm tra lại các ô báo đỏ rồi lưu lại.')).toBeTruthy();
     expect(document.activeElement).toBe(screen.getByLabelText('Số tài khoản'));
+    // Centred, so the sticky save bar cannot cover the field it points at.
+    expect(scrolled).toHaveBeenCalledWith({ block: 'center' });
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
     await userEvent.type(screen.getByLabelText('Số tài khoản'), '6');
     expect(screen.queryByText('Số tài khoản gồm 6 đến 19 chữ số.')).toBeNull();
@@ -263,7 +267,7 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByText('Nhân viên mở bàn'));
     const blocked = router.push('/quan-ly');
     const sheet = await screen.findByRole('dialog', { name: 'Rời trang khi chưa lưu?' });
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Ở lại' }));
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Huỷ' }));
     await blocked;
     expect(router.currentRoute.value.path).toBe('/quan-ly/cai-dat');
     const event = new Event('beforeunload', { cancelable: true });

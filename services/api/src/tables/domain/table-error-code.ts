@@ -2,6 +2,7 @@
 export const TableErrorCode = {
   NameTaken: 'TABLE_NAME_TAKEN',
   LimitReached: 'TABLE_LIMIT_REACHED',
+  HasHistory: 'TABLE_HAS_HISTORY',
   QrExpired: 'QR_EXPIRED',
   GuestTableNotFound: 'TABLE_NOT_FOUND',
 } as const;

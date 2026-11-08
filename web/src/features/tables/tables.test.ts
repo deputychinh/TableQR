@@ -200,6 +200,22 @@ describe('tables page', () => {
     expect(await screen.findByRole('heading', { name: 'Chưa có bàn nào' })).toBeTruthy();
   });
 
+  it('explains in the sheet why a table with history cannot be deleted and offers a rename', async () => {
+    fakeApi({
+      'GET /api/tables': () => jsonResponse({ items: [table()] }),
+      'DELETE /api/tables/11111111-1111-4111-8111-111111111111': () =>
+        jsonResponse({ code: 'TABLE_HAS_HISTORY' }, 409),
+    });
+    await renderTables();
+    await userEvent.click(await screen.findByRole('button', { name: 'Xoá Bàn 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Xoá bàn' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Không xoá được Bàn 1' });
+    expect(sheet.textContent).toContain('giữ lịch sử');
+    expect(screen.getByRole('heading', { name: 'Bàn 1' })).toBeTruthy();
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Đổi tên bàn' }));
+    expect(await screen.findByRole('dialog', { name: 'Sửa Bàn 1' })).toBeTruthy();
+  });
+
   it('lists tables in natural order: Bàn 2 before Bàn 10', async () => {
     fakeApi({
       'GET /api/tables': () =>

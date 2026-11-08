@@ -178,10 +178,10 @@ describe('KitchenPage (S9)', () => {
     });
     const { router } = await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
     const tabs = await screen.findAllByRole('tab');
-    expect(tabs.map((t) => [t.textContent?.trim(), t.getAttribute('aria-selected')])).toEqual([
-      ['Bếp nóng', 'true'],
-      ['Quầy bar', 'false'],
-    ]);
+    expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+    // Each tab says how many dishes wait there (TQR-014 review); none shows no count.
+    expect(screen.getByRole('tab', { name: 'Bếp nóng , 2 món đang chờ' })).toBe(tabs[0]);
+    expect(screen.getByRole('tab', { name: 'Quầy bar' })).toBe(tabs[1]);
     const waiting = await screen.findByRole('region', { name: 'Đang chờ (2)' });
     expect(
       within(waiting)
@@ -265,6 +265,33 @@ describe('KitchenPage (S9)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Bắt đầu nấu' }));
     await screen.findByRole('region', { name: 'Đang nấu (1)' });
+  });
+
+  it('says "món này gọi trước" when the older order of the dish is the same table', async () => {
+    const older = ticket('1', { tableName: 'Bàn 1' });
+    const younger = ticket('2', { tableName: 'Bàn 1', status: 'cooking', version: 2 });
+    stubApi({
+      'GET /api/kitchen/stations': () => jsonResponse({ stations }),
+      'GET /api/kitchen/stations/hot/queue': () => jsonResponse(queue([older, younger])),
+      'POST /api/kitchen/items/2/done': () =>
+        jsonResponse({ code: 'SKIP_REASON_REQUIRED', older: [] }, 422),
+    });
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    const cooking = await screen.findByRole('region', { name: 'Đang nấu (1)' });
+    await userEvent.click(within(cooking).getByRole('button', { name: 'Xong' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Có bàn gọi món này trước' });
+    expect(sheet.textContent).toContain('Bàn này có một phần Phở bò tái gọi trước món này.');
+    expect(sheet.textContent).not.toContain('Bàn 1 gọi');
+  });
+
+  it('keeps the open station’s tab count live from its queue', async () => {
+    stubApi({
+      'GET /api/kitchen/stations': () => jsonResponse({ stations }),
+      'GET /api/kitchen/stations/hot/queue': () => jsonResponse(queue([ticket('1')])),
+    });
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    await screen.findByRole('region', { name: 'Đang chờ (1)' });
+    expect(await screen.findByRole('tab', { name: 'Bếp nóng , 1 món đang chờ' })).toBeTruthy();
   });
 
   it('says the item changed elsewhere and re-reads the queue on 409', async () => {

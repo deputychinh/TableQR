@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const OWNER_PASSWORD = 'mat-khau-dai-123';
@@ -48,7 +48,15 @@ test('a waiter opens Bàn & QR from their home, sees only reachable pages and pr
 
   // Navigation: their home and the pages open to floor staff — no owner-only sections.
   const nav = page.getByRole('navigation', { name: 'Quản lý nhà hàng' });
-  await expect(nav.getByRole('link')).toHaveText(['Phục vụ', 'Bàn & QR', 'Đặt bàn']);
+  await expect(nav.getByRole('link')).toHaveText(['Phục vụ', 'Duyệt đơn', 'Bàn & QR', 'Đặt bàn']);
+  await expect(nav.getByRole('button', { name: 'Thêm' })).toHaveCount(0);
+  // Duyệt đơn and back to Phục vụ from the same bar (one shell per role).
+  await nav.getByRole('link', { name: 'Duyệt đơn' }).click();
+  await expect(page).toHaveURL(/\/phuc-vu\/duyet$/);
+  await nav.getByRole('link', { name: 'Phục vụ' }).click();
+  await expect(page).toHaveURL(/\/phuc-vu$/);
+  await nav.getByRole('link', { name: 'Bàn & QR' }).click();
+  await expect(page).toHaveURL(/\/quan-ly\/ban$/);
   await expect(page.getByRole('button', { name: 'Thêm bàn' })).toHaveCount(0);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])

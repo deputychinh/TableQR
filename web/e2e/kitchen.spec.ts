@@ -7,7 +7,7 @@ import {
   type APIRequestContext,
   type Browser,
   type Page,
-} from '@playwright/test';
+} from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const PASSWORD = 'mat-khau-dai-123';

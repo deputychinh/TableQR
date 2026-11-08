@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Info, ReceiptText, TriangleAlert } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
@@ -151,7 +151,7 @@ const payBillOf = computed(() => paying.value?.session.bill);
 </script>
 
 <template>
-  <StaffShell :title="t('billing.cashier.title')">
+  <RoleShell :title="t('billing.cashier.title')">
     <div class="cashier-page">
       <h1 class="cashier-page__title">{{ t('billing.cashier.heading') }}</h1>
       <p class="cashier-page__lead">{{ t('billing.cashier.lead') }}</p>
@@ -264,7 +264,7 @@ const payBillOf = computed(() => paying.value?.session.bill);
       />
       <FormAlert v-if="actionError" :message="actionError" />
     </ConfirmSheet>
-  </StaffShell>
+  </RoleShell>
 </template>
 
 <style scoped>

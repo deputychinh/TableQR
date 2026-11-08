@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { Plus, Printer, QrCode } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
-import OwnerShell from '@/app/layouts/OwnerShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -29,7 +29,7 @@ const toast = useToastStore();
 const actionError = ref<string>();
 const formOpen = ref(false);
 const editing = ref<TableItem>();
-const confirming = ref<{ kind: 'rotate' | 'delete'; table: TableItem }>();
+const confirming = ref<{ kind: 'rotate' | 'delete' | 'refused'; table: TableItem }>();
 const confirmBusy = ref(false);
 
 onMounted(load);
@@ -54,6 +54,11 @@ const save = async (input: TableInput) => {
 const confirmAction = async () => {
   const pending = confirming.value;
   if (!pending) return;
+  if (pending.kind === 'refused') {
+    confirming.value = undefined;
+    openEdit(pending.table);
+    return;
+  }
   confirmBusy.value = true;
   actionError.value = undefined;
   try {
@@ -64,8 +69,13 @@ const confirmAction = async () => {
       await remove(pending.table.id);
       toast.show(t('tables.delete.done', { name: pending.table.name }));
     }
+    confirming.value = undefined;
   } catch (error: unknown) {
-    if (error instanceof ApiError && error.code === 'NOT_FOUND') {
+    confirming.value = undefined;
+    if (error instanceof ApiError && error.code === 'TABLE_HAS_HISTORY') {
+      // Keep the sheet and say why (TQR-007 review): the table carries paid bills and bookings.
+      confirming.value = { kind: 'refused', table: pending.table };
+    } else if (error instanceof ApiError && error.code === 'NOT_FOUND') {
       actionError.value = t('tables.errors.gone');
       await load();
     } else {
@@ -77,7 +87,6 @@ const confirmAction = async () => {
     }
   } finally {
     confirmBusy.value = false;
-    confirming.value = undefined;
   }
 };
 
@@ -87,7 +96,7 @@ const printAll = () => router.push('/quan-ly/ban/in');
 </script>
 
 <template>
-  <OwnerShell>
+  <RoleShell :title="t('tables.title')">
     <div class="tables-page">
       <header class="tables-page__header">
         <div class="tables-page__heading">
@@ -156,15 +165,17 @@ const printAll = () => router.push('/quan-ly/ban/in');
         confirming ? t(`tables.${confirming.kind}.title`, { name: confirming.table.name }) : ''
       "
       :confirm-label="confirming ? t(`tables.${confirming.kind}.confirm`) : ''"
-      :cancel-label="t('tables.form.cancel')"
+      :cancel-label="
+        confirming?.kind === 'refused' ? t('tables.refused.close') : t('tables.form.cancel')
+      "
       :busy="confirmBusy"
-      :variant="confirming?.kind === 'rotate' ? 'primary' : 'danger'"
+      :variant="confirming?.kind === 'delete' ? 'danger' : 'primary'"
       @confirm="confirmAction"
       @cancel="confirming = undefined"
     >
       <p v-if="confirming">{{ t(`tables.${confirming.kind}.body`) }}</p>
     </ConfirmSheet>
-  </OwnerShell>
+  </RoleShell>
 </template>
 
 <style scoped>

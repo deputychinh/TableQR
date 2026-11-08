@@ -5,8 +5,8 @@ import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import { asTenantId, type TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
-import { isUniqueViolation } from '../db/pg-error.js';
-import { restaurants } from '../db/schema.js';
+import { FOREIGN_KEY_VIOLATION, isUniqueViolation, pgCode } from '../db/pg-error.js';
+import { bookings, restaurants, tableSessions } from '../db/schema.js';
 import { RestaurantStatusService } from '../identity/restaurant-status.service.js';
 import { isWellFormedQrToken, newQrToken } from './domain/qr-token.js';
 import { TableErrorCode } from './domain/table-error-code.js';
@@ -64,6 +64,15 @@ const nameTaken = (): DomainError =>
   new DomainError(TableErrorCode.NameTaken, 409, {
     detail: 'Tên bàn đã có',
     extensions: { fields: [{ path: 'name', code: 'taken' }] },
+  });
+
+/**
+ * A table that has served guests carries their sessions, bills and bookings; deleting it would
+ * erase that history (TQR-007 review), so it is refused. Rename it instead.
+ */
+const hasHistory = (): DomainError =>
+  new DomainError(TableErrorCode.HasHistory, 409, {
+    detail: 'Bàn này đã có lượt khách, hoá đơn hoặc đặt bàn nên không xoá được, để giữ lịch sử.',
   });
 
 /** Maps the name unique index to 409; everything else propagates. */
@@ -143,12 +152,34 @@ export class TablesService {
     }
   }
 
+  /**
+   * Deletes a table that never served anyone. One with an open or past session or a booking is
+   * refused with 409 `TABLE_HAS_HISTORY`, checked under a row lock so a check-in cannot slip in
+   * between; the foreign keys (no cascade) are the last line if anything else does.
+   */
   async remove(tenant: TenantId, id: string): Promise<void> {
-    const deleted = await this.db
-      .delete(diningTables)
-      .where(and(eq(diningTables.restaurantId, tenant), eq(diningTables.id, id)))
-      .returning({ id: diningTables.id });
-    if (deleted.length === 0) throw tableNotFound();
+    try {
+      await this.db.transaction(async (tx) => {
+        await this.findOwn(tx, tenant, id, true);
+        const [session] = await tx
+          .select({ id: tableSessions.id })
+          .from(tableSessions)
+          .where(and(eq(tableSessions.restaurantId, tenant), eq(tableSessions.tableId, id)))
+          .limit(1);
+        const [booking] = await tx
+          .select({ id: bookings.id })
+          .from(bookings)
+          .where(and(eq(bookings.restaurantId, tenant), eq(bookings.tableId, id)))
+          .limit(1);
+        if (session || booking) throw hasHistory();
+        await tx
+          .delete(diningTables)
+          .where(and(eq(diningTables.restaurantId, tenant), eq(diningTables.id, id)));
+      });
+    } catch (error: unknown) {
+      if (pgCode(error) === FOREIGN_KEY_VIOLATION) throw hasHistory();
+      throw error;
+    }
   }
 
   /** AC10: a new token replaces the old one; the old one is kept so guests see "expired". */

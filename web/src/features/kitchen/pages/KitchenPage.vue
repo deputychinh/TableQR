@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { Store } from 'lucide-vue-next';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
@@ -27,12 +27,37 @@ const load = async () => {
     state.value = 'error';
   }
 };
-onMounted(load);
-
 /** The selected station lives in the URL (`?khu=<id>`), so a reload keeps the cook's tab. */
 const selected = computed(
   () => stations.value.find((s) => s.id === route.query.khu) ?? stations.value[0],
 );
+
+/**
+ * Tab counts (TQR-014 review): the open station's count is live from its queue; the others are
+ * re-read every 30 s. A failed re-read keeps the last counts, the queue itself is unaffected.
+ */
+const COUNTS_EVERY_MS = 30_000;
+let timer: ReturnType<typeof setInterval> | undefined;
+const refreshCounts = async () => {
+  try {
+    const fresh = await listStations();
+    for (const station of stations.value) {
+      const next = fresh.find((s) => s.id === station.id);
+      if (next && station.id !== selected.value?.id) station.waiting = next.waiting;
+    }
+  } catch {
+    // Keep the last counts; the next tick tries again.
+  }
+};
+onMounted(async () => {
+  await load();
+  timer = setInterval(() => void refreshCounts(), COUNTS_EVERY_MS);
+});
+onUnmounted(() => clearInterval(timer));
+
+const onWaiting = (count: number) => {
+  if (selected.value) selected.value.waiting = count;
+};
 
 const tabs = ref<HTMLButtonElement[]>([]);
 const select = async (station: KitchenStation, focus = false) => {
@@ -54,7 +79,7 @@ const onTabKey = (event: KeyboardEvent, index: number) => {
 </script>
 
 <template>
-  <StaffShell :title="t('kitchen.title')">
+  <RoleShell :title="t('kitchen.title')">
     <h1 class="visually-hidden">{{ t('kitchen.title') }}</h1>
     <LoadingState v-if="state === 'loading'" :label="t('kitchen.loading')" :rows="2" />
     <ErrorState
@@ -88,6 +113,12 @@ const onTabKey = (event: KeyboardEvent, index: number) => {
           @keydown="onTabKey($event, index)"
         >
           {{ station.name }}
+          <span v-if="station.waiting > 0" class="kitchen-page__count" aria-hidden="true">
+            {{ station.waiting }}
+          </span>
+          <span v-if="station.waiting > 0" class="visually-hidden">
+            , {{ t('kitchen.tabWaiting', { n: station.waiting }) }}
+          </span>
         </button>
       </div>
       <div
@@ -96,10 +127,10 @@ const onTabKey = (event: KeyboardEvent, index: number) => {
         class="kitchen-page__panel"
         :aria-labelledby="`station-tab-${selected.id}`"
       >
-        <StationQueue :key="selected.id" :station-id="selected.id" />
+        <StationQueue :key="selected.id" :station-id="selected.id" @waiting="onWaiting" />
       </div>
     </div>
-  </StaffShell>
+  </RoleShell>
 </template>
 
 <style scoped>
@@ -127,6 +158,24 @@ const onTabKey = (event: KeyboardEvent, index: number) => {
   color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
+}
+
+.kitchen-page__count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.75rem;
+  margin-inline-start: var(--space-2);
+  padding-inline: var(--space-1);
+  border-radius: 999px;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.kitchen-page__tab--active .kitchen-page__count {
+  color: var(--color-primary);
+  background: var(--color-on-primary);
 }
 
 .kitchen-page__tab--active {

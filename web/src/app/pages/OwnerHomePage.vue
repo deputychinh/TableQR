@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import { ChevronRight, QrCode, Settings, UtensilsCrossed } from 'lucide-vue-next';
+import {
+  ChefHat,
+  ChevronRight,
+  HandPlatter,
+  QrCode,
+  Settings,
+  UtensilsCrossed,
+  Wallet,
+} from 'lucide-vue-next';
 import OwnerShell from '@/app/layouts/OwnerShell.vue';
 import { useSessionStore } from '@/stores/session';
 
@@ -12,6 +20,13 @@ const steps = [
   { key: 'tables', to: '/quan-ly/ban', icon: QrCode },
   { key: 'settings', to: '/quan-ly/cai-dat', icon: Settings },
 ] as const;
+
+/** The floor screens the owner also works on (r2 review: reachable from the overview). */
+const operations = [
+  { key: 'cashier', to: '/thu-ngan', icon: Wallet },
+  { key: 'kitchen', to: '/bep', icon: ChefHat },
+  { key: 'serving', to: '/phuc-vu', icon: HandPlatter },
+] as const;
 </script>
 
 <template>
@@ -20,6 +35,7 @@ const steps = [
       {{ t('owner.welcome', { name: session.me?.restaurant?.name ?? '' }) }}
     </h1>
     <p class="owner-home__lead">{{ t('owner.lead') }}</p>
+    <h2 class="owner-home__section">{{ t('owner.setup') }}</h2>
     <ol class="owner-home__steps">
       <li v-for="(step, index) in steps" :key="step.key">
         <RouterLink :to="step.to" class="owner-home__step">
@@ -35,6 +51,28 @@ const steps = [
         </RouterLink>
       </li>
     </ol>
+    <section class="owner-home__operations" aria-labelledby="owner-operations">
+      <h2 id="owner-operations" class="owner-home__section">{{ t('owner.operations.title') }}</h2>
+      <p class="owner-home__lead">{{ t('owner.operations.lead') }}</p>
+      <ul class="owner-home__steps">
+        <li v-for="place in operations" :key="place.key">
+          <RouterLink :to="place.to" class="owner-home__step">
+            <span class="owner-home__icon">
+              <component :is="place.icon" :size="24" aria-hidden="true" />
+            </span>
+            <span class="owner-home__text">
+              <span class="owner-home__step-title">{{
+                t(`owner.operations.${place.key}.title`)
+              }}</span>
+              <span class="owner-home__step-body">{{
+                t(`owner.operations.${place.key}.body`)
+              }}</span>
+            </span>
+            <ChevronRight :size="22" aria-hidden="true" class="owner-home__chevron" />
+          </RouterLink>
+        </li>
+      </ul>
+    </section>
   </OwnerShell>
 </template>
 
@@ -47,6 +85,19 @@ const steps = [
 .owner-home__lead {
   margin-block: var(--space-2) var(--space-4);
   color: var(--color-text-muted);
+}
+
+.owner-home__section {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-lead);
+}
+
+.owner-home__operations {
+  margin-block-start: var(--space-5);
+}
+
+.owner-home__operations .owner-home__lead {
+  margin-block-start: calc(-1 * var(--space-2));
 }
 
 .owner-home__steps {

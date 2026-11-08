@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ClipboardCheck } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
@@ -77,7 +77,7 @@ onMounted(() => load());
 </script>
 
 <template>
-  <StaffShell :title="t('review.title')">
+  <RoleShell :title="t('review.title')">
     <div class="review-page">
       <h1 class="review-page__title">{{ t('review.title') }}</h1>
       <p class="review-page__lead">{{ t('review.lead') }}</p>
@@ -121,7 +121,7 @@ onMounted(() => load());
     >
       <p>{{ t('review.rejectBody') }}</p>
     </ConfirmSheet>
-  </StaffShell>
+  </RoleShell>
 </template>
 
 <style scoped>

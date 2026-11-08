@@ -48,9 +48,10 @@ const signInAsOwner = () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('staff service helpers', () => {
-  it('shows the email when a person has no display name', () => {
-    expect(nameOf(owner)).toBe('chu@example.com');
+  it('falls back to "Chủ quán" for an owner and the email name for others, never the email', () => {
+    expect(nameOf(owner)).toBe('Chủ quán');
     expect(nameOf(member())).toBe('Anh Bếp');
+    expect(nameOf(member({ displayName: '  ' }))).toBe('bep');
   });
 
   it.each([
@@ -83,6 +84,9 @@ describe('StaffListPage', () => {
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(3);
     expect(items[0]?.textContent).toContain('(Bạn)');
+    // The owner without a display name reads "Chủ quán", and their email shows once.
+    expect(items[0]?.textContent).toContain('Chủ quán');
+    expect(items[0]?.textContent.split('chu@example.com')).toHaveLength(2);
     expect(items[1]?.textContent).toContain('Bếp');
     expect(items[2]?.textContent).toContain('Đã khoá');
     expect(screen.getByRole('link', { name: /Thêm nhân viên/ }).getAttribute('href')).toBe(

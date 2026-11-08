@@ -60,6 +60,12 @@ export const tables = {
       confirm: 'Xoá bàn',
       done: 'Đã xoá {name}.',
     },
+    refused: {
+      title: 'Không xoá được {name}',
+      body: 'Bàn này đã có khách ngồi, hoá đơn hoặc lượt đặt bàn. Quán cần giữ lịch sử thu tiền nên không xoá bàn này được. Nếu bàn đổi chỗ hay đổi tên, hãy đổi tên bàn.',
+      confirm: 'Đổi tên bàn',
+      close: 'Đóng',
+    },
     created: 'Đã thêm {name}. Mã QR đã sẵn sàng để in.',
     saved: 'Đã lưu {name}.',
     print: {

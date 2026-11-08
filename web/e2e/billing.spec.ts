@@ -8,7 +8,7 @@ import {
   type Browser,
   type Page,
   type TestInfo,
-} from '@playwright/test';
+} from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const PASSWORD = 'mat-khau-dai-123';

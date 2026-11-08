@@ -1,6 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
-import { test, expect, type Browser, type Page, type TestInfo } from '@playwright/test';
+import {
+  test,
+  expect,
+  openSection,
+  type Browser,
+  type Page,
+  type TestInfo,
+} from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const PASSWORD = 'mat-khau-dai-123';
@@ -55,7 +62,7 @@ test('AC14/AC16 owner adds a kitchen user who lands on /bep; disabling sends the
   await signUpOwner(page, ownerEmail, 'Bếp Nhà E2E');
 
   // Owner adds the kitchen user.
-  await page.getByRole('link', { name: 'Nhân viên' }).click();
+  await openSection(page, 'Nhân viên');
   await expect(page).toHaveURL(/\/quan-ly\/nhan-vien$/);
   await expect(page.getByText('Chưa có nhân viên nào')).toBeVisible();
   await expectNoSeriousA11yIssues(page);

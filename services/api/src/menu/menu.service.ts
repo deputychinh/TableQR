@@ -37,6 +37,7 @@ import {
 import {
   MenuErrorCode,
   categoryNotEmpty,
+  itemHasOrders,
   lastStation,
   limitReached,
   nameTaken,
@@ -369,12 +370,17 @@ export class MenuService {
     return this.updateItem(tenant, id, { available });
   }
 
+  /** A dish guests have ordered stays for their orders and bills: 409 `ITEM_HAS_ORDERS`. */
   async deleteItem(tenant: TenantId, id: string): Promise<void> {
-    const deleted = await this.db
-      .delete(menuItems)
-      .where(and(eq(menuItems.restaurantId, tenant), eq(menuItems.id, id)))
-      .returning({ id: menuItems.id });
-    if (deleted.length === 0) throw notFound();
+    try {
+      const deleted = await this.db
+        .delete(menuItems)
+        .where(and(eq(menuItems.restaurantId, tenant), eq(menuItems.id, id)))
+        .returning({ id: menuItems.id });
+      if (deleted.length === 0) throw notFound();
+    } catch (error: unknown) {
+      translate(error, itemHasOrders);
+    }
   }
 
   // --- guest -----------------------------------------------------------------

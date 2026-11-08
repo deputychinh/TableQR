@@ -33,7 +33,7 @@ type Sheet =
   | { kind: 'item'; item?: MenuItem; categoryId?: string }
   | { kind: 'category'; category?: Category; first?: boolean }
   | { kind: 'station'; station?: Station }
-  | { kind: 'confirm'; target: Target };
+  | { kind: 'confirm'; target: Target; refused?: boolean };
 
 const { t } = useI18n();
 const session = useSessionStore();
@@ -129,15 +129,43 @@ const askRemove = (target: Target) => {
 const confirmText = computed(() => {
   if (sheet.value?.kind !== 'confirm') return { title: '', body: '' };
   const { kind, name } = sheet.value.target;
+  if (sheet.value.refused) {
+    return {
+      title: t('menu.item.refusedTitle', { name }),
+      body: t('menu.item.refusedBody'),
+    };
+  }
   return {
     title: t(`menu.${kind}.confirmTitle`),
     body: t(`menu.${kind}.confirmBody`, { name }),
   };
 });
 
+const findItem = (id: string): MenuItem | undefined =>
+  categories.value.flatMap((category) => category.items).find((item) => item.id === id);
+
+/** A dish guests ordered stays for their bills (409 ITEM_HAS_ORDERS): stop selling it instead. */
+const retire = async (target: Target) => {
+  const item = findItem(target.id);
+  if (!item) return close();
+  confirmBusy.value = true;
+  confirmError.value = undefined;
+  try {
+    await state.setAvailability(item, false);
+    close();
+    toast.show(t('menu.toast.retired', { name: item.name }));
+  } catch (error: unknown) {
+    const message = describeMenuError(error, 'item').form ?? { key: 'errors.unexpected' };
+    confirmError.value = t(message.key, message.params ?? {});
+  } finally {
+    confirmBusy.value = false;
+  }
+};
+
 const remove = async () => {
   if (sheet.value?.kind !== 'confirm') return;
   const { target } = sheet.value;
+  if (sheet.value.refused) return retire(target);
   confirmBusy.value = true;
   confirmError.value = undefined;
   try {
@@ -154,12 +182,18 @@ const remove = async () => {
     close();
     toast.show(t('menu.toast.deleted', { name: target.name }));
   } catch (error: unknown) {
+    if (error instanceof ApiError && error.code === 'ITEM_HAS_ORDERS') {
+      sheet.value = { kind: 'confirm', target, refused: true };
+      return;
+    }
     const message = describeMenuError(error, target.kind).form ?? { key: 'errors.unexpected' };
     confirmError.value = t(message.key, message.params ?? {});
   } finally {
     confirmBusy.value = false;
   }
 };
+
+const refused = computed(() => sheet.value?.kind === 'confirm' && sheet.value.refused === true);
 </script>
 
 <template>
@@ -316,9 +350,9 @@ const remove = async () => {
     <ConfirmSheet
       :open="sheet?.kind === 'confirm'"
       :title="confirmText.title"
-      :confirm-label="t('menu.delete')"
-      :cancel-label="t('menu.cancel')"
-      variant="danger"
+      :confirm-label="refused ? t('menu.item.retire') : t('menu.delete')"
+      :cancel-label="refused ? t('menu.close') : t('menu.cancel')"
+      :variant="refused ? 'primary' : 'danger'"
       :busy="confirmBusy"
       @confirm="remove"
       @cancel="close"

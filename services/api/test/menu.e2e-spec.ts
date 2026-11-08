@@ -5,6 +5,8 @@ import { categories, menuItems, restaurants, stations, users } from '../src/db/s
 import { hashPassword } from '../src/identity/domain/password.js';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, cookieOf, newOwner, signUp } from './support/http.js';
+import { openSession, releaseOrder } from './support/service-fixtures.js';
+import { diningTables } from '../src/tables/tables.schema.js';
 
 type Role = 'cashier' | 'waiter' | 'kitchen';
 
@@ -410,6 +412,30 @@ describe('menu: stations, categories, items, availability (e2e)', () => {
       const item = await addItem(r, cat.id);
       await del(`/api/menu/items/${item.id}`, r.cookie).expect(204);
       await del(`/api/menu/items/${item.id}`, r.cookie).expect(404);
+    });
+
+    it('refuses to delete a dish that was ever ordered (409 ITEM_HAS_ORDERS, not 500)', async () => {
+      const r = await newRestaurant();
+      const cat = await addCategory(r.cookie, 'Món');
+      const item = await addItem(r, cat.id);
+      const [table] = await db()
+        .insert(diningTables)
+        .values({
+          restaurantId: r.restaurantId,
+          name: 'Bàn 1',
+          seats: 4,
+          qrToken: `qr-m-${Date.now()}`,
+        })
+        .returning({ id: diningTables.id });
+      const session = await openSession(db(), r.restaurantId, table?.id ?? '');
+      await releaseOrder(db(), r.restaurantId, session, [
+        { dish: { id: item.id, name: 'Phở bò', stationId: r.stationId, priceVnd: 45_000 } },
+      ]);
+      const response = await del(`/api/menu/items/${item.id}`, r.cookie).expect(409);
+      expect(response.body.code).toBe('ITEM_HAS_ORDERS');
+      expect(response.body.detail).toMatch(/Ngừng bán/);
+      const menu = await http().get('/api/menu').set('cookie', r.cookie).expect(200);
+      expect(JSON.stringify(menu.body)).toContain(item.id);
     });
 
     it('the database refuses an out-of-range price even if the API check were bypassed', async () => {
