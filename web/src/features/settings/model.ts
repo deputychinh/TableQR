@@ -33,6 +33,8 @@ export interface HouseRules {
   orderApproval: OrderApproval;
   anomaly: { maxMainPerPerson: number; minMainPerPerson: number };
   booking: { enabled: boolean; slotMinutes: number; openingHours: Record<Weekday, DayHours> };
+  /** TQR-029: VietQR transfer is opt-in (default off); on needs a bank account. */
+  payment: { qrEnabled: boolean };
 }
 
 export interface Bank {
@@ -55,7 +57,7 @@ export interface OwnerSettings {
   banks: Bank[];
 }
 
-/** The bank section as typed; an empty `bin` means "no account, pay at the counter". */
+/** The bank section as typed; an empty `bin` means "no account". */
 export interface BankDraft {
   bin: string;
   accountNumber: string;
@@ -107,9 +109,13 @@ export const checkDraft = (rules: HouseRules, draft: BankDraft): FieldErrors => 
       errors[`rules.booking.openingHours.${day}.close`] = 'settings.errors.closeAfterOpen';
     }
   }
+  // QR off: the bank fields are hidden and hold the saved account (or nothing), never edits.
+  if (!rules.payment.qrEnabled) return errors;
   const typedSomething = draft.accountNumber !== '' || draft.accountName !== '';
   if (draft.bin === '') {
-    if (typedSomething) errors['bank.bin'] = 'settings.errors.bankRequired';
+    errors['bank.bin'] = typedSomething
+      ? 'settings.errors.bankRequired'
+      : 'settings.errors.bankRequiredForQr';
     return errors;
   }
   if (!ACCOUNT_NUMBER_PATTERN.test(digitsOnly(draft.accountNumber))) {
@@ -126,6 +132,7 @@ export const checkDraft = (rules: HouseRules, draft: BankDraft): FieldErrors => 
 export const messageForPath = (path: string): string => {
   if (path.startsWith('rules.booking.openingHours.')) return 'settings.errors.closeAfterOpen';
   const known: Record<string, string> = {
+    bank: 'settings.errors.bankRequiredForQr',
     'bank.bin': 'settings.errors.bankRequired',
     'bank.accountNumber': 'settings.errors.accountNumber',
     'bank.accountName': 'settings.errors.accountName',
@@ -133,3 +140,6 @@ export const messageForPath = (path: string): string => {
   };
   return known[path] ?? 'settings.errors.invalid';
 };
+
+/** The form field an API error path points at: "QR on needs an account" (`bank`) → the bank select. */
+export const fieldOfPath = (path: string): string => (path === 'bank' ? 'bank.bin' : path);

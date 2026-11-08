@@ -74,11 +74,17 @@ const seed = async (
   });
   expect(signUp.status()).toBe(201);
   const restaurantId = ((await signUp.json()) as { restaurant: { id: string } }).restaurant.id;
-  const rules = ((await (await api.get('/api/restaurant/settings')).json()) as { rules: unknown })
-    .rules;
-  // A new bank account re-sends the owner's password (step-up, TQR-023).
+  const { rules } = (await (await api.get('/api/restaurant/settings')).json()) as {
+    rules: Record<string, unknown>;
+  };
+  // These journeys pay by VietQR: turn the option on (off by default, TQR-029). A new bank
+  // account re-sends the owner's password (step-up, TQR-023).
   const saved = await api.put('/api/restaurant/settings', {
-    data: { rules, bank: BANK, currentPassword: PASSWORD },
+    data: {
+      rules: { ...rules, payment: { qrEnabled: true } },
+      bank: BANK,
+      currentPassword: PASSWORD,
+    },
   });
   expect(saved.ok()).toBe(true);
   const cashierEmail = `bill-cashier-${stamp}@example.com`;

@@ -6,7 +6,7 @@ export const core = {
   },
   landing: {
     title: 'Khách quét mã QR, gọi món ngay tại bàn',
-    lead: 'Bếp làm theo đúng thứ tự khách vào, khách thấy món nào đang nấu, thanh toán bằng chuyển khoản VietQR. Miễn phí cho quán của bạn.',
+    lead: 'Bếp làm theo đúng thứ tự khách vào, khách thấy món nào đang nấu. Nhận chuyển khoản VietQR nếu quán muốn. Miễn phí cho quán của bạn.',
     signUp: 'Đăng ký nhà hàng',
     signIn: 'Đăng nhập',
   },
@@ -82,7 +82,7 @@ export const core = {
       tables: { title: 'Thêm bàn và in mã QR', body: 'Mỗi bàn một mã QR. In ra và dán lên bàn.' },
       settings: {
         title: 'Chọn cách vận hành',
-        body: 'Trả tiền trước hay sau, ai mở bàn, tài khoản nhận chuyển khoản.',
+        body: 'Trả tiền trước hay sau, ai mở bàn. Nhận chuyển khoản bằng mã QR là tuỳ chọn, bật khi bạn cần.',
       },
     },
     step: 'Bước {n}',

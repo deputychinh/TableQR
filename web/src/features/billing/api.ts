@@ -59,6 +59,8 @@ export interface PaidBy {
 export interface CashierOverview {
   sessions: CashierSession[];
   bankConfigured: boolean;
+  /** TQR-029: QR option on and an account stored; off: only "Đã nhận tiền" at the counter. */
+  qrEnabled: boolean;
   bankChangedAt: string | null;
   bankChangedRecently: boolean;
 }

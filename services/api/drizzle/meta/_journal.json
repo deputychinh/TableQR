@@ -64,6 +64,13 @@
       "when": 1794134371457,
       "tag": "0008_archive_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794139235688,
+      "tag": "0009_qr_payment_option",
+      "breakpoints": true
     }
   ]
 }

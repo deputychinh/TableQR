@@ -558,7 +558,7 @@ describe('guest live status (S11)', () => {
       }),
     );
     const { router } = await renderGuest(`/t/${TOKEN}?xem=da-goi`);
-    const banner = await screen.findByRole('link', { name: 'Thanh toán tại quầy hoặc bằng mã QR' });
+    const banner = await screen.findByRole('link', { name: 'Xem hoá đơn để thanh toán' });
     expect(banner.getAttribute('href')).toBe(`/t/${TOKEN}/hoa-don`);
     await userEvent.click(screen.getByRole('button', { name: 'Xem hoá đơn / Thanh toán' }));
     await waitFor(() => expect(router.currentRoute.value.path).toBe(`/t/${TOKEN}/hoa-don`));

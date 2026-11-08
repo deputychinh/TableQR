@@ -5,12 +5,15 @@ import {
   checkDraft,
   digitsOnly,
   draftOf,
+  fieldOfPath,
   messageForPath,
   normalizeAccountName,
 } from './model';
 
 const empty = { bin: '', accountNumber: '', accountName: '' };
 const filled = { bin: '970436', accountNumber: '0123 456 789', accountName: 'Nguyễn Văn Ánh' };
+/** The bank fields are checked only with QR transfer on (TQR-029). */
+const qrRules = () => ({ ...defaultRules(), payment: { qrEnabled: true } });
 
 describe('account name and number (same rule as the API)', () => {
   it.each([
@@ -45,7 +48,7 @@ describe('checkDraft', () => {
   });
 
   it('asks for a bank when a number or name was typed without one', () => {
-    expect(checkDraft(defaultRules(), { ...empty, accountNumber: '123456' })).toEqual({
+    expect(checkDraft(qrRules(), { ...empty, accountNumber: '123456' })).toEqual({
       'bank.bin': 'settings.errors.bankRequired',
     });
   });
@@ -55,13 +58,21 @@ describe('checkDraft', () => {
     ['1'.repeat(20), 'bank.accountNumber'],
     ['01234a678', 'bank.accountNumber'],
   ])('refuses account number %s', (accountNumber, path) => {
-    expect(Object.keys(checkDraft(defaultRules(), { ...filled, accountNumber }))).toEqual([path]);
+    expect(Object.keys(checkDraft(qrRules(), { ...filled, accountNumber }))).toEqual([path]);
   });
 
   it.each(['A', 'A'.repeat(51), 'Ánh @ quán', ''])('refuses holder name "%s"', (accountName) => {
-    expect(Object.keys(checkDraft(defaultRules(), { ...filled, accountName }))).toEqual([
+    expect(Object.keys(checkDraft(qrRules(), { ...filled, accountName }))).toEqual([
       'bank.accountName',
     ]);
+  });
+
+  it('TQR-029: QR on needs an account; QR off never checks the hidden bank fields', () => {
+    expect(checkDraft(qrRules(), empty)).toEqual({
+      'bank.bin': 'settings.errors.bankRequiredForQr',
+    });
+    expect(checkDraft(qrRules(), filled)).toEqual({});
+    expect(checkDraft(defaultRules(), { ...filled, accountNumber: '1' })).toEqual({});
   });
 
   it('refuses min above max and a closing time not after opening; ignores closed days', () => {
@@ -80,6 +91,7 @@ describe('messageForPath', () => {
   it('maps every API field path to an existing message', () => {
     const errors = messages.settings.errors as Record<string, string>;
     for (const path of [
+      'bank',
       'bank.bin',
       'bank.accountNumber',
       'bank.accountName',
@@ -91,5 +103,11 @@ describe('messageForPath', () => {
       expect(errors[key]).toBeTruthy();
     }
     expect(messageForPath('rules.paymentTiming')).toBe('settings.errors.invalid');
+    expect(messageForPath('bank')).toBe('settings.errors.bankRequiredForQr');
+  });
+
+  it('points "QR on needs an account" (path `bank`) at the bank select', () => {
+    expect(fieldOfPath('bank')).toBe('bank.bin');
+    expect(fieldOfPath('bank.accountName')).toBe('bank.accountName');
   });
 });

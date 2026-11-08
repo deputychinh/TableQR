@@ -175,6 +175,7 @@ if (process.env.E2E_SCREENSHOTS) {
     });
     await shoot(page, 'settings-invalid', async () => {
       await page.goto('/quan-ly/cai-dat');
+      await page.getByRole('switch', { name: 'Cho khách chuyển khoản bằng mã QR' }).click();
       await page.getByLabel('Ngân hàng').selectOption({ label: 'Vietcombank' });
       await page.getByLabel('Số tài khoản').fill('123');
       await page.getByLabel('Tên chủ tài khoản').fill('Nguyễn Văn Ánh');

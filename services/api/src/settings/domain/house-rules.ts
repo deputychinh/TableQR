@@ -75,6 +75,8 @@ export const houseRulesSchema = z
         openingHours: openingHoursSchema,
       })
       .strict(),
+    /** TQR-029: VietQR transfer is opt-in; off = "Thanh toán tại quầy" (AC41). */
+    payment: z.object({ qrEnabled: z.boolean() }).strict(),
   })
   .strict();
 
@@ -105,6 +107,7 @@ export const DEFAULT_RULES: HouseRules = deepFreeze({
       DayHours
     >,
   },
+  payment: { qrEnabled: false },
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

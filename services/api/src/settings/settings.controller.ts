@@ -13,6 +13,7 @@ import {
 } from './domain/account-name.js';
 import { isKnownBin } from './domain/banks.js';
 import { houseRulesSchema } from './domain/house-rules.js';
+import { qrPaymentNeedsBank } from './domain/qr-payment.js';
 import { type OwnerSettings, SettingsService, type StaffRules } from './settings.service.js';
 
 const bankSchema = z
@@ -34,7 +35,13 @@ const updateSchema = z
     // Step-up (TQR-023): required only when `bank` differs from the stored account.
     currentPassword: z.string().min(1).max(MAX_PASSWORD_LENGTH).optional(),
   })
-  .strict();
+  .strict()
+  // TQR-029: QR transfer on needs the account the QR pays into.
+  .superRefine((input, ctx) => {
+    if (qrPaymentNeedsBank(input.rules, input.bank)) {
+      ctx.addIssue({ code: 'custom', path: ['bank'], message: 'bank_required_for_qr' });
+    }
+  });
 
 @Controller('restaurant')
 @UseGuards(StaffGuard)

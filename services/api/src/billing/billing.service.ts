@@ -12,6 +12,8 @@ import { hashToken } from '../identity/domain/session-token.js';
 import { publish } from '../realtime/publisher.js';
 import { guestDevices, orderItems, orders, tableSessions } from '../service/service.schema.js';
 import { bankByBin } from '../settings/domain/banks.js';
+import { readStoredRules } from '../settings/domain/house-rules.js';
+import { qrPaymentActive } from '../settings/domain/qr-payment.js';
 import { diningTables } from '../tables/tables.schema.js';
 import {
   billableIn,
@@ -67,14 +69,17 @@ export interface SessionBillView {
   dueVnd: number;
   /** The open bill, else the latest one; null before any bill. */
   bill: BillView | null;
-  /** VietQR transfer details for an open bill; null = pay at the counter (AC41) or nothing open. */
+  /**
+   * VietQR transfer details for an open bill; null = pay at the counter (AC41: QR option off or no
+   * bank account, TQR-029) or nothing open.
+   */
   transfer: {
     payload: string;
     bankName: string;
     accountNumber: string;
     accountName: string;
   } | null;
-  /** True when the restaurant has no bank account: "Thanh toán tại quầy" (AC41). */
+  /** True when the restaurant takes no QR transfer: "Thanh toán tại quầy" (AC41, TQR-029). */
   payAtCounter: boolean;
 }
 
@@ -98,6 +103,8 @@ export interface PaidBy {
 export interface CashierOverview {
   sessions: CashierSession[];
   bankConfigured: boolean;
+  /** TQR-029: QR option on and an account stored; off → the screen offers only "Đã nhận tiền". */
+  qrEnabled: boolean;
   bankChangedAt: string | null;
   /** docs/security.md: show "Tài khoản nhận tiền vừa đổi" for 24 h after a change. */
   bankChangedRecently: boolean;
@@ -433,6 +440,7 @@ export class BillingService {
       .select({
         bankBin: restaurants.bankBin,
         bankChangedAt: restaurants.bankChangedAt,
+        rules: restaurants.rules,
       })
       .from(restaurants)
       .where(eq(restaurants.id, tenant))
@@ -514,6 +522,7 @@ export class BillingService {
         };
       }),
       bankConfigured: restaurant.bankBin !== null,
+      qrEnabled: qrPaymentActive(readStoredRules(restaurant.rules), restaurant.bankBin !== null),
       bankChangedAt: restaurant.bankChangedAt?.toISOString() ?? null,
       bankChangedRecently: isBankChangeRecent(restaurant.bankChangedAt, this.clock.now()),
     };
@@ -561,6 +570,7 @@ export class BillingService {
     const [head] = await executor
       .select({
         restaurantName: restaurants.name,
+        rules: restaurants.rules,
         bankBin: restaurants.bankBin,
         bankAccount: restaurants.bankAccount,
         bankAccountName: restaurants.bankAccountName,
@@ -587,10 +597,13 @@ export class BillingService {
       .where(and(eq(bills.restaurantId, tenant), eq(bills.sessionId, sessionId)))
       .orderBy(desc(sql`${bills.status} = 'open'`), desc(bills.createdAt))
       .limit(1);
-    const bank =
+    const stored =
       head.bankBin !== null && head.bankAccount !== null && head.bankAccountName !== null
         ? { bin: head.bankBin, account: head.bankAccount, name: head.bankAccountName }
         : null;
+    // TQR-029: the restaurant's current choice, not an order's snapshot (it is how money is taken
+    // now, not a rule an order is judged by). Off → never a VietQR payload, even with an account.
+    const bank = qrPaymentActive(readStoredRules(head.rules), stored !== null) ? stored : null;
     let transfer: SessionBillView['transfer'] = null;
     let payAtCounter = bank === null;
     if (latest?.status === 'open' && bank) {

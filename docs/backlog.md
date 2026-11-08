@@ -30,3 +30,4 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-024 | Archive ("Ẩn bàn") tables with history                                     | review |
 | TQR-025 | Re-sync the open bill when the kitchen cancels an item                     | review |
 | TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | review |
+| TQR-029 | QR payment as a per-restaurant option (default off)                        | review |

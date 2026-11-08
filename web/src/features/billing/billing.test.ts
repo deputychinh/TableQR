@@ -101,13 +101,18 @@ describe('GuestBill', () => {
     expect(screen.getByText('2 ×')).toBeTruthy();
   });
 
-  it('AC41: without a bank account it says pay at the counter and shows the code', async () => {
+  it('AC41/TQR-029: QR off (or no account) shows items, total and code with "Thanh toán tại quầy", never a QR', async () => {
     await renderWithApp(GuestBill, {
       props: { bill: view({ transfer: null, payAtCounter: true }) },
     });
     expect(screen.getByRole('heading', { name: 'Thanh toán tại quầy' })).toBeTruthy();
     expect(screen.getByText('7F3K2')).toBeTruthy();
+    expect(screen.getByText('Phở bò')).toBeTruthy();
+    expect(screen.getAllByText(/115\.000/).length).toBeGreaterThan(0);
     expect(screen.queryByRole('img')).toBeNull();
+    // The counter copy never talks about QR or transfers (TQR-029).
+    const article = screen.getByRole('article');
+    expect(article.textContent).not.toMatch(/QR|chuyển khoản/i);
   });
 
   it('AC42: tells the guest the bill changed', async () => {
@@ -340,6 +345,7 @@ const session = (patch: Partial<CashierSession> = {}): CashierSession => ({
 const overview = (patch: Partial<CashierOverview> = {}): CashierOverview => ({
   sessions: [session()],
   bankConfigured: true,
+  qrEnabled: true,
   bankChangedAt: null,
   bankChangedRecently: false,
   ...patch,
@@ -482,7 +488,7 @@ describe('CashierPage', () => {
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ sessionId: 's1' });
   });
 
-  it('warns for 24 h after the bank account changed; without a bank only cash is offered', async () => {
+  it('warns for 24 h after the bank account changed; QR off offers only "Đã nhận tiền"', async () => {
     fakeApi({
       'GET /api/bills/overview': {
         body: overview({ bankChangedRecently: true, bankChangedAt: '2026-11-08T05:00:00.000Z' }),
@@ -493,11 +499,36 @@ describe('CashierPage', () => {
     vi.unstubAllGlobals();
     vi.stubGlobal('EventSource', FakeEventSource);
     document.body.innerHTML = '';
-    fakeApi({ 'GET /api/bills/overview': { body: overview({ bankConfigured: false }) } });
+    fakeApi({
+      'GET /api/bills/overview': { body: overview({ bankConfigured: false, qrEnabled: false }) },
+    });
     await renderWithApp(CashierPage, { paths: ['/dang-nhap'] });
     expect(await screen.findByText(/khách thanh toán tại quầy/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Đã nhận chuyển khoản/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Đã nhận tiền mặt – Bàn 3' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Đã nhận tiền – Bàn 3' })).toBeTruthy();
+  });
+
+  it('TQR-029: QR off with an account stored: no transfer action, no bank warning, cash at the counter', async () => {
+    const calls = fakeApi({
+      'GET /api/bills/overview': {
+        body: overview({
+          qrEnabled: false,
+          bankChangedRecently: true,
+          bankChangedAt: '2026-11-08T05:00:00.000Z',
+        }),
+      },
+      'POST /api/bills/b1/pay': { body: {} },
+    });
+    await renderWithApp(CashierPage, { paths: ['/dang-nhap'] });
+    const pay = await screen.findByRole('button', { name: 'Đã nhận tiền – Bàn 3' });
+    expect(screen.queryByRole('button', { name: /Đã nhận chuyển khoản/ })).toBeNull();
+    expect(screen.queryByText(/Tài khoản nhận tiền vừa đổi/)).toBeNull();
+    expect(screen.getByText(/Thu tiền tại quầy theo mã hoá đơn/)).toBeTruthy();
+    expect(screen.getByText(/Quán không nhận chuyển khoản bằng mã QR/)).toBeTruthy();
+    await userEvent.click(pay);
+    const sheet = screen.getByRole('dialog', { name: 'Xác nhận đã nhận tiền?' });
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Đã nhận 115.000\u00a0₫' }));
+    expect(calls.find((c) => c.path === '/api/bills/b1/pay')?.body).toEqual({ method: 'cash' });
   });
 
   it('shows empty and error states, and reloads on floor events', async () => {
