@@ -31,6 +31,7 @@ test('owner sets house rules and a bank account; a reload shows them (AC12 setti
 
   await page.getByText('Thanh toán trước khi bếp làm', { exact: true }).click();
   await page.getByText('Duyệt mọi đơn', { exact: true }).click();
+  await page.getByRole('switch', { name: 'Cho khách chuyển khoản bằng mã QR' }).click();
   await page.getByLabel('Ngân hàng').selectOption({ label: 'Vietcombank' });
   await page.getByLabel('Số tài khoản').fill('0123 456 789');
   await page.getByLabel('Tên chủ tài khoản').fill('Nguyễn Văn Ánh');
@@ -97,6 +98,7 @@ test('the field to fix is focused in view, never under the sticky save bar (r2 r
   await page.getByRole('button', { name: 'Tạo nhà hàng' }).click();
   await expect(page).toHaveURL(/\/quan-ly$/);
   await page.goto('/quan-ly/cai-dat');
+  await page.getByRole('switch', { name: 'Cho khách chuyển khoản bằng mã QR' }).click();
   await page.getByLabel('Ngân hàng').selectOption({ label: 'Vietcombank' });
   await page.getByLabel('Số tài khoản').fill('123');
   await page.getByLabel('Tên chủ tài khoản').fill('Nguyễn Văn Ánh');
@@ -142,6 +144,7 @@ if (process.env.E2E_SCREENSHOTS) {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto('/quan-ly/cai-dat');
+      await page.getByRole('switch', { name: 'Cho khách chuyển khoản bằng mã QR' }).click();
       await page.getByLabel('Ngân hàng').selectOption({ label: 'Vietcombank' });
       await page.getByLabel('Số tài khoản').fill('0123456789');
       await page.getByLabel('Tên chủ tài khoản').fill('Nguyễn Văn Ánh');

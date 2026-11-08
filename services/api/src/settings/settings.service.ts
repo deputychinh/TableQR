@@ -12,6 +12,7 @@ import { reauthRequiredError } from '../identity/identity.errors.js';
 import { maskAccountNumber } from './domain/account-name.js';
 import { type Bank, VIETNAM_BANKS, bankByBin } from './domain/banks.js';
 import { type HouseRules, readStoredRules, sameRules } from './domain/house-rules.js';
+import { qrPaymentActive } from './domain/qr-payment.js';
 
 export interface BankAccount {
   bin: string;
@@ -33,8 +34,9 @@ export interface OwnerSettings {
 export interface StaffRules {
   rules: HouseRules;
   rulesUpdatedAt: string | null;
-  /** False → bills say "Thanh toán tại quầy" (AC41). */
   bankConfigured: boolean;
+  /** TQR-029: QR option on and an account stored; false → bills say "Thanh toán tại quầy" (AC41). */
+  qrEnabled: boolean;
   /** The cashier screen warns for 24 h after a change (docs/security.md). */
   bankChangedAt: string | null;
 }
@@ -68,10 +70,12 @@ export class SettingsService {
 
   async staffRules(tenantId: TenantId): Promise<StaffRules> {
     const row = await this.load(this.db, tenantId);
+    const rules = readStoredRules(row.rules);
     return {
-      rules: readStoredRules(row.rules),
+      rules,
       rulesUpdatedAt: iso(row.rulesUpdatedAt),
       bankConfigured: bankOf(row) !== null,
+      qrEnabled: qrPaymentActive(rules, bankOf(row) !== null),
       bankChangedAt: iso(row.bankChangedAt),
     };
   }

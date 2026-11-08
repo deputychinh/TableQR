@@ -14,6 +14,7 @@ export const defaultRules = (): HouseRules => ({
     ) as HouseRules['booking']['openingHours'],
   },
   kitchen: { reminderMinutes: 10, repeatMinutes: 10 },
+  payment: { qrEnabled: false },
 });
 
 export const ownerSettings = (patch: Partial<OwnerSettings> = {}): OwnerSettings => ({

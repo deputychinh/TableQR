@@ -12,6 +12,7 @@ import FormField from '@/components/FormField.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import NumberStepper from '@/components/NumberStepper.vue';
 import RadioCardGroup from '@/components/RadioCardGroup.vue';
+import ToggleSwitch from '@/components/ToggleSwitch.vue';
 import { useToastStore } from '@/stores/toast';
 import BankAccountSection from './components/BankAccountSection.vue';
 import OpeningHoursEditor from './components/OpeningHoursEditor.vue';
@@ -29,6 +30,7 @@ import {
   bankOfDraft,
   checkDraft,
   draftOf,
+  fieldOfPath,
   messageForPath,
 } from './model';
 import { loadSettings, saveSettings } from './settings-api';
@@ -139,6 +141,28 @@ const repeatMinutes = computed({
     if (rules.value) rules.value.kitchen.repeatMinutes = minutesOf(value);
   },
 });
+/**
+ * TQR-029: QR transfer is opt-in. Turning it off drops unsaved bank edits (the hidden fields keep
+ * the saved account, so no password step and nothing to fix out of sight).
+ */
+const qrEnabled = computed({
+  get: () => rules.value?.payment.qrEnabled === true,
+  set: (on: boolean) => {
+    if (!rules.value || !saved.value) return;
+    rules.value.payment.qrEnabled = on;
+    if (!on) bank.value = draftOf(saved.value.bank);
+  },
+});
+/** QR off with an account saved: keep it (default) or remove it on save. */
+const removingKeptBank = computed(
+  () => saved.value !== undefined && saved.value.bank !== null && newBank.value === null,
+);
+const removeKeptBank = () => {
+  bank.value = { bin: '', accountNumber: '', accountName: '' };
+};
+const keepBank = () => {
+  if (saved.value) bank.value = draftOf(saved.value.bank);
+};
 
 const message = (path: string): string | undefined => {
   const key = errors.value[path];
@@ -196,7 +220,9 @@ const save = async (password?: string) => {
     }
     closeBankSheet();
     if (error instanceof ApiError && error.code === 'VALIDATION_FAILED') {
-      errors.value = Object.fromEntries(error.fields.map((f) => [f.path, messageForPath(f.path)]));
+      errors.value = Object.fromEntries(
+        error.fields.map((f) => [fieldOfPath(f.path), messageForPath(f.path)]),
+      );
       formError.value = 'settings.fixErrors';
       await focusFirstInvalid();
     } else {
@@ -402,11 +428,41 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
           </template>
         </section>
 
-        <section class="settings-page__section" aria-labelledby="settings-bank">
-          <h2 id="settings-bank" class="settings-page__heading">{{ t('settings.bank.title') }}</h2>
-          <p class="settings-page__hint">{{ t('settings.bank.lead') }}</p>
-          <p v-if="changedAt" class="settings-page__changed">{{ changedAt }}</p>
-          <BankAccountSection v-model="bank" :banks="saved.banks" :errors="errors" />
+        <section class="settings-page__section" aria-labelledby="settings-qr">
+          <h2 id="settings-qr" class="settings-page__heading">{{ t('settings.qr.title') }}</h2>
+          <div>
+            <div class="settings-page__switch">
+              <p class="settings-page__switch-label">{{ t('settings.qr.label') }}</p>
+              <ToggleSwitch
+                v-model="qrEnabled"
+                :label="t('settings.qr.label')"
+                :state-text="qrEnabled ? t('settings.qr.on') : t('settings.qr.off')"
+                aria-describedby="settings-qr-body"
+              />
+            </div>
+            <p id="settings-qr-body" class="settings-page__hint">{{ t('settings.qr.body') }}</p>
+          </div>
+          <template v-if="qrEnabled">
+            <h3 class="settings-page__subheading">{{ t('settings.bank.title') }}</h3>
+            <p class="settings-page__hint">{{ t('settings.bank.lead') }}</p>
+            <p v-if="changedAt" class="settings-page__changed">{{ changedAt }}</p>
+            <BankAccountSection v-model="bank" :banks="saved.banks" :errors="errors" />
+          </template>
+          <div v-else-if="saved.bank" class="settings-page__kept">
+            <p class="settings-page__hint">
+              {{
+                removingKeptBank
+                  ? t('settings.qr.removing')
+                  : t('settings.qr.kept', { bank: saved.bank.bankName })
+              }}
+            </p>
+            <BaseButton v-if="removingKeptBank" variant="secondary" @click="keepBank">
+              {{ t('settings.qr.keep') }}
+            </BaseButton>
+            <BaseButton v-else variant="ghost" @click="removeKeptBank">
+              {{ t('settings.qr.remove') }}
+            </BaseButton>
+          </div>
         </section>
 
         <div class="settings-page__bar">
@@ -516,6 +572,25 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
 
 .settings-page__section > .settings-page__hint {
   margin-block-start: calc(-1 * var(--space-3));
+}
+
+.settings-page__switch {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-page__switch-label {
+  min-inline-size: 0;
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.settings-page__kept {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
 }
 
 .settings-page__changed {

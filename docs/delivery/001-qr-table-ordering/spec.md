@@ -35,7 +35,7 @@ S16 (platform admin suspends a restaurant) sits under "Set up" in release 1. S17
 
 ### S4 — As an owner, I want my own house rules, so that the system works the way my restaurant works
 
-Rules (per restaurant, defaults in brackets): payment timing [pay after eating] | pay before cooking; session opening [guest self check-in] | staff opens; order approval [only anomalies] | every order | none; anomaly threshold — max main-dish portions per person [2] and min per person [0.5, rounded down]; booking enabled [yes], slot length [90 min].
+Rules (per restaurant, defaults in brackets): payment timing [pay after eating] | pay before cooking; QR transfer payment [off] | on (needs a bank account, TQR-029); session opening [guest self check-in] | staff opens; order approval [only anomalies] | every order | none; anomaly threshold — max main-dish portions per person [2] and min per person [0.5, rounded down]; booking enabled [yes], slot length [90 min].
 
 - AC12: WHEN the owner changes a rule THE SYSTEM SHALL apply it to orders placed after the change and leave earlier orders unchanged.
 - AC13: WHILE payment timing is "pay before cooking", WHEN a guest submits an order THE SYSTEM SHALL keep it out of the kitchen queue until its payment is confirmed.
@@ -91,8 +91,8 @@ Roles: owner, cashier, waiter, kitchen.
 
 ### S12 — As a guest, I want a bill with a VietQR code, so that I can pay by bank transfer from my table
 
-- AC40: WHEN a guest or staff requests the bill THE SYSTEM SHALL show all non-cancelled items, total in VND, and a VietQR (EMVCo) code with the restaurant's bank account, the exact amount and a memo that identifies the bill (e.g. `TQR 7F3K2`).
-- AC41: WHEN the restaurant has no bank account configured THE SYSTEM SHALL show the bill without a QR and "Thanh toán tại quầy".
+- AC40: WHEN a guest or staff requests the bill THE SYSTEM SHALL show all non-cancelled items, total in VND and the bill code; WHERE the restaurant has turned QR payment on (house rule `payment.qrEnabled`, TQR-029) it SHALL also show a VietQR (EMVCo) code with the restaurant's bank account, the exact amount and a memo that identifies the bill (e.g. `TQR 7F3K2`).
+- AC41: WHEN the restaurant has QR payment off (the default) or no bank account configured THE SYSTEM SHALL show the bill without a QR and "Thanh toán tại quầy", and SHALL NOT build a VietQR payload even if an account is stored.
 - AC42 (boundary): WHEN items are added after a bill is shown THE SYSTEM SHALL issue a new bill code and amount; the old code SHALL show "Hoá đơn đã thay đổi".
 - AC43: The generated VietQR payload SHALL decode with a correct CRC and the stated bank BIN, account, amount and memo.
 
@@ -176,3 +176,4 @@ Owner's words: "khi nào có ai đợi quá 5 hay 10 phút thì nhắc lại ví
 
 - 2026-11-08 (architect) Release time for pay-before-cooking orders = payment confirmation time — the kitchen cannot start earlier; ADR 0005.
 - 2026-11-08 (owner) New top priority: voice support for the kitchen — S17 (TQR-027, read new orders aloud) and S18 (TQR-028, spoken overdue reminders with house rule `kitchen.reminderMinutes` / `repeatMinutes`). Decisions: (1) the browser's own speech synthesis, not a cloud TTS — offline, free, no new service or data leaving the device, and iPad ships the Vietnamese voice "Linh"; quality depends on the device's voice. (2) The reminder rule is read as it is now, not from the order's AC12 snapshot: it is how the kitchen screen behaves, not a judgement of the order (money, approval), so a change applies on the next queue read. (3) Voice covers the station tab the cook is viewing; there is no "Tất cả khu" view yet, so a kitchen with several stations on one iPad hears only the open tab. (4) Voice commands from the cook (speech recognition) are not in scope: browser speech recognition for vi-VN on iPad sends audio to Apple's servers and is unreliable in a noisy kitchen — candidate TQR-030. (5) The waiter screen `/phuc-vu` stays silent and unchanged.
+- 2026-11-08 (owner) "các tính năng thanh toán thông qua qr code là option nhé" — QR payment becomes a per-restaurant option, off by default (TQR-029): house rule `payment.qrEnabled`; turning it on needs a bank account; off → every bill says "Thanh toán tại quầy" and the cashier gets one "Đã nhận tiền" action. Pay-before-cooking stays available (cash at the counter). AC40/AC41 reworded above; restaurants that had saved an account before the change keep QR on (migration `0009_qr_payment_option`).

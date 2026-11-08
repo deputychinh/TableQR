@@ -157,19 +157,25 @@ const payBillOf = computed(() => paying.value?.session.bill);
   <RoleShell :title="t('billing.cashier.title')">
     <div class="cashier-page">
       <h1 class="cashier-page__title">{{ t('billing.cashier.heading') }}</h1>
-      <p class="cashier-page__lead">{{ t('billing.cashier.lead') }}</p>
+      <p class="cashier-page__lead">
+        {{
+          overview?.qrEnabled === false
+            ? t('billing.cashier.leadCounter')
+            : t('billing.cashier.lead')
+        }}
+      </p>
 
       <p
-        v-if="overview?.bankChangedRecently"
+        v-if="overview?.qrEnabled && overview.bankChangedRecently"
         class="cashier-page__banner cashier-page__banner--warning"
         role="alert"
       >
         <TriangleAlert :size="22" aria-hidden="true" />
         {{ t('billing.cashier.bankChanged', { at: shortDateTime(overview.bankChangedAt) }) }}
       </p>
-      <p v-else-if="overview && !overview.bankConfigured" class="cashier-page__banner">
+      <p v-else-if="overview && !overview.qrEnabled" class="cashier-page__banner">
         <Info :size="22" aria-hidden="true" />
-        {{ t('billing.cashier.noBank') }}
+        {{ t('billing.cashier.noQr') }}
       </p>
 
       <FormAlert v-if="actionError && !paying && !closing" :message="actionError" />
@@ -193,7 +199,7 @@ const payBillOf = computed(() => paying.value?.session.bill);
           v-for="session in overview.sessions"
           :key="session.sessionId"
           :session="session"
-          :transfer-enabled="overview.bankConfigured"
+          :transfer-enabled="overview.qrEnabled"
           @bill="makeBill"
           @pay="askPay"
           @close="askClose"
@@ -205,9 +211,11 @@ const payBillOf = computed(() => paying.value?.session.bill);
       :open="paying !== undefined"
       :title="
         t(
-          paying?.method === 'cash'
-            ? 'billing.cashier.confirmCashTitle'
-            : 'billing.cashier.confirmTransferTitle',
+          paying?.method !== 'cash'
+            ? 'billing.cashier.confirmTransferTitle'
+            : overview?.qrEnabled
+              ? 'billing.cashier.confirmCashTitle'
+              : 'billing.cashier.confirmCounterTitle',
         )
       "
       :confirm-label="

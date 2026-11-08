@@ -72,8 +72,15 @@ const renderRouted = async () => {
 
 const PASSWORD_LABEL = 'Mật khẩu đăng nhập của bạn';
 
+const QR_SWITCH = 'Cho khách chuyển khoản bằng mã QR';
+/** TQR-029: the bank account is asked for only once QR transfer is turned on. */
+const turnQrOn = async () => {
+  await userEvent.click(screen.getByRole('switch', { name: QR_SWITCH }));
+};
+
 /** Fills a new bank account and opens the confirm sheet. */
 const openBankSheet = async () => {
+  await turnQrOn();
   await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970436');
   await userEvent.type(screen.getByLabelText('Số tài khoản'), '0123456789');
   await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'An');
@@ -112,7 +119,11 @@ describe('SettingsPage', () => {
       ).value,
     ).toBe('0,5');
     expect(screen.getByLabelText('Giờ mở cửa ngày Thứ Hai')).toBeTruthy();
-    expect(screen.getByText('Hoá đơn sẽ ghi “Thanh toán tại quầy”.')).toBeTruthy();
+    // TQR-029: QR transfer is off by default and the bank account is not asked for.
+    const qr = screen.getByRole('switch', { name: QR_SWITCH });
+    expect(qr.getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByText(/Tắt thì khách thanh toán tại quầy/)).toBeTruthy();
+    expect(screen.queryByLabelText('Ngân hàng')).toBeNull();
     expect(saveButton().disabled).toBe(true);
     expect(screen.getByText(/Chưa có thay đổi/)).toBeTruthy();
   });
@@ -179,6 +190,7 @@ describe('SettingsPage', () => {
   it('previews the bank name live and confirms a new bank account before saving', async () => {
     const calls = stubApi(ownerSettings());
     await renderPage();
+    await turnQrOn();
     await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970436');
     await userEvent.type(screen.getByLabelText('Số tài khoản'), '0123 456 789');
     await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'Nguyễn Văn Ánh');
@@ -193,6 +205,7 @@ describe('SettingsPage', () => {
     await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Đúng, lưu tài khoản này' }));
     expect(calls.find((c) => c.method === 'PUT')?.body).toMatchObject({
+      rules: { payment: { qrEnabled: true } },
       bank: { bin: '970436', accountNumber: '0123456789', accountName: 'NGUYEN VAN ANH' },
       currentPassword: 'mat-khau-dai-123',
     });
@@ -202,6 +215,7 @@ describe('SettingsPage', () => {
   it('"Huỷ" closes the bank sheet without saving', async () => {
     const calls = stubApi(ownerSettings());
     await renderPage();
+    await turnQrOn();
     await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970422');
     await userEvent.type(screen.getByLabelText('Số tài khoản'), '123456');
     await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'An');
@@ -211,7 +225,7 @@ describe('SettingsPage', () => {
     expect(calls.some((c) => c.method === 'PUT')).toBe(false);
   });
 
-  it('removing the bank account asks with the consequence, then saves null', async () => {
+  it('TQR-029: QR off keeps a saved account out of sight; removing it asks, then saves null', async () => {
     const calls = stubApi(
       ownerSettings({
         bank: {
@@ -224,12 +238,13 @@ describe('SettingsPage', () => {
       }),
     );
     await renderPage();
-    expect(screen.getByText(/Tài khoản đổi lần cuối lúc/)).toBeTruthy();
-    await userEvent.selectOptions(
-      screen.getByLabelText('Ngân hàng'),
-      'Chưa cài — khách thanh toán tại quầy',
-    );
     expect(screen.queryByLabelText('Số tài khoản')).toBeNull();
+    expect(screen.getByText(/Tài khoản Vietcombank đã lưu vẫn được giữ/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Xoá tài khoản đã lưu' }));
+    expect(screen.getByText(/sẽ bị xoá khi bạn lưu/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Giữ lại tài khoản' }));
+    expect(saveButton().disabled).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Xoá tài khoản đã lưu' }));
     await userEvent.click(saveButton());
     const sheet = screen.getByRole('dialog', { name: 'Bỏ tài khoản nhận tiền?' });
     await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
@@ -245,6 +260,7 @@ describe('SettingsPage', () => {
     Element.prototype.scrollIntoView = scrolled;
     const calls = stubApi(ownerSettings());
     await renderPage();
+    await turnQrOn();
     await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970436');
     await userEvent.type(screen.getByLabelText('Số tài khoản'), '12345');
     await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'Ánh');
@@ -258,6 +274,79 @@ describe('SettingsPage', () => {
     await userEvent.type(screen.getByLabelText('Số tài khoản'), '6');
     expect(screen.queryByText('Số tài khoản gồm 6 đến 19 chữ số.')).toBeNull();
     expect(screen.queryByText('Kiểm tra lại các ô báo đỏ rồi lưu lại.')).toBeNull();
+  });
+
+  describe('QR transfer is an option (TQR-029)', () => {
+    const saved = () =>
+      ownerSettings({
+        rules: { ...ownerSettings().rules, payment: { qrEnabled: true } },
+        bank: {
+          bin: '970436',
+          bankName: 'Vietcombank',
+          accountNumber: '0123456789',
+          accountName: 'NGUYEN VAN ANH',
+        },
+        bankChangedAt: '2026-11-07T03:00:00.000Z',
+      });
+
+    it('turning it on shows the bank account; on without an account asks for one, nothing sent', async () => {
+      const calls = stubApi(ownerSettings());
+      await renderPage();
+      await turnQrOn();
+      expect(screen.getByRole('switch', { name: QR_SWITCH }).getAttribute('aria-checked')).toBe(
+        'true',
+      );
+      expect(screen.getByLabelText('Ngân hàng')).toBeTruthy();
+      await userEvent.click(saveButton());
+      expect(
+        screen.getByText('Nhập tài khoản nhận tiền để bật chuyển khoản bằng mã QR.'),
+      ).toBeTruthy();
+      expect(document.activeElement).toBe(screen.getByLabelText('Ngân hàng'));
+      expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+      // Off again: nothing left to fix, nothing to save.
+      await userEvent.click(screen.getByRole('switch', { name: QR_SWITCH }));
+      expect(screen.queryByText(/Nhập tài khoản nhận tiền/)).toBeNull();
+      expect(saveButton().disabled).toBe(true);
+    });
+
+    it('turning it off keeps the saved account: saved without the password step', async () => {
+      const calls = stubApi(saved());
+      await renderPage();
+      expect(screen.getByLabelText('Số tài khoản')).toBeTruthy();
+      await userEvent.type(screen.getByLabelText('Số tài khoản'), '9');
+      await userEvent.click(screen.getByRole('switch', { name: QR_SWITCH }));
+      expect(screen.queryByLabelText('Số tài khoản')).toBeNull();
+      await userEvent.click(saveButton());
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({
+        rules: { ...saved().rules, payment: { qrEnabled: false } },
+        bank: { bin: '970436', accountNumber: '0123456789', accountName: 'NGUYEN VAN ANH' },
+      });
+    });
+
+    it('the API refusing "on without an account" marks the bank select', async () => {
+      stubApi(ownerSettings(), () =>
+        jsonResponse(
+          { code: 'VALIDATION_FAILED', fields: [{ path: 'bank', code: 'custom' }] },
+          422,
+        ),
+      );
+      await renderPage();
+      await userEvent.click(screen.getByText('Không cần duyệt'));
+      // An old tab: the switch says on while the API stored nothing; the server has the last word.
+      await turnQrOn();
+      await userEvent.selectOptions(screen.getByLabelText('Ngân hàng'), '970436');
+      await userEvent.type(screen.getByLabelText('Số tài khoản'), '0123456789');
+      await userEvent.type(screen.getByLabelText('Tên chủ tài khoản'), 'An');
+      await userEvent.click(saveButton());
+      const sheet = screen.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' });
+      await userEvent.type(within(sheet).getByLabelText(PASSWORD_LABEL), 'mat-khau-dai-123');
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Đúng, lưu tài khoản này' }));
+      expect(
+        await screen.findByText('Nhập tài khoản nhận tiền để bật chuyển khoản bằng mã QR.'),
+      ).toBeTruthy();
+      expect(screen.getByLabelText('Ngân hàng').getAttribute('aria-invalid')).toBe('true');
+    });
   });
 
   it('flags a closing time that is not after the opening time', async () => {

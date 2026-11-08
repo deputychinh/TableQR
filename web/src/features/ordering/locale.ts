@@ -66,7 +66,7 @@ export const orderingLocale = {
         'Đơn này đang chờ nhân viên xác nhận: bàn {n} người đã gọi {total} phần món chính, quá mức thường lệ {limit} phần. Nhân viên sẽ xác nhận ngay.',
       heldEvery: 'Quán xác nhận mọi đơn trước khi nấu. Nhân viên sẽ xác nhận ngay.',
       awaitingPayment: 'Quán nấu sau khi bạn thanh toán.',
-      awaitingPaymentLink: 'Thanh toán tại quầy hoặc bằng mã QR',
+      awaitingPaymentLink: 'Xem hoá đơn để thanh toán',
       rejected: 'Nhân viên đã huỷ đơn này. Bạn hỏi nhân viên nếu cần nhé.',
       live: 'Đang cập nhật trực tiếp',
       bill: 'Xem hoá đơn / Thanh toán',

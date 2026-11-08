@@ -18,6 +18,10 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 const bill = computed(() => props.session.bill);
+/** TQR-029: QR off leaves one counter action, "Đã nhận tiền" (recorded as cash). */
+const cashLabel = computed(() =>
+  props.transferEnabled ? t('billing.cashier.receivedCash') : t('billing.cashier.received'),
+);
 const openBill = computed(() => (bill.value?.status === 'open' ? bill.value : null));
 const settled = computed(() => props.session.dueVnd === 0 && props.session.totalVnd > 0);
 /** A bill is needed (none yet, or the table ordered more since the code was issued). */
@@ -89,11 +93,11 @@ const chip = computed(() => {
         <BaseButton
           :variant="transferEnabled ? 'secondary' : 'primary'"
           size="lg"
-          :aria-label="`${t('billing.cashier.receivedCash')} – ${session.tableName}`"
+          :aria-label="`${cashLabel} – ${session.tableName}`"
           @click="emit('pay', session, 'cash')"
         >
           <Banknote :size="20" aria-hidden="true" />
-          {{ t('billing.cashier.receivedCash') }}
+          {{ cashLabel }}
         </BaseButton>
       </template>
       <BaseButton

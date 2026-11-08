@@ -32,7 +32,4 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | review |
 | TQR-027 | Kitchen voice: read new orders aloud on `/bep` (browser speech, vi-VN)     | review |
 | TQR-028 | Spoken overdue reminders (house rule `kitchen.reminderMinutes`)            | review |
-
-Candidates (not scheduled):
-
-- TQR-030 — Voice commands from the cook ("Bàn 1 xong"): speech recognition. Not built with TQR-027/028 because browser speech recognition for vi-VN on iPad sends the audio to Apple's servers (not offline) and is unreliable in a noisy kitchen; revisit with an on-device model or a push-to-talk test in a real kitchen.
+| TQR-029 | QR payment as a per-restaurant option (default off)                        | review |

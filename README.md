@@ -24,8 +24,11 @@ The platform admin (suspends abusive restaurants at `/quan-tri`) has no sign-up 
 - **Owner:** self sign-up, house rules (pay before/after eating, who opens a table, order approval, portions per person, kitchen reminder time), VietQR bank account, menu with kitchen stations, tables with printable QR codes, staff accounts per role.
 - **Guest (phone, no app):** scan the table QR, party size, order, live status per dish, bill with a VietQR code that follows new orders, online table booking at `/r/<slug>/dat-ban`.
 - **Kitchen (`/bep`):** one queue per station, oldest first; overtaking the same dish needs a reason; "Bật đọc to" reads new orders aloud in Vietnamese ("Bàn 1: hai phở bò, một trà đá") and reminds dishes waiting too long (5–20 min, set by the owner), offline on the iPad's own voice.
+- **Owner:** self sign-up, house rules (pay before/after eating, who opens a table, order approval, portions per person), optional VietQR transfer payment (off by default; turn it on with a bank account), menu with kitchen stations, tables with printable QR codes, staff accounts per role.
+- **Guest (phone, no app):** scan the table QR, party size, order, live status per dish, bill that follows new orders ("Thanh toán tại quầy", or a VietQR code when the restaurant turned QR payment on), online table booking at `/r/<slug>/dat-ban`.
+- **Kitchen (`/bep`):** one queue per station, oldest first; overtaking the same dish needs a reason.
 - **Waiter (`/phuc-vu`):** ready dishes per table, unusual orders to confirm (`/phuc-vu/duyet`).
-- **Cashier (`/thu-ngan`):** confirm transfers against the bill code, close tables.
+- **Cashier (`/thu-ngan`):** confirm payment against the bill code ("Đã nhận tiền" at the counter; "Đã nhận chuyển khoản" too when QR payment is on), close tables.
 
 Results of release 1: [docs/delivery/001-qr-table-ordering/demo.md](docs/delivery/001-qr-table-ordering/demo.md).
 
