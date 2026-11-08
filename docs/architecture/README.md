@@ -26,7 +26,7 @@ that take the tenant id first. Details and data model:
 
 ## Stream liveness (ADR 0010)
 
-Every stream sends `heartbeat` `{intervalMs}` after its first snapshot and every `TQR_SSE_HEARTBEAT_MS` (15 s). `web/src/composables/useStream.ts` treats 2.5 heartbeats without any event as a dead stream (an API gone behind a proxy leaves EventSource "open"): it closes it, shows `reconnecting` and reopens with backoff (1, 2, 5, 10, 30 s); the reconnect snapshot repairs state. Every screen that follows a stream shows `StreamBanner` ("Mất kết nối — đang kết nối lại…") meanwhile. On shutdown `StreamGate.beforeApplicationShutdown` sends `bye` and ends every stream, so `app.close()` never waits for a browser.
+Every stream sends `heartbeat` `{intervalMs}` after its first snapshot and every `TQR_SSE_HEARTBEAT_MS` (15 s). `web/src/composables/useStream.ts` treats 2.5 heartbeats without any event as a dead stream (an API gone behind a proxy leaves EventSource "open"): it closes it, shows `reconnecting` and reopens with jittered backoff capped at 10 s (1, 2, 5, 10 s steps); the reconnect snapshot repairs state. A `revoked` stream, or a 401 when the browser gave up, ends it (`ended`) and sends staff to sign-in instead. Every screen that follows a stream shows `StreamBanner` ("Mất kết nối — đang kết nối lại…") meanwhile. On shutdown `StreamGate.beforeApplicationShutdown` sends `bye` and ends every stream, so `app.close()` never waits for a browser.
 
 ## Kitchen voice (ADR 0009)
 
