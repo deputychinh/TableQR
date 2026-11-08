@@ -55,13 +55,18 @@ const request = async <T>(
   path: string,
   body: unknown,
   fetchImpl: typeof fetch,
+  extraHeaders: Record<string, string> = {},
 ): Promise<T> => {
   let response: Response;
+  const headers = {
+    ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    ...extraHeaders,
+  };
   try {
     response = await fetchImpl(`${API_BASE}${path}`, {
       method,
       credentials: 'same-origin',
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+      headers: Object.keys(headers).length === 0 ? undefined : headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (error: unknown) {
@@ -88,3 +93,11 @@ export const sendJson = <T>(
   body?: unknown,
   fetchImpl: typeof fetch = fetch,
 ): Promise<T> => request<T>(method, path, body, fetchImpl);
+
+/** POST with extra request headers, e.g. `Idempotency-Key` for a submission that may be retried. */
+export const postJsonWithHeaders = <T>(
+  path: string,
+  body: unknown,
+  headers: Record<string, string>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<T> => request<T>('POST', path, body, fetchImpl, headers);

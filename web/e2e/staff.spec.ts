@@ -70,7 +70,7 @@ test('AC14/AC16 owner adds a kitchen user who lands on /bep; disabling sends the
   await expectNoSeriousA11yIssues(page);
   await page.getByRole('button', { name: 'Thêm nhân viên' }).click();
   await expect(page).toHaveURL(/\/quan-ly\/nhan-vien$/);
-  await expect(page.getByRole('status')).toContainText('Đã thêm Anh Bếp');
+  await expect(page.getByRole('status').filter({ hasText: 'Đã thêm Anh Bếp' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Anh Bếp/ })).toContainText('Bếp');
 
   // Owner signs out; the kitchen user signs in on the same device and lands on /bep.

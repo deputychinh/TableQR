@@ -137,6 +137,14 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     allowed: FLOOR,
     body: () => ({}),
   },
+  // service floor (TQR-011, TQR-013); confirm/reject are one-shot, covered in ordering.e2e-spec.ts
+  {
+    method: 'patch',
+    path: (f) => `/api/sessions/${f.sessionId}`,
+    allowed: FLOOR,
+    body: () => ({ partySize: 2 }),
+  },
+  { method: 'get', path: () => '/api/orders/review', allowed: FLOOR },
   // platform admin (TQR-009)
   { method: 'get', path: () => '/api/admin/restaurants', allowed: ADMIN },
   {

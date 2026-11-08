@@ -83,7 +83,7 @@ test('owner adds tables, prints the QR sheet, regenerates a code and the old cod
   const guest = await page.context().newPage();
   await guest.goto(oldUrl ?? '');
   await expect(guest.getByRole('heading', { name: 'Chào mừng bạn đến Lẩu Nấm E2E' })).toBeVisible();
-  await expect(guest.getByRole('heading', { name: 'Thực đơn sắp có' })).toBeVisible();
+  await expect(guest.getByRole('button', { name: 'Bắt đầu gọi món' })).toBeVisible();
   await expectNoSeriousA11yIssues(guest);
 
   // AC10: regenerate → the old code shows "Mã QR đã hết hạn", the new one works
@@ -99,7 +99,7 @@ test('owner adds tables, prints the QR sheet, regenerates a code and the old cod
   await expect(guest.getByRole('heading', { level: 1, name: 'Mã QR đã hết hạn' })).toBeVisible();
   await expectNoSeriousA11yIssues(guest);
   await guest.goto(newUrl ?? '');
-  await expect(guest.getByRole('heading', { name: 'Thực đơn sắp có' })).toBeVisible();
+  await expect(guest.getByRole('button', { name: 'Bắt đầu gọi món' })).toBeVisible();
 
   // AC11: an unknown code
   await guest.goto('/t/AAAAAAAAAAAAAAAAAAAAAA');

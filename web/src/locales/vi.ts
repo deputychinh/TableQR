@@ -9,6 +9,7 @@ import { staffLocale } from '@/features/staff/locale';
 import { adminLocale } from '@/features/admin/locale';
 import { billingLocale } from '@/features/billing/locale';
 import { bookingLocale } from '@/features/booking/locale';
+import { orderingLocale } from '@/features/ordering/locale';
 
 export const vi = {
   ...core,
@@ -20,6 +21,7 @@ export const vi = {
   ...adminLocale,
   ...billingLocale,
   ...bookingLocale,
+  ...orderingLocale,
 } as const;
 
 export type Messages = typeof vi;

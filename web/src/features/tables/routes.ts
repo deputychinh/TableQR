@@ -14,11 +14,4 @@ export const tablesRoutes: RouteRecordRaw[] = [
     component: () => import('./pages/TablePrintPage.vue'),
     meta: { staff: true, roles: ['owner'], title: 'In mã QR' },
   },
-  {
-    // Public guest entry a table's QR code opens; ordering arrives with TQR-011/012.
-    path: '/t/:qrToken',
-    name: 'guest-table',
-    component: () => import('./pages/GuestTablePage.vue'),
-    meta: { title: 'Gọi món' },
-  },
 ];
