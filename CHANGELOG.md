@@ -4,6 +4,10 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-08
+
+Kitchen voice and reliability: new orders read aloud in Vietnamese on the kitchen screen, overdue reminders per restaurant (5/10/15/20 min), QR payment as a per-restaurant option (off by default), table archive, kitchen "Bỏ món" with live bill re-sync, security headers and step-up auth for bank changes, stream liveness (banner + spoken warning) and graceful shutdown, tenant isolation sweep with route-coverage guard, demo video script.
+
 ### Fixed
 
 - Simultaneous guest bookings no longer answer 500: booking creation is serialised per restaurant and deadlocks are retried up to 3 times (found by the AC50 concurrency test failing about one run in three) (TQR-020).

@@ -3,9 +3,9 @@
 Request (verbatim): "Tôi muốn làm 1 website chạy chủ yếu trên ipad và mobile mục đích chính là cung cấp QR để dán lên các bàn ăn trong quán ăn xong r khách hàng có thể nhanh chóng đặt bàn và thanh toán luôn khi thanh toán thì sẽ là hình thức quét mã QR ở ngay bàn thông qua hình thức chuyển khoản hoặc có thể thanh toán sau khi ăn tuỳ nhưng nhìn chung là như vậy có timeline ra đồ ăn và quy trình rõ ràng để tránh trường hợp khách vào sau mà lại nhận món trước khách vào hay quy trình ví dụ bàn đi 5 người mà ra đồ ăn sai hay bàn đi 1 ngừoi mà lại order nhiều kiểu vậy hiểu ý tôi rồi chứ" + "mỗi nhà hàng nên có 1 tài khoản riêng" + "và quy cách vận hành riêng nhé"
 Path: Full — because new product, several features (multi-tenant, ordering, kitchen queue, payment, booking)
 Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 5.0 of 6 days**
-Status: doing
+Status: done
 
-**Next action:** Merge the review-fix branch (TQR-017/025) and the kitchen voice branch (TQR-027/028); then build TQR-029 (QR payment optional, default off); independent review of 017, 025, 027, 028, 029; release v0.6.0.
+**Next action:** Owner feedback on v0.6.0 and the phone demo video; candidates: deploy target (hosting + domain), TQR-030 cook voice commands (ask first), Android in the e2e matrix, "Tất cả khu" kitchen view.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -59,6 +59,7 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 - 2026-11-08 release-1 batch review (fresh reviewer, real browser walkthrough): PASS 004, 005, 008, 009, 010, 011, 013, 014, 015, 019, 020, 021 (9.0–9.5); FAIL 006 8.5, 007 8.0 (deleting a table erases paid bills), 012 8.5, 016 8.5, 018 5.5 (no bill entry for guests, open bill not superseded live) — improve round 2 running as 2 agents (money/guest path, owner/staff UI + data)
 - 2026-11-08 round 2 merged (b901958 UI/data, 8958771 guest/money), guest menu LCP 2 601 → 1 960 ms (3316e70), round 3 TQR-018 dead end fixed (f2ab976) — re-reviews: 006, 007, 012, 016 PASS 9.5; 018 PASS 9.0
 - 2026-11-08 TQR-017 tenant isolation sweep — 28 id-bearing endpoints answer 404 to another restaurant's owner
+- 2026-11-08 v0.6.0: TQR-022–029 and TQR-031/032 shipped, each independently reviewed 9.0–10; booking deadlock 500 under concurrency found and fixed (27aa549); Vietnamese phone demo video (2:59, `make demo-video`)
 - 2026-11-08 plan — 21 items in 5 slices, estimate 4.5–7 d (60 %), circuit breaker written
 - 2026-11-08 architect — design.md, ADRs 0002–0007 (same-origin cookies, tenant scoping, SSE+NOTIFY, queue order, VietQR, booking exclusion), threat model
 
