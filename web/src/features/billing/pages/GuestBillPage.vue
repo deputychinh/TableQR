@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
-import { HeartHandshake, QrCode, ReceiptText } from 'lucide-vue-next';
+import { HeartHandshake, QrCode } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
@@ -82,19 +82,7 @@ onMounted(load);
     <main class="guest-bill-page__main">
       <LoadingState v-if="state.kind === 'loading'" :label="t('billing.guest.loading')" :rows="3" />
       <template v-else-if="state.kind === 'ready'">
-        <GuestBill :bill="state.bill" :changed="changed" @request="load" />
-        <EmptyState
-          v-if="state.bill.lines.length === 0 && state.bill.bill === null"
-          :title="t('billing.guest.emptyTitle')"
-          :body="t('billing.guest.emptyBody')"
-        >
-          <template #icon><ReceiptText :size="32" /></template>
-          <template #action>
-            <RouterLink class="guest-bill-page__link" :to="tableUrl">
-              {{ t('billing.guest.backToTable') }}
-            </RouterLink>
-          </template>
-        </EmptyState>
+        <GuestBill :bill="state.bill" :changed="changed" :table-url="tableUrl" @request="load" />
       </template>
       <EmptyState
         v-else-if="state.kind === 'no-session'"

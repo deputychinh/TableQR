@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { CircleCheck, Landmark, RefreshCw, Store } from 'lucide-vue-next';
+import { CircleCheck, Landmark, ReceiptText, RefreshCw, Store } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import QrImage from '@/features/tables/components/QrImage.vue';
 import { formatVnd } from '@/features/menu/price';
@@ -13,7 +14,10 @@ import type { SessionBill } from '../api';
  * quầy" without a bank account (AC41), a notice when the code changed (AC42) and "Đã thanh toán"
  * once the cashier confirms (AC44). Presentational: the page loads and refreshes `bill`.
  */
-const props = defineProps<{ bill: SessionBill; changed?: boolean }>();
+const props = withDefaults(
+  defineProps<{ bill: SessionBill; changed?: boolean; tableUrl?: string }>(),
+  { changed: false, tableUrl: '/' },
+);
 const emit = defineEmits<{ request: [] }>();
 const { t } = useI18n();
 
@@ -22,6 +26,15 @@ const isPaid = computed(() => current.value?.status === 'paid' && props.bill.due
 const isOpen = computed(() => current.value?.status === 'open');
 /** Something is due but no open bill exists yet (e.g. new items after a payment): never a dead end. */
 const needsNewBill = computed(() => !isPaid.value && !isOpen.value && props.bill.dueVnd > 0);
+/** Nothing ordered yet: no bill and no billable line. */
+const nothingOrdered = computed(() => current.value === null && props.bill.lines.length === 0);
+/**
+ * TQR-025: the bill was superseded (e.g. the kitchen dropped the last dish) and nothing is due — a
+ * proper empty state with the way back to the table, live and after a reload alike.
+ */
+const nothingDue = computed(
+  () => !isPaid.value && !isOpen.value && props.bill.dueVnd === 0 && !nothingOrdered.value,
+);
 </script>
 
 <template>
@@ -103,6 +116,32 @@ const needsNewBill = computed(() => !isPaid.value && !isOpen.value && props.bill
         {{ t('billing.guest.newBill') }}
       </BaseButton>
     </section>
+
+    <EmptyState
+      v-else-if="nothingDue"
+      :title="t('billing.guest.nothingDueTitle')"
+      :body="t('billing.guest.nothingDueBody')"
+    >
+      <template #icon><ReceiptText :size="32" /></template>
+      <template #action>
+        <RouterLink class="guest-bill__link" :to="tableUrl">
+          {{ t('billing.guest.backToTableShort') }}
+        </RouterLink>
+      </template>
+    </EmptyState>
+
+    <EmptyState
+      v-else-if="nothingOrdered"
+      :title="t('billing.guest.emptyTitle')"
+      :body="t('billing.guest.emptyBody')"
+    >
+      <template #icon><ReceiptText :size="32" /></template>
+      <template #action>
+        <RouterLink class="guest-bill__link" :to="tableUrl">
+          {{ t('billing.guest.backToTable') }}
+        </RouterLink>
+      </template>
+    </EmptyState>
     <section v-if="bill.lines.length > 0" class="guest-bill__lines">
       <h2 class="guest-bill__section-title">{{ t('billing.guest.items') }}</h2>
       <ul class="guest-bill__list">
@@ -280,6 +319,14 @@ const needsNewBill = computed(() => !isPaid.value && !isOpen.value && props.bill
 .guest-bill__counter-body,
 .guest-bill__code {
   margin: var(--space-1) 0 0;
+}
+
+.guest-bill__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target-min);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary);
 }
 
 .guest-bill__lines {

@@ -38,8 +38,11 @@ export const billingLocale = {
       counterTitle: 'Thanh toán tại quầy',
       counterBody:
         'Quán chưa nhận chuyển khoản qua mã QR. Mời bạn thanh toán tại quầy, đọc mã hoá đơn cho thu ngân.',
-      changed: 'Hoá đơn đã thay đổi vì có thêm món. Hãy quét mã mới bên dưới, đừng dùng mã cũ.',
-      changedNoDue: 'Hoá đơn đã thay đổi. Hiện bàn không còn món cần thanh toán.',
+      changed: 'Hoá đơn đã thay đổi. Hãy quét mã mới bên dưới, đừng dùng mã cũ.',
+      changedNoDue: 'Hoá đơn đã thay đổi, đừng dùng mã cũ.',
+      nothingDueTitle: 'Bàn không còn món cần thanh toán',
+      nothingDueBody: 'Món gọi thêm sẽ hiện ở đây cùng hoá đơn mới.',
+      backToTableShort: 'Quay lại bàn',
       newBill: 'Lấy hoá đơn mới',
       newBillHint: 'Bàn vừa gọi thêm món sau lần thanh toán trước. Lấy hoá đơn mới để quét mã.',
       paidTitle: 'Đã thanh toán',
@@ -88,7 +91,7 @@ export const billingLocale = {
       billReady: 'Hoá đơn {table}: {amount}, mã {code}.',
       errors: {
         alreadyPaid: 'Hoá đơn này đã được xác nhận rồi. Danh sách đã được cập nhật.',
-        superseded: 'Hoá đơn đã thay đổi vì có thêm món. Hãy đối chiếu với mã mới.',
+        superseded: 'Hoá đơn đã thay đổi. Hãy đối chiếu với mã mới.',
         sessionClosed: 'Bàn này đã được đóng.',
         generic: 'Chưa làm được. Kiểm tra mạng rồi thử lại.',
       },

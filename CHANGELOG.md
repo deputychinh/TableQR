@@ -18,6 +18,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 - A cancelled dish now re-syncs the table's open bill in the same transaction: the bill is superseded with the new amount (or no new bill when nothing is due) and the guest bill page updates live (TQR-025).
 - `make bench` no longer fails when run right after other local traffic: setup requests that meet a per-address limit (429) wait for the window with backoff and retry, and the result reports `setup_429_retries` / `setup_429_wait_s`; production limits are unchanged (TQR-026).
+- Guest bill page after the kitchen drops dishes (review round 1, TQR-025): when nothing is due any more it shows "Bàn không còn món cần thanh toán" with "Quay lại bàn", live and after a reload (a reload used to show only the title); the change notice no longer says "vì có thêm món" when the amount went down.
 
 ## [0.5.0] - 2026-11-08
 
