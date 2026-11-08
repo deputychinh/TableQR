@@ -5,7 +5,7 @@ Path: Full — because new product, several features (multi-tenant, ordering, ki
 Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 4.5 of 6 days**
 Status: doing
 
-**Next action:** Verify (`verify-app`: every AC with evidence on the dev server, benchmark diff), then `demo` (results page), then `release` v0.5.0 (local only: tag, CHANGELOG section, smoke), retro + improve-skills.
+**Next action:** `demo` (results page artifact from evidence/verification.md), then `release` v0.5.0 local (tag, CHANGELOG section, smoke), retro + improve-skills.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 

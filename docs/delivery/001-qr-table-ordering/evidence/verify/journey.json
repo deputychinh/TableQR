@@ -1,0 +1,139 @@
+{
+  "stamp": 1794117690184,
+  "email": "r3-owner-1794117690184@example.com",
+  "staff": {
+    "cashier": "r3-cashier-1794117690184@example.com",
+    "waiter": "r3-waiter-1794117690184@example.com",
+    "kitchen": "r3-kitchen-1794117690184@example.com"
+  },
+  "tokens": ["e0KTTv7e1Lg8s3BQAzc8ug", "mO8kZa6fbfYC6lExvel3OQ"],
+  "failed": 0,
+  "log": [
+    {
+      "k": "OK signup",
+      "v": ""
+    },
+    {
+      "k": "price 65000.5 dialog still open",
+      "v": true
+    },
+    {
+      "k": "price 65000.5 message",
+      "v": "Giá bán / Giá phải là số nguyên đồng, không có số lẻ."
+    },
+    {
+      "k": "menu contains 650 or 650.005",
+      "v": false
+    },
+    {
+      "k": "OK menu",
+      "v": ""
+    },
+    {
+      "k": "tokens",
+      "v": ["e0KTTv", "mO8kZa"]
+    },
+    {
+      "k": "OK tables",
+      "v": ""
+    },
+    {
+      "k": "OK settings pay_after + bank",
+      "v": ""
+    },
+    {
+      "k": "OK staff accounts",
+      "v": ""
+    },
+    {
+      "k": "OK guest A orders",
+      "v": ""
+    },
+    {
+      "k": "bill entries on orders page",
+      "v": 1
+    },
+    {
+      "k": "bill1",
+      "v": {
+        "memo": "TQR E09QF"
+      }
+    },
+    {
+      "k": "OK guest A opens bill by tapping",
+      "v": ""
+    },
+    {
+      "k": "OK guest B orders more",
+      "v": ""
+    },
+    {
+      "k": "bill2",
+      "v": {
+        "memo": "TQR 3Z10E",
+        "codeChanged": true,
+        "qrChanged": true
+      }
+    },
+    {
+      "k": "OK A bill live change",
+      "v": ""
+    },
+    {
+      "k": "confirm sheet",
+      "v": "Xác nhận đã nhận chuyển khoản? Bàn 1: 155.000 ₫, mã hoá đơn 3Z10E. Chỉ xác nhận khi tiền đã vào tài khoản và nội dung có “TQR 3Z10E”. Huỷ Đã nhận 155.000 ₫"
+    },
+    {
+      "k": "OK cashier confirms",
+      "v": ""
+    },
+    {
+      "k": "table refusal",
+      "v": "Không xoá được Bàn 1 Bàn này đã có khách ngồi, hoá đơn hoặc lượt đặt bàn. Quán cần giữ lịch sử thu tiền nên không xoá bàn này được. Nếu bàn đổi chỗ hay đổi tên, hãy đổi tên bàn. Đóng Đổi tên bàn"
+    },
+    {
+      "k": "OK delete table refused",
+      "v": ""
+    },
+    {
+      "k": "dish refusal",
+      "v": "Không xoá được Nem rán Món này đã có khách gọi, quán cần giữ món trong hoá đơn cũ nên không xoá được. Chọn \"Ngừng bán\": món hiện là Hết món và khách không gọi được nữa. Khi bán lại, bật Còn món. Đóng Ngừng bán"
+    },
+    {
+      "k": "Nem rán available after Ngừng bán",
+      "v": "false"
+    },
+    {
+      "k": "OK delete ordered dish refused",
+      "v": ""
+    },
+    {
+      "k": "OK switch to pay_before",
+      "v": ""
+    },
+    {
+      "k": "pay_before before",
+      "v": "Thực đơn Món đã gọi (1) Đã gửi món. Bạn theo dõi từng món ở đây. Món đã gọi Đang cập nhật trực tiếp Gửi lúc 13:01 Chờ thanh toán Quán nấu sau khi bạn thanh toán. Thanh toán tại quầy hoặc bằng mã QR Bún chả × 1 Chờ thanh toán Tổng 55.000 ₫ Xem hoá đơn / Thanh toán"
+    },
+    {
+      "k": "cashier buttons for Bàn 2",
+      "v": ["Đăng xuất", "Đóng bàn", "Lấy hoá đơn", "Đóng bàn"]
+    },
+    {
+      "k": "Bàn 2 card",
+      "v": "no article"
+    },
+    {
+      "k": "Lấy hoá đơn names",
+      "v": [" Lấy hoá đơn"]
+    },
+    {
+      "k": "pay_before after",
+      "v": "Thực đơn Món đã gọi (1) Đã gửi món. Bạn theo dõi từng món ở đây. Món đã gọi Đang cập nhật trực tiếp Gửi lúc 13:01 Đã gửi Bún chả × 1 Đang chờ Tổng 55.000 ₫ Xem hoá đơn / Thanh toán"
+    },
+    {
+      "k": "OK pay_before guest banner",
+      "v": ""
+    }
+  ]
+}
