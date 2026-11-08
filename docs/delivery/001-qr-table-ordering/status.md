@@ -2,10 +2,10 @@
 
 Request (verbatim): "Tôi muốn làm 1 website chạy chủ yếu trên ipad và mobile mục đích chính là cung cấp QR để dán lên các bàn ăn trong quán ăn xong r khách hàng có thể nhanh chóng đặt bàn và thanh toán luôn khi thanh toán thì sẽ là hình thức quét mã QR ở ngay bàn thông qua hình thức chuyển khoản hoặc có thể thanh toán sau khi ăn tuỳ nhưng nhìn chung là như vậy có timeline ra đồ ăn và quy trình rõ ràng để tránh trường hợp khách vào sau mà lại nhận món trước khách vào hay quy trình ví dụ bàn đi 5 người mà ra đồ ăn sai hay bàn đi 1 ngừoi mà lại order nhiều kiểu vậy hiểu ý tôi rồi chứ" + "mỗi nhà hàng nên có 1 tài khoản riêng" + "và quy cách vận hành riêng nhé"
 Path: Full — because new product, several features (multi-tenant, ordering, kitchen queue, payment, booking)
-Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 3.0 of 6 days**
+Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 3.5 of 6 days**
 Status: doing
 
-**Next action:** Merge the slice-1 fix agent branch (security fixes D1–D6 + consistency), `make ci`, push; then one independent batch review of everything (TQR-004…021 incl. re-review of failed slice-1 items) → improve round(s) → scores into stories; then TQR-017, verify-app, demo, release v0.5.0.
+**Next action:** Merge the two round-2 fix branches (money/guest path; owner/staff UI + data), `make ci`, push; re-review the failed items (006, 007, 012, 016, 018) with a fresh reviewer; then TQR-017, verify-app, demo, release v0.5.0.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -55,6 +55,8 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 - 2026-11-08 shared service schema 24b16cf; slices 2–4 started as 4 parallel agents: ordering (011/012/013/016), kitchen+serving (014/015), billing (018/019), booking (020/021)
 - 2026-11-08 slice-1 batch review: PASS TQR-003 9.0, TQR-008 9.0; FAIL TQR-004 7.0 (security 0: parallel throttle bypass, timing oracle, malformed cookie 500), TQR-005 7.0, TQR-006 7.5, TQR-007 7.5, TQR-009 8.0, TQR-010 8.0 (streams survive revocation) — improve round 1 running in a fix agent
 - 2026-11-08 slices 2–4 merged: billing TQR-018/019 (agent self-review 6.5 → fixed), booking TQR-020/021 62fbb0e (agent review 9/10), guest ordering TQR-011/012/013/016 17abfac, kitchen + serving TQR-014/015 b81f32f (agent review 9/10; rush replay 0 unfair serves over 302 items) — make ci green (API 321 unit + 486 e2e, web 325 unit + 34 Playwright)
+- 2026-11-08 slice-1 fixes merged edc4ad9 (12 findings, each with a failing-first test) — make ci green (API 342 unit + 574 e2e, web 339 unit + 36 Playwright)
+- 2026-11-08 release-1 batch review (fresh reviewer, real browser walkthrough): PASS 004, 005, 008, 009, 010, 011, 013, 014, 015, 019, 020, 021 (9.0–9.5); FAIL 006 8.5, 007 8.0 (deleting a table erases paid bills), 012 8.5, 016 8.5, 018 5.5 (no bill entry for guests, open bill not superseded live) — improve round 2 running as 2 agents (money/guest path, owner/staff UI + data)
 - 2026-11-08 plan — 21 items in 5 slices, estimate 4.5–7 d (60 %), circuit breaker written
 - 2026-11-08 architect — design.md, ADRs 0002–0007 (same-origin cookies, tenant scoping, SSE+NOTIFY, queue order, VietQR, booking exclusion), threat model
 
