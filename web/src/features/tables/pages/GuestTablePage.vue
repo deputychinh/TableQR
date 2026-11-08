@@ -8,6 +8,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import { resolveGuestTable, type GuestTable } from '../api';
+import GuestSuspended from '../components/GuestSuspended.vue';
 
 /** What a guest sees after scanning a table's QR code (AC8, AC10, AC11). Ordering: TQR-011/012. */
 type State =
@@ -15,6 +16,7 @@ type State =
   | { kind: 'ready'; data: GuestTable }
   | { kind: 'expired' }
   | { kind: 'not-found' }
+  | { kind: 'suspended' }
   | { kind: 'error' };
 
 const { t } = useI18n();
@@ -30,6 +32,8 @@ const load = async () => {
     document.title = `${data.table.name} · ${data.restaurant.name}`;
   } catch (error: unknown) {
     if (error instanceof ApiError && error.code === 'QR_EXPIRED') state.value = { kind: 'expired' };
+    else if (error instanceof ApiError && error.code === 'RESTAURANT_SUSPENDED')
+      state.value = { kind: 'suspended' };
     else if (error instanceof ApiError && error.status === 404) state.value = { kind: 'not-found' };
     else state.value = { kind: 'error' };
   }
@@ -75,6 +79,7 @@ onMounted(load);
       >
         <template #icon><CircleHelp :size="32" /></template>
       </EmptyState>
+      <GuestSuspended v-else-if="state.kind === 'suspended'" />
       <ErrorState
         v-else
         :message="t('guestTable.loadError')"

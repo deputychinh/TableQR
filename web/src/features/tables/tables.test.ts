@@ -363,6 +363,18 @@ describe('guest table page', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  it('AC54 a suspended restaurant shows "Nhà hàng tạm ngưng" and nothing to order', async () => {
+    fakeApi({
+      'GET /api/g/t/AAAAAAAAAAAAAAAAAAAAAA': () =>
+        jsonResponse({ code: 'RESTAURANT_SUSPENDED', detail: 'Nhà hàng tạm ngưng' }, 403),
+    });
+    await renderGuest();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Nhà hàng tạm ngưng' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
   it('offers a retry when the network fails', async () => {
     let fail = true;
     vi.stubGlobal(

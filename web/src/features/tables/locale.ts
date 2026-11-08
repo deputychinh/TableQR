@@ -86,6 +86,9 @@ export const tables = {
     notFoundTitle: 'Không tìm thấy bàn',
     notFoundBody:
       'Mã QR này không thuộc bàn nào. Hãy kiểm tra lại mã dán trên bàn hoặc hỏi nhân viên.',
+    suspendedTitle: 'Nhà hàng tạm ngưng',
+    suspendedBody:
+      'Quán đang tạm ngưng nhận gọi món qua mã QR. Bạn vui lòng hỏi nhân viên để được phục vụ.',
     loadError: 'Không mở được bàn. Kiểm tra mạng rồi thử lại.',
     retry: 'Thử lại',
   },
