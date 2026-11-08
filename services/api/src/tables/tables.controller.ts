@@ -17,7 +17,12 @@ import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import { isValidSeats, isValidTableName, normalizeTableName } from './domain/table-rules.js';
-import { TablesService, type GuestTableView, type TableView } from './tables.service.js';
+import {
+  TablesService,
+  type GuestTableView,
+  type TableList,
+  type TableView,
+} from './tables.service.js';
 
 // Limits live in domain/table-rules.ts; zod only wires them to the request body.
 const name = z.string().max(200).transform(normalizeTableName).refine(isValidTableName);
@@ -40,8 +45,8 @@ export class TablesController {
   @Get()
   @Roles('owner', 'cashier', 'waiter')
   @Header('Cache-Control', 'no-store')
-  async list(@CurrentPrincipal() principal: Principal): Promise<{ items: TableView[] }> {
-    return { items: await this.tables.list(tenantOf(principal)) };
+  list(@CurrentPrincipal() principal: Principal): Promise<TableList> {
+    return this.tables.list(tenantOf(principal));
   }
 
   @Get(':id')
@@ -73,6 +78,22 @@ export class TablesController {
   @Roles('owner')
   remove(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<void> {
     return this.tables.remove(tenantOf(principal), uuidParam(id));
+  }
+
+  /** TQR-024 "Ẩn bàn": hide a table that has history (it cannot be deleted). */
+  @Post(':id/archive')
+  @HttpCode(200)
+  @Roles('owner')
+  archive(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<TableView> {
+    return this.tables.archive(tenantOf(principal), uuidParam(id));
+  }
+
+  /** TQR-024 "Hiện lại": bring a hidden table back. */
+  @Post(':id/unarchive')
+  @HttpCode(200)
+  @Roles('owner')
+  unarchive(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<TableView> {
+    return this.tables.unarchive(tenantOf(principal), uuidParam(id));
   }
 
   @Post(':id/rotate-qr')

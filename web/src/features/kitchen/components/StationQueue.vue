@@ -3,11 +3,18 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ChefHat } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
+import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import { olderSameDish } from '../queue-state';
-import { finishItem, startItem, type ItemChange, type Ticket } from '../services/kitchen.service';
+import {
+  cancelItem,
+  finishItem,
+  startItem,
+  type ItemChange,
+  type Ticket,
+} from '../services/kitchen.service';
 import { useStationQueue } from '../useStationQueue';
 import SkipReasonSheet from './SkipReasonSheet.vue';
 import TicketCard from './TicketCard.vue';
@@ -72,6 +79,19 @@ const done = async (ticket: Ticket) => {
   }
 };
 
+/** TQR-025: "Bỏ món" asks first; the guest's bill follows on the server. */
+const dropping = ref<Ticket | undefined>();
+
+const confirmDrop = async () => {
+  const ticket = dropping.value;
+  if (!ticket) return;
+  const outcome = await run(ticket, () => cancelItem(ticket));
+  dropping.value = undefined;
+  if (outcome === 'ok') {
+    message.value = t('kitchen.drop.done', { dish: ticket.name, table: ticket.tableName });
+  }
+};
+
 const confirmSkip = async (reason: string) => {
   const current = skipping.value;
   if (!current) return;
@@ -116,6 +136,7 @@ const confirmSkip = async (reason: string) => {
               :now="now"
               :busy="busyId === ticket.id"
               @start="start(ticket)"
+              @drop="dropping = ticket"
             />
           </li>
         </ol>
@@ -134,6 +155,7 @@ const confirmSkip = async (reason: string) => {
               :now="now"
               :busy="busyId === ticket.id"
               @done="done(ticket)"
+              @drop="dropping = ticket"
             />
           </li>
         </ol>
@@ -148,6 +170,20 @@ const confirmSkip = async (reason: string) => {
       @confirm="confirmSkip"
       @cancel="skipping = undefined"
     />
+    <ConfirmSheet
+      :open="dropping !== undefined"
+      :title="
+        dropping ? t('kitchen.drop.title', { dish: dropping.name, table: dropping.tableName }) : ''
+      "
+      :confirm-label="t('kitchen.drop.confirm')"
+      :cancel-label="t('kitchen.drop.cancel')"
+      variant="danger"
+      :busy="busyId !== undefined"
+      @confirm="confirmDrop"
+      @cancel="dropping = undefined"
+    >
+      <p>{{ t('kitchen.drop.body') }}</p>
+    </ConfirmSheet>
   </div>
 </template>
 

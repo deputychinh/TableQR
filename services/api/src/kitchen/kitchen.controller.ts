@@ -41,6 +41,18 @@ export class KitchenController {
     return this.kitchen.start(tenantOf(principal), idParam(id), version);
   }
 
+  /** TQR-025 "Huỷ món": the kitchen cannot make this dish; the table's open bill follows. */
+  @Post('items/:id/cancel')
+  @HttpCode(200)
+  cancel(
+    @CurrentPrincipal() principal: Principal,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<ItemChange> {
+    const { version } = parseBody(versionSchema, body);
+    return this.kitchen.cancel(tenantOf(principal), idParam(id), version);
+  }
+
   @Post('items/:id/done')
   @HttpCode(200)
   done(

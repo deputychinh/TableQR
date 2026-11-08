@@ -25,6 +25,8 @@ export const diningTables = pgTable(
     seats: integer('seats').notNull(),
     qrToken: text('qr_token').notNull(),
     qrRotatedAt: timestamp('qr_rotated_at', { withTimezone: true }),
+    /** TQR-024 "Ẩn bàn": hidden from lists, printing and guests; its history stays. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

@@ -9,6 +9,16 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 - Production security headers (TQR-022): every API response — problem details and event streams included — sends a deny-all CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `Cross-Origin-Opener-Policy: same-origin` and a `Permissions-Policy` denying camera, microphone and location; `X-Powered-By` is gone; `Strict-Transport-Security` with `TQR_HSTS=true`. The SPA's CSP and headers live in `deploy/security-headers.json`, are sent by `vite preview` and by the new `deploy/nginx.conf.example` (serves `web/dist`, proxies `/api`, SSE-ready), and every browser journey now fails on a CSP violation. New setting `TQR_TRUSTED_PROXIES` (Express `trust proxy`, default none): a client's own `X-Forwarded-For` no longer moves its rate-limit key, while a listed proxy's does.
 - Step-up authentication for the bank account (TQR-023): changing or removing it via `PUT /api/restaurant/settings` needs the owner's current password (`currentPassword`; missing → 422 `REAUTH_REQUIRED`, wrong → 403 `REAUTH_FAILED`), checked with the sign-in scrypt and counted by the same per-email throttle (10 failures / 15 min → 429 `LOGIN_BLOCKED`, for sign-in too); rules-only changes need none. The bank confirm sheet on `/quan-ly/cai-dat` asks "Mật khẩu đăng nhập của bạn", shows a wrong password inline and never keeps it. `ConfirmSheet` now starts in its first form field when it has one.
 
+### Added
+
+- "Ẩn bàn": a table with history (that cannot be deleted) can be hidden from the refused-delete sheet — `POST /api/tables/:id/archive` / `unarchive` (owner only; 409 `TABLE_IN_USE` while guests sit at it), migration `0008_archive_tables` (`dining_tables.archived_at`); hidden tables leave the list (`GET /api/tables` → `{items, archived}`), the print sheet and booking assignment, their QR codes (current and old) answer "Không tìm thấy bàn", and "Bàn đã ẩn" lists them with "Hiện lại"; guest tokens resolve in one place (`TablesService.findLiveByToken`) (TQR-024).
+- Kitchen "Bỏ món": `POST /api/kitchen/items/:id/cancel` (waiting or cooking → cancelled, owner and kitchen) with a confirm sheet on `/bep`; the guest sees "Đã huỷ" (TQR-025).
+
+### Fixed
+
+- A cancelled dish now re-syncs the table's open bill in the same transaction: the bill is superseded with the new amount (or no new bill when nothing is due) and the guest bill page updates live (TQR-025).
+- `make bench` no longer fails when run right after other local traffic: setup requests that meet a per-address limit (429) wait for the window with backoff and retry, and the result reports `setup_429_retries` / `setup_429_wait_s`; production limits are unchanged (TQR-026).
+
 ## [0.5.0] - 2026-11-08
 
 Release 1 (local only): QR table ordering for many restaurants — sign-up and house rules, menu, tables and printable QR codes, staff roles, guest ordering with anomaly holds, fair kitchen queue, serving, live dish status, VietQR bills with cashier confirmation, online table booking, platform admin.

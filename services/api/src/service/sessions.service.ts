@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
@@ -111,15 +111,8 @@ export class SessionsService {
     currentDeviceToken: string | undefined,
   ): Promise<CheckInResult> {
     const result = await this.db.transaction(async (tx) => {
-      const [table] = await tx
-        .select({
-          id: diningTables.id,
-          restaurantId: diningTables.restaurantId,
-          seats: diningTables.seats,
-        })
-        .from(diningTables)
-        .where(eq(diningTables.qrToken, qrToken))
-        .for('update');
+      // The one token resolver (hidden tables are "not found"); locks the row like "Ẩn bàn" does.
+      const table = await this.tables.findLiveByToken(tx, qrToken, true);
       if (!table) return undefined;
       const tenant = asTenantId(table.restaurantId);
       await this.restaurantStatus.assertActive(tenant);
@@ -183,22 +176,17 @@ export class SessionsService {
    * or wait for staff — without opening anything. Same 404 / 410 / 403 answers as check-in.
    */
   async checkInNext(qrToken: string): Promise<CheckInNext> {
-    const [table] = await this.db
-      .select({
-        id: diningTables.id,
-        restaurantId: diningTables.restaurantId,
-        seats: diningTables.seats,
-        rules: restaurants.rules,
-      })
-      .from(diningTables)
-      .innerJoin(restaurants, eq(restaurants.id, diningTables.restaurantId))
-      .where(eq(diningTables.qrToken, qrToken));
+    const table = await this.tables.findLiveByToken(this.db, qrToken);
     if (!table) {
       await this.tables.resolveGuestToken(qrToken);
       throw notFound();
     }
     const tenant = asTenantId(table.restaurantId);
     await this.restaurantStatus.assertActive(tenant);
+    const [restaurant] = await this.db
+      .select({ rules: restaurants.rules })
+      .from(restaurants)
+      .where(eq(restaurants.id, tenant));
     const maxPartySizeOfTable = maxPartySize(table.seats);
     const [open] = await this.db
       .select({ id: tableSessions.id })
@@ -213,7 +201,7 @@ export class SessionsService {
     if (open) return { next: 'join', maxPartySize: maxPartySizeOfTable };
     return {
       next:
-        readStoredRules(table.rules).sessionOpening === 'staff_opens'
+        readStoredRules(restaurant?.rules).sessionOpening === 'staff_opens'
           ? 'wait_for_staff'
           : 'party_size',
       maxPartySize: maxPartySizeOfTable,
@@ -306,7 +294,14 @@ export class SessionsService {
       const [table] = await tx
         .select({ id: diningTables.id, seats: diningTables.seats })
         .from(diningTables)
-        .where(and(eq(diningTables.restaurantId, tenant), eq(diningTables.id, tableId)))
+        .where(
+          and(
+            eq(diningTables.restaurantId, tenant),
+            eq(diningTables.id, tableId),
+            // A hidden table (TQR-024) takes no guests; "Hiện lại" first.
+            isNull(diningTables.archivedAt),
+          ),
+        )
         .for('update');
       if (!table) throw notFound();
       if (!isValidPartySize(partySize, table.seats)) {

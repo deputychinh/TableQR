@@ -62,9 +62,21 @@ export const tables = {
     },
     refused: {
       title: 'Không xoá được {name}',
-      body: 'Bàn này đã có khách ngồi, hoá đơn hoặc lượt đặt bàn. Quán cần giữ lịch sử thu tiền nên không xoá bàn này được. Nếu bàn đổi chỗ hay đổi tên, hãy đổi tên bàn.',
-      confirm: 'Đổi tên bàn',
+      body: 'Bàn này đã có khách ngồi, hoá đơn hoặc lượt đặt bàn. Quán cần giữ lịch sử thu tiền nên không xoá bàn này được. Bạn có thể ẩn bàn: bàn không còn trong danh sách, không in và không nhận đặt bàn, ai quét mã QR sẽ thấy “Không tìm thấy bàn”. Lịch sử vẫn giữ nguyên, muốn dùng lại thì bấm “Hiện lại”.',
+      confirm: 'Ẩn bàn',
       close: 'Đóng',
+    },
+    archive: {
+      done: 'Đã ẩn {name}. Mã QR của bàn không dùng được nữa, lịch sử vẫn giữ nguyên.',
+      inUse: 'Bàn này đang có khách. Thanh toán và đóng bàn xong rồi hãy ẩn bàn.',
+    },
+    archived: {
+      toggle: 'Bàn đã ẩn ({n})',
+      lead: 'Các bàn này không hiện trong danh sách, không in được và khách quét mã sẽ thấy “Không tìm thấy bàn”. Lịch sử thu tiền vẫn giữ nguyên.',
+      badge: 'Đã ẩn',
+      show: 'Hiện lại',
+      showFor: 'Hiện lại {name}',
+      shown: 'Đã hiện lại {name}. Mã QR đang dán trên bàn dùng lại được.',
     },
     created: 'Đã thêm {name}. Mã QR đã sẵn sàng để in.',
     saved: 'Đã lưu {name}.',

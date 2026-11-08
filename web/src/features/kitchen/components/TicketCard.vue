@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AlarmClock, Clock } from 'lucide-vue-next';
+import { AlarmClock, CircleSlash, Clock } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
 import { isLate, waitedMinutes } from '../queue-state';
 import type { Ticket } from '../services/kitchen.service';
@@ -11,7 +11,7 @@ import type { Ticket } from '../services/kitchen.service';
  * (AC33) gets a red border and background plus an alarm icon and the word "Trễ" — never colour alone.
  */
 const props = defineProps<{ ticket: Ticket; now: number; busy: boolean }>();
-const emit = defineEmits<{ start: []; done: [] }>();
+const emit = defineEmits<{ start: []; done: []; drop: [] }>();
 const { t } = useI18n();
 const id = useId();
 
@@ -69,6 +69,18 @@ const waiting = computed(() => props.ticket.status === 'waiting');
       @click="emit('done')"
     >
       {{ t('kitchen.ticket.done') }}
+    </BaseButton>
+    <BaseButton
+      variant="ghost"
+      size="lg"
+      block
+      class="ticket-card__drop"
+      :disabled="busy"
+      :aria-describedby="`${id}-title`"
+      @click="emit('drop')"
+    >
+      <CircleSlash :size="20" aria-hidden="true" />
+      {{ t('kitchen.ticket.drop') }}
     </BaseButton>
   </article>
 </template>
@@ -145,6 +157,10 @@ const waiting = computed(() => props.ticket.status === 'waiting');
   align-items: center;
   margin: 0;
   color: var(--color-text-muted);
+}
+
+.ticket-card__drop {
+  color: var(--color-danger);
 }
 
 .ticket-card--late .ticket-card__wait {

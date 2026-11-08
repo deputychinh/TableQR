@@ -35,6 +35,14 @@ export const kitchenLocale = {
       late: 'Trễ',
       start: 'Bắt đầu nấu',
       done: 'Xong',
+      drop: 'Bỏ món',
+    },
+    drop: {
+      title: 'Bỏ {dish} của {table}?',
+      body: 'Dùng khi bếp không làm được món này (hết nguyên liệu, hỏng). Khách sẽ thấy món “Đã huỷ” và không phải trả tiền món này. Nhớ báo phục vụ nói với khách.',
+      confirm: 'Bỏ món',
+      cancel: 'Huỷ',
+      done: 'Đã bỏ {dish} của {table}. Hoá đơn của bàn đã được cập nhật.',
     },
     live: {
       reconnecting: 'Mất kết nối, đang kết nối lại…',

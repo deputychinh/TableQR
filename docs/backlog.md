@@ -27,6 +27,6 @@ Source: `docs/delivery/001-qr-table-ordering/plan.md` (ACs per item there).
 | TQR-021 | Staff booking list: confirm, seat, cancel, late                            | done   |
 | TQR-022 | Production security headers and X-Powered-By removal (before first deploy) | review |
 | TQR-023 | Step-up auth (current password) for bank account changes                   | review |
-| TQR-024 | Archive ("Ẩn bàn") tables with history                                     | todo   |
-| TQR-025 | Re-sync the open bill when the kitchen cancels an item                     | todo   |
-| TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | todo   |
+| TQR-024 | Archive ("Ẩn bàn") tables with history                                     | review |
+| TQR-025 | Re-sync the open bill when the kitchen cancels an item                     | review |
+| TQR-026 | `make bench` setup tolerant of per-IP limits (dedicated bench IPs/limits)  | review |

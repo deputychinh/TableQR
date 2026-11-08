@@ -20,6 +20,20 @@ Updated: 2026-11-08 · Machine: Apple M4 Pro × 14, 48 GB, macOS (Darwin 27.0.0)
 
 Full numbers: `benchmarks/baseline.json`. Lighthouse stays out of `make ci` (20 s and noisy); the bundle budget is the CI guard (circuit breaker item 4).
 
+## Running `make bench` next to other local traffic (TQR-026)
+
+The workload's setup signs up one owner and checks in 30 phones from 127.0.0.1, so it shares the API's per-address limits (sign-up/sign-in 20 per minute, guest check-in 30 per minute; fixed windows, in memory). A setup request that gets 429 now waits with backoff (2, 4, 8, 16, 16… s, at most `SETUP_RETRY_BUDGET_S`, default 150 s) and retries; the run reports `setup_429_retries` and `setup_429_wait_s` in `benchmarks/results/api.json` and on stdout. Production limits are unchanged and the measured window (`POST /api/g/orders`) never retries — a 429 there is a workload error. To skip the wait entirely, start the API with raised limits for benchmarking only, e.g. `TQR_AUTH_RATE_LIMIT_PER_MINUTE=1000 TQR_GUEST_CHECKINS_PER_MINUTE=1000 make api` (never in production).
+
+Proof (2026-11-08, dev API on 127.0.0.1:3310 in watch mode, machine shared with other local work):
+
+| Run                                                        | Setup 429 retries (waited) | Result                                               |
+| ---------------------------------------------------------- | -------------------------- | ---------------------------------------------------- |
+| right after 25 sign-ups + 35 check-ins (20 × 201, 5 × 429) | 6 on sign-up (62 s)        | ok, p95 114.1 ms, p99 246.5 ms, 360 orders, 0 errors |
+| immediately after, back to back                            | 0                          | ok, p95 39.0 ms, p99 76.2 ms, 361 orders, 0 errors   |
+| right after 31 check-ins (limit used up)                   | 6 on check-in (62 s)       | ok, p95 26.2 ms, p99 37.2 ms, 360 orders, 0 errors   |
+
+Before TQR-026 the first and third runs stopped in setup (`signup: expected 201, got 429` / `check-in: expected 201, got 429`). The first run's p95 is higher than the baseline because the machine was busy with other local work at the time; all three are inside the 300 ms target, and the baseline is not re-recorded from them.
+
 ## Changes to the baseline
 
 - 2026-11-08 guest menu LCP 2 601 → ~1 960 ms (3 runs) by grouping chunks (`manualChunks`: vendor, icons, qr, ui, guest) — initial JS 74.0 → 98.1 kB gzip, still under 150 kB; landing LCP ~760 → ~900 ms. Deliberate trade: guests open one QR page on a phone, owners load the app once.

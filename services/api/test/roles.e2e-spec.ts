@@ -121,7 +121,7 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
         db,
         restaurantId,
         kitchenSession,
-        Array.from({ length: 8 }, () => ({ dish: kitchenFloor.pho, status })),
+        Array.from({ length: 16 }, () => ({ dish: kitchenFloor.pho, status })),
       );
       const ids = items.map((i) => i.id);
       return () => ids.shift() ?? 'pool-empty';

@@ -7,7 +7,7 @@ import {
 } from '@playwright/test';
 
 export { devices, expect } from '@playwright/test';
-export type { APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+export type { APIRequestContext, Browser, Locator, Page, TestInfo } from '@playwright/test';
 
 /**
  * Opens a shell destination the way a person would: from the bar or rail when it shows there,

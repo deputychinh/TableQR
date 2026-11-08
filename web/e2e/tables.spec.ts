@@ -1,4 +1,5 @@
-import { test, expect, type Page } from './support/fixtures.js';
+import process from 'node:process';
+import { test, expect, type Locator, type Page, type TestInfo } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 import { sql } from './support/db.js';
 
@@ -161,4 +162,97 @@ test('a table with a paid bill cannot be deleted; a table without history can (T
     .click();
   await expect(page.getByRole('status')).toContainText('Đã xoá Bàn 2.');
   await expect(page.getByRole('heading', { name: 'Bàn 2' })).toHaveCount(0);
+});
+
+const EVIDENCE = '../docs/delivery/001-qr-table-ordering/evidence';
+/** 390 px evidence, light and dark (iPhone project) when `E2E_SCREENSHOTS=1`; never asserted. */
+const evidence = async (page: Page, info: TestInfo, name: string, show: Locator) => {
+  if (!process.env.E2E_SCREENSHOTS || info.project.name !== 'iphone') return;
+  // The shell scrolls its content area, so a full-page shot would cut it: bring `show` up instead.
+  await show.evaluate((el) => {
+    el.scrollIntoView({ block: 'start' });
+  });
+  await page.mouse.move(0, 0);
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+    await page.screenshot({ path: `${EVIDENCE}/${name}-390-${scheme}.png` });
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
+};
+
+test('TQR-024 a table with history is hidden ("Ẩn bàn"): not listed, not printed, its QR says "Không tìm thấy bàn"; "Hiện lại" brings it back', async ({
+  page,
+  browser,
+}, info) => {
+  await page.goto('/dang-ky');
+  await page.getByLabel('Tên nhà hàng').fill('Quán Ẩn Bàn');
+  const email = `archive-${info.project.name}-${Date.now()}@example.com`;
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill('mat-khau-dai-123');
+  await page.getByRole('button', { name: 'Tạo nhà hàng' }).click();
+  await expect(page).toHaveURL(/\/quan-ly$/);
+  await page.goto('/quan-ly/ban');
+  await page.getByRole('button', { name: 'Thêm bàn đầu tiên' }).click();
+  await addTable(page, 'Bàn sân', 0);
+  await page.getByRole('button', { name: 'Thêm bàn', exact: true }).click();
+  await addTable(page, 'Bàn 2', 0);
+  sql(`
+    with t as (
+      select d.id, d.restaurant_id from dining_tables d
+        join users u on u.restaurant_id = d.restaurant_id
+      where u.email = '${email}' and d.name = 'Bàn sân'
+    ), s as (
+      insert into table_sessions (restaurant_id, table_id, party_size, opened_by, status, closed_at)
+      select restaurant_id, id, 2, 'staff', 'closed', now() from t returning id, restaurant_id
+    )
+    insert into bills (restaurant_id, session_id, code, amount_vnd, status, paid_at, method)
+    select restaurant_id, id, 'HDE12', 150000, 'paid', now(), 'cash' from s;
+  `);
+  const qrToken = sql(`select d.qr_token from dining_tables d join users u
+    on u.restaurant_id = d.restaurant_id where u.email = '${email}' and d.name = 'Bàn sân'`);
+
+  // Delete is refused; the sheet's primary action hides the table instead.
+  await page.getByRole('button', { name: 'Xoá Bàn sân' }).click();
+  await page
+    .getByRole('dialog', { name: 'Xoá Bàn sân?' })
+    .getByRole('button', { name: 'Xoá bàn' })
+    .click();
+  const refused = page.getByRole('dialog', { name: 'Không xoá được Bàn sân' });
+  await expect(refused).toContainText('Bạn có thể ẩn bàn');
+  await refused.getByRole('button', { name: 'Ẩn bàn' }).click();
+  await expect(page.getByRole('status')).toContainText('Đã ẩn Bàn sân.');
+  await expect(page.getByRole('heading', { name: 'Bàn sân' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Đóng thông báo' }).click();
+  const toggle = page.getByRole('button', { name: 'Bàn đã ẩn (1)' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(page.getByRole('button', { name: 'Hiện lại Bàn sân' })).toBeVisible();
+  await expectNoSeriousA11yIssues(page);
+  await evidence(page, info, 'tables-archived', page.locator('.tables-page__archived'));
+  const paid = sql(`select count(*) from bills b join users u on u.restaurant_id = b.restaurant_id
+    where u.email = '${email}' and b.status = 'paid'`);
+  expect(paid).toBe('1');
+
+  // Not printable: the print sheet has Bàn 2 only.
+  await page.getByRole('button', { name: 'In tất cả mã QR' }).click();
+  const sheet = page.getByRole('region', { name: 'Trang in mã QR' });
+  await expect(sheet.getByRole('heading')).toHaveText(['Bàn 2']);
+
+  // A guest scanning its code is told the table does not exist.
+  const guest = await browser.newPage({ baseURL: new URL(page.url()).origin });
+  await guest.goto(`/t/${qrToken}`);
+  await expect(guest.getByRole('heading', { name: 'Không tìm thấy bàn' })).toBeVisible();
+
+  // "Hiện lại": listed again and the same sticker works.
+  await page.goto('/quan-ly/ban');
+  await page.getByRole('button', { name: 'Bàn đã ẩn (1)' }).click();
+  await page.getByRole('button', { name: 'Hiện lại Bàn sân' }).click();
+  await expect(page.getByRole('status')).toContainText('Đã hiện lại Bàn sân.');
+  await expect(page.getByRole('heading', { name: 'Bàn sân' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Bàn đã ẩn/ })).toHaveCount(0);
+  await guest.reload();
+  await expect(guest.getByText('Bàn sân').first()).toBeVisible();
+  await expect(guest.getByRole('heading', { name: 'Không tìm thấy bàn' })).toHaveCount(0);
+  await guest.close();
 });

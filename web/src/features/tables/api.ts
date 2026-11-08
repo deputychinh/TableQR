@@ -7,7 +7,15 @@ export interface TableItem {
   seats: number;
   qrToken: string;
   qrRotatedAt: string | null;
+  /** Set while the table is hidden ("Ẩn bàn", TQR-024). */
+  archivedAt: string | null;
   createdAt: string;
+}
+
+/** Tables in use, and the hidden ones apart (TQR-024). */
+export interface TableList {
+  items: TableItem[];
+  archived: TableItem[];
 }
 
 export interface TableInput {
@@ -21,8 +29,10 @@ export interface GuestTable {
   table: { id: string; name: string; seats: number };
 }
 
-export const listTables = async (): Promise<TableItem[]> =>
-  (await getJson<{ items: TableItem[] }>('/tables')).items;
+export const listTables = async (): Promise<TableList> => {
+  const body = await getJson<{ items: TableItem[]; archived?: TableItem[] }>('/tables');
+  return { items: body.items, archived: body.archived ?? [] };
+};
 
 export const createTable = (input: TableInput): Promise<TableItem> =>
   sendJson<TableItem>('POST', '/tables', input);
@@ -35,6 +45,12 @@ export const deleteTable = (id: string): Promise<void> =>
 
 export const rotateTableQr = (id: string): Promise<TableItem> =>
   sendJson<TableItem>('POST', `/tables/${encodeURIComponent(id)}/rotate-qr`);
+
+export const archiveTable = (id: string): Promise<TableItem> =>
+  sendJson<TableItem>('POST', `/tables/${encodeURIComponent(id)}/archive`);
+
+export const unarchiveTable = (id: string): Promise<TableItem> =>
+  sendJson<TableItem>('POST', `/tables/${encodeURIComponent(id)}/unarchive`);
 
 export const resolveGuestTable = (qrToken: string): Promise<GuestTable> =>
   getJson<GuestTable>(`/g/t/${encodeURIComponent(qrToken)}`);

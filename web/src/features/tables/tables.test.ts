@@ -12,6 +12,7 @@ const table = (over: Partial<TableItem> = {}): TableItem => ({
   seats: 4,
   qrToken: 'AAAAAAAAAAAAAAAAAAAAAA',
   qrRotatedAt: null,
+  archivedAt: null,
   createdAt: '2026-11-08T00:00:00.000Z',
   ...over,
 });
@@ -200,20 +201,92 @@ describe('tables page', () => {
     expect(await screen.findByRole('heading', { name: 'Chưa có bàn nào' })).toBeTruthy();
   });
 
-  it('explains in the sheet why a table with history cannot be deleted and offers a rename', async () => {
-    fakeApi({
-      'GET /api/tables': () => jsonResponse({ items: [table()] }),
-      'DELETE /api/tables/11111111-1111-4111-8111-111111111111': () =>
-        jsonResponse({ code: 'TABLE_HAS_HISTORY' }, 409),
+  it('TQR-024 the refused-delete sheet offers "Ẩn bàn" first: the table moves to "Bàn đã ẩn"', async () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const calls = fakeApi({
+      'GET /api/tables': () =>
+        jsonResponse({ items: [table(), table({ id: 'b', name: 'Bàn 2' })] }),
+      [`DELETE /api/tables/${id}`]: () => jsonResponse({ code: 'TABLE_HAS_HISTORY' }, 409),
+      [`POST /api/tables/${id}/archive`]: () =>
+        jsonResponse(table({ archivedAt: '2026-11-08T10:00:00.000Z' })),
     });
     await renderTables();
     await userEvent.click(await screen.findByRole('button', { name: 'Xoá Bàn 1' }));
     await userEvent.click(screen.getByRole('button', { name: 'Xoá bàn' }));
     const sheet = await screen.findByRole('dialog', { name: 'Không xoá được Bàn 1' });
     expect(sheet.textContent).toContain('giữ lịch sử');
+    expect(sheet.textContent).toContain('Không tìm thấy bàn');
+    const buttons = within(sheet).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent.trim())).toEqual(['Đóng', 'Ẩn bàn']);
+    expect(buttons[1]?.className).toContain('base-button--primary');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Ẩn bàn' }));
+    expect(calls.at(-1)?.key).toBe(`POST /api/tables/${id}/archive`);
+    expect(await screen.findByRole('status')).toHaveProperty(
+      'textContent',
+      'Đã ẩn Bàn 1. Mã QR của bàn không dùng được nữa, lịch sử vẫn giữ nguyên.',
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Bàn 1' })).toBeNull();
+    expect(screen.getByText('1 bàn')).toBeTruthy();
+    const toggle = screen.getByRole('button', { name: 'Bàn đã ẩn (1)' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Hiện lại Bàn 1' })).toBeTruthy();
+    // Hidden tables are not printable: no QR and no print button for them.
+    expect(screen.queryByRole('img', { name: 'Mã QR của Bàn 1' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'In mã QR của Bàn 1' })).toBeNull();
+  });
+
+  it('TQR-024 says the table has guests when hiding is refused (TABLE_IN_USE)', async () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    fakeApi({
+      'GET /api/tables': () => jsonResponse({ items: [table()] }),
+      [`DELETE /api/tables/${id}`]: () => jsonResponse({ code: 'TABLE_HAS_HISTORY' }, 409),
+      [`POST /api/tables/${id}/archive`]: () => jsonResponse({ code: 'TABLE_IN_USE' }, 409),
+    });
+    await renderTables();
+    await userEvent.click(await screen.findByRole('button', { name: 'Xoá Bàn 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Xoá bàn' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Không xoá được Bàn 1' });
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Ẩn bàn' }));
+    expect(
+      await screen.findByText('Bàn này đang có khách. Thanh toán và đóng bàn xong rồi hãy ẩn bàn.'),
+    ).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Bàn 1' })).toBeTruthy();
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Đổi tên bàn' }));
-    expect(await screen.findByRole('dialog', { name: 'Sửa Bàn 1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Bàn đã ẩn/ })).toBeNull();
+  });
+
+  it('TQR-024 "Hiện lại" brings a hidden table back into the list', async () => {
+    const hidden = table({ id: 'h', name: 'Bàn 9', archivedAt: '2026-11-08T10:00:00.000Z' });
+    fakeApi({
+      'GET /api/tables': () => jsonResponse({ items: [table()], archived: [hidden] }),
+      'POST /api/tables/h/unarchive': () => jsonResponse({ ...hidden, archivedAt: null }),
+    });
+    await renderTables();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bàn đã ẩn (1)' }));
+    expect(screen.getByText('Đã ẩn')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Hiện lại Bàn 9' }));
+    expect(await screen.findByRole('status')).toHaveProperty(
+      'textContent',
+      'Đã hiện lại Bàn 9. Mã QR đang dán trên bàn dùng lại được.',
+    );
+    expect(screen.getByRole('heading', { name: 'Bàn 9' })).toBeTruthy();
+    expect(screen.getByText('2 bàn')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Bàn đã ẩn/ })).toBeNull();
+  });
+
+  it('TQR-024 shows hidden tables only to the owner', async () => {
+    fakeApi({
+      'GET /api/tables': () =>
+        jsonResponse({
+          items: [table()],
+          archived: [table({ id: 'h', name: 'Bàn 9', archivedAt: '2026-11-08T10:00:00.000Z' })],
+        }),
+    });
+    await renderTables('waiter');
+    expect(await screen.findByRole('heading', { name: 'Bàn 1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Bàn đã ẩn/ })).toBeNull();
   });
 
   it('lists tables in natural order: Bàn 2 before Bàn 10', async () => {

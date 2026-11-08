@@ -3,7 +3,8 @@
 // guest phone per table — then phones submit carts at a fixed arrival rate and k6 measures p95.
 import http from 'k6/http';
 import exec from 'k6/execution';
-import { check, fail } from 'k6';
+import { Counter } from 'k6/metrics';
+import { check, fail, sleep } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:3310';
 // Non-GET requests need an allowed Origin (docs/security.md, CSRF); the dev web origin is allowed.
@@ -15,10 +16,17 @@ const DRINKS = 30;
 const RATE_PER_S = 6;
 const DURATION_S = Number(__ENV.DURATION_S || 60);
 const WORKLOAD = 'guest-order-submit';
+// TQR-026: setup shares the per-address limits (sign-up 20/min, check-in 30/min) with any other
+// local traffic. A 429 in setup waits for the fixed window to pass and retries, instead of failing
+// the run; production limits stay as they are. Backoff 2, 4, 8, 16, 16… s, at most this long.
+const SETUP_RETRY_BUDGET_S = Number(__ENV.SETUP_RETRY_BUDGET_S || 150);
+const setupRetries = new Counter('setup_429_retries');
+const setupWaited = new Counter('setup_429_wait_s');
+let retryWaitedS = 0;
 
 export const options = {
-  // Setup makes ~120 calls; the 30 check-ins stay within the 30 / min per-address limit.
-  setupTimeout: '120s',
+  // Setup makes ~120 calls; it may also wait out a per-address limit window (TQR-026).
+  setupTimeout: `${60 + SETUP_RETRY_BUDGET_S}s`,
   scenarios: {
     order_submit: {
       executor: 'constant-arrival-rate',
@@ -54,9 +62,34 @@ const must = (res, status, what) => {
   return res.json();
 };
 
+/**
+ * Sends a setup request; on 429 (a per-address limit used up by earlier local traffic) it waits
+ * with backoff and sends it again, counting retries and seconds waited for the summary.
+ */
+const withRetry = (send, what) => {
+  let res = send();
+  for (let attempt = 0; res.status === 429; attempt += 1) {
+    const wait = Math.min(2 ** (attempt + 1), 16);
+    if (retryWaitedS + wait > SETUP_RETRY_BUDGET_S) {
+      fail(`${what}: still 429 after waiting ${retryWaitedS} s (SETUP_RETRY_BUDGET_S)`);
+    }
+    console.warn(`${what}: 429 ${res.json('code')}, retrying in ${wait} s`);
+    setupRetries.add(1);
+    setupWaited.add(wait);
+    retryWaitedS += wait;
+    sleep(wait);
+    res = send();
+  }
+  return res;
+};
+
 const post = (path, body, status, what) => {
   const { headers, body: payload } = json(body);
-  return must(http.post(`${BASE_URL}${path}`, payload, { headers }), status, what);
+  return must(
+    withRetry(() => http.post(`${BASE_URL}${path}`, payload, { headers }), what),
+    status,
+    what,
+  );
 };
 
 export const setup = () => {
@@ -98,10 +131,10 @@ export const setup = () => {
     const table = post('/api/tables', { name: `Bàn ${i + 1}`, seats: 8 }, 201, 'table');
     const { headers, body } = json({ qrToken: table.qrToken, partySize: 8 });
     // A fresh jar per check-in: each table gets its own phone (device cookie).
-    const res = http.post(`${BASE_URL}/api/g/session`, body, {
-      headers,
-      jar: new http.CookieJar(),
-    });
+    const res = withRetry(
+      () => http.post(`${BASE_URL}/api/g/session`, body, { headers, jar: new http.CookieJar() }),
+      'check-in',
+    );
     must(res, 201, 'check-in');
     const cookie = res.cookies.tqr_guest?.[0]?.value;
     if (!cookie) fail('check-in set no tqr_guest cookie');
@@ -155,10 +188,13 @@ export const handleSummary = (data) => {
     p99_ms: Number(duration.values['p(99)'].toFixed(2)),
     max_ms: Number(duration.values.max.toFixed(2)),
     error_rate: failed?.values.rate ?? 0,
+    // TQR-026: setup requests that met a per-address limit and were retried (not workload errors).
+    setup_429_retries: data.metrics.setup_429_retries?.values.count ?? 0,
+    setup_429_wait_s: data.metrics.setup_429_wait_s?.values.count ?? 0,
   };
   const verdict = result.passed ? 'ok' : 'FAIL';
   return {
     'benchmarks/results/api.json': JSON.stringify(result, null, 2),
-    stdout: `\n${WORKLOAD}: ${verdict} p95=${result.p95_ms} ms p99=${result.p99_ms} ms orders=${result.orders} errors=${result.error_rate}\n`,
+    stdout: `\n${WORKLOAD}: ${verdict} p95=${result.p95_ms} ms p99=${result.p99_ms} ms orders=${result.orders} errors=${result.error_rate} setup 429 retries=${result.setup_429_retries} (waited ${result.setup_429_wait_s} s)\n`,
   };
 };

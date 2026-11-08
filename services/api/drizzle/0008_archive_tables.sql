@@ -1,0 +1,1 @@
+ALTER TABLE "dining_tables" ADD COLUMN "archived_at" timestamp with time zone;
