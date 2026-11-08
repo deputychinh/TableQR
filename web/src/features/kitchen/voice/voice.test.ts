@@ -567,6 +567,19 @@ describe('useConnectionVoice (TQR-031: a cook who does not look still hears it)'
     expect(said).toEqual([]);
   });
 
+  it('says nothing when the stream ends for good (revoked, signed out)', async () => {
+    const { status, said } = setUp();
+    status.value = 'live';
+    await nextTick();
+    status.value = 'reconnecting';
+    await nextTick();
+    status.value = 'ended';
+    await nextTick();
+    vi.advanceTimersByTime(LOST_GRACE_MS * 2);
+    status.value = 'ended';
+    expect(said).toEqual([]);
+  });
+
   it('never announces the first connection and stops its timer with the screen', async () => {
     const { status, said, scope } = setUp();
     vi.advanceTimersByTime(LOST_GRACE_MS * 3);

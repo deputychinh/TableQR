@@ -1,5 +1,6 @@
 import { effectScope } from 'vue';
-import { isNewer, useStream, type StreamHandlers } from './useStream';
+import { staffSessionAlive } from './staff-stream';
+import { isNewer, useStream, type StreamHandlers, type StreamOptions } from './useStream';
 
 class FakeEventSource extends EventTarget {
   readyState = 0;
@@ -21,7 +22,10 @@ class FakeEventSource extends EventTarget {
 }
 
 /** Opens a stream on fakes; `sources` grows with every (re)connect. */
-const open = (handlers: Partial<StreamHandlers<unknown>> = {}) => {
+const open = (
+  handlers: Partial<StreamHandlers<unknown>> = {},
+  extra: Omit<StreamOptions, 'create'> = {},
+) => {
   const sources: FakeEventSource[] = [];
   const snapshots: unknown[] = [];
   const deltas: unknown[] = [];
@@ -35,6 +39,9 @@ const open = (handlers: Partial<StreamHandlers<unknown>> = {}) => {
         ...handlers,
       },
       {
+        // The top of each jitter range unless a test says otherwise, so delays are exact.
+        random: () => 1,
+        ...extra,
         create: (url) => {
           const fake = new FakeEventSource(url);
           sources.push(fake);
@@ -136,6 +143,78 @@ describe('useStream', () => {
     opensAfter(1000);
   });
 
+  it('TQR-031 never waits more than 10 s between attempts, so a restarted API is back quickly', () => {
+    vi.useFakeTimers();
+    const { sources, current } = open();
+    current().emit('snapshot', {});
+    const waits: number[] = [];
+    for (let i = 0; i < 7; i += 1) {
+      current().close();
+      current().emit('error');
+      const before = sources.length;
+      let waited = 0;
+      while (sources.length === before) {
+        vi.advanceTimersByTime(100);
+        waited += 100;
+      }
+      waits.push(waited);
+    }
+    expect(waits).toEqual([1000, 2000, 5000, 10_000, 10_000, 10_000, 10_000]);
+  });
+
+  it('TQR-031 spreads reconnects with jitter (half to all of each step)', () => {
+    vi.useFakeTimers();
+    const { sources, current } = open({}, { random: () => 0 });
+    current().emit('snapshot', {});
+    current().emit('bye', {});
+    vi.advanceTimersByTime(499);
+    expect(sources).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sources).toHaveLength(2);
+  });
+
+  it('TQR-031 stops on `revoked`: no reconnect, status ended, the screen is told once', () => {
+    vi.useFakeTimers();
+    const onRevoked = vi.fn<() => void>();
+    const { stream, sources, snapshots, current } = open({}, { onRevoked });
+    current().emit('snapshot', { n: 1 });
+    current().emit('revoked', {});
+    expect(stream.status.value).toBe('ended');
+    expect(onRevoked).toHaveBeenCalledOnce();
+    expect(sources[0]?.closed).toBe(true);
+    // The browser's own error after the server ended the response changes nothing.
+    current().emit('error');
+    current().emit('snapshot', { n: 2 });
+    vi.advanceTimersByTime(120_000);
+    expect(sources).toHaveLength(1);
+    expect(stream.status.value).toBe('ended');
+    expect(snapshots).toEqual([{ n: 1 }]);
+    expect(onRevoked).toHaveBeenCalledOnce();
+  });
+
+  it('TQR-031 a stream the browser gave up on is ended when the session is gone (401), retried when not', async () => {
+    vi.useFakeTimers();
+    let signedIn = true;
+    const onRevoked = vi.fn<() => void>();
+    const checkSession = vi.fn<() => Promise<boolean>>(() => Promise.resolve(signedIn));
+    const { stream, sources, current } = open({}, { onRevoked, checkSession });
+    current().emit('snapshot', {});
+    // Proxy 502 while still signed in: retried.
+    current().close();
+    current().emit('error');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sources).toHaveLength(2);
+    expect(onRevoked).not.toHaveBeenCalled();
+    // Signed out elsewhere: the stream answers 401, the browser gives up, the session check fails.
+    signedIn = false;
+    current().close();
+    current().emit('error');
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sources).toHaveLength(2);
+    expect(stream.status.value).toBe('ended');
+    expect(onRevoked).toHaveBeenCalledOnce();
+  });
+
   it('TQR-032 reconnects after the server says `bye` (shutdown or restart)', () => {
     vi.useFakeTimers();
     const { stream, sources, current } = open();
@@ -159,6 +238,37 @@ describe('useStream', () => {
     vi.advanceTimersByTime(120_000);
     expect(sources).toHaveLength(2);
     expect(sources[1]?.closed).toBe(true);
+  });
+});
+
+describe('staffSessionAlive (TQR-031)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([
+    [200, true],
+    [401, false],
+    [502, true],
+  ])('/api/me answering %s → %s', async (status, alive) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(status === 200 ? {} : { code: 'X' }), {
+            status,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ),
+      ),
+    );
+    await expect(staffSessionAlive()).resolves.toBe(alive);
+  });
+
+  it('keeps trying through a network failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => Promise.reject(new TypeError('offline'))),
+    );
+    await expect(staffSessionAlive()).resolves.toBe(true);
   });
 });
 

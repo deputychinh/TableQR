@@ -35,6 +35,11 @@ export const useConnectionVoice = (options: {
       announced = false;
       return;
     }
+    if (now === 'ended') {
+      // Revoked or signed out: the screen goes to sign-in; "lost" would be wrong.
+      stopTimer();
+      return;
+    }
     if (!wasLive || timer !== undefined || announced) return;
     timer = setTimeout(() => {
       timer = undefined;

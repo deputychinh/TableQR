@@ -1,6 +1,7 @@
 import { onScopeDispose, ref } from 'vue';
 
-export type StreamStatus = 'connecting' | 'live' | 'reconnecting';
+/** `ended`: the server revoked the stream or the session is gone; it is not reopened. */
+export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'ended';
 
 export interface StreamDelta {
   topic: string;
@@ -20,14 +21,28 @@ export interface StreamOptions {
   create?: EventSourceFactory;
   /** Used until the server's first `heartbeat` event names its own interval. */
   heartbeatMs?: number;
+  /**
+   * Told once when the stream ends for good: the server sent `revoked` (access ended), or the
+   * browser gave up and `checkSession` says the session is gone (401). Staff screens send the person
+   * to sign-in (`staffStream`).
+   */
+  onRevoked?: () => void;
+  /** Asked when the browser gives up on a connection: false (signed out) ends the stream. */
+  checkSession?: () => Promise<boolean>;
+  /** Jitter source, 0…1 (tests pin it). */
+  random?: () => number;
 }
 
 /** The server's default `TQR_SSE_HEARTBEAT_MS`. */
 export const DEFAULT_HEARTBEAT_MS = 15_000;
 /** No event at all for this many heartbeats → the stream is dead (TQR-031). */
 export const DEAD_AFTER_HEARTBEATS = 2.5;
-/** Waits before each reconnect attempt; the last one repeats. Reset by a snapshot. */
-export const RECONNECT_DELAYS_MS: readonly number[] = [1_000, 2_000, 5_000, 10_000, 30_000];
+/**
+ * Upper bound of the wait before each reconnect attempt; the last one repeats, so a restarted API
+ * is back within ~10 s. Reset by a snapshot. Each wait is jittered to half…all of its step, so a
+ * room of screens does not reconnect in lockstep.
+ */
+export const RECONNECT_DELAYS_MS: readonly number[] = [1_000, 2_000, 5_000, 10_000];
 
 /** `EventSource.CLOSED`: the browser gave up (e.g. a proxy answered 502) and will not retry. */
 const CLOSED = 2;
@@ -55,6 +70,8 @@ export const useStream = <S>(
   let retry: ReturnType<typeof setTimeout> | undefined;
   let attempt = 0;
   let disposed = false;
+  let ended = false;
+  const random = options.random ?? Math.random;
 
   const parse = (event: Event): unknown => JSON.parse((event as MessageEvent<string>).data);
 
@@ -68,16 +85,45 @@ export const useStream = <S>(
     status.value = 'reconnecting';
     clearTimeout(watchdog);
     source?.close();
-    if (retry !== undefined || disposed) return;
-    const delay =
-      RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)] ??
-      DEFAULT_HEARTBEAT_MS;
+    if (retry !== undefined || disposed || ended) return;
+    const step = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)] ?? 10_000;
+    const delay = Math.round(step / 2 + random() * (step / 2));
     attempt += 1;
     retry = setTimeout(() => {
       retry = undefined;
       connect();
     }, delay);
   }
+
+  /** The stream ends for good (revoked, signed out): no banner, no reconnect, the screen is told. */
+  const end = () => {
+    if (ended || disposed) return;
+    ended = true;
+    clearTimeout(watchdog);
+    clearTimeout(retry);
+    source?.close();
+    status.value = 'ended';
+    options.onRevoked?.();
+  };
+
+  /** The browser gave up (HTTP error such as 401, or a proxy 502): retry unless signed out. */
+  const onGaveUp = () => {
+    clearTimeout(watchdog);
+    const check = options.checkSession;
+    if (!check) {
+      reconnectLater();
+      return;
+    }
+    check().then(
+      (alive) => {
+        if (alive) reconnectLater();
+        else end();
+      },
+      () => {
+        reconnectLater();
+      },
+    );
+  };
 
   function connect() {
     const mine = create(url);
@@ -86,7 +132,7 @@ export const useStream = <S>(
     /** Listens on this connection only: a replaced one may still deliver a late event. */
     const on = (type: string, handle: (event: Event) => void) => {
       mine.addEventListener(type, (event) => {
-        if (mine === source && !disposed) handle(event);
+        if (mine === source && !disposed && !ended) handle(event);
       });
     };
     on('open', arm);
@@ -110,9 +156,10 @@ export const useStream = <S>(
       status.value = 'reconnecting';
     });
     on('bye', reconnectLater);
+    on('revoked', end);
     on('error', () => {
       status.value = 'reconnecting';
-      if (mine.readyState === CLOSED) reconnectLater();
+      if (mine.readyState === CLOSED) onGaveUp();
     });
   }
 

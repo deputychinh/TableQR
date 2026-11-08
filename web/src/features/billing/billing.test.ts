@@ -223,6 +223,21 @@ describe('GuestBillPage', () => {
     expect(await screen.findByRole('heading', { name: 'Đã thanh toán' })).toBeTruthy();
   });
 
+  it('TQR-031 shows "Mất kết nối" while the stream reconnects and hides it on the next snapshot', async () => {
+    fakeApi({ 'POST /api/g/bill': { body: view() } });
+    await renderWithApp(GuestBillPage, { paths: ['/t/:qrToken/hoa-don'], at: '/t/abc/hoa-don' });
+    await screen.findByText('TQR 7F3K2');
+    FakeEventSource.last?.emit('snapshot', view());
+    expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+    FakeEventSource.last?.emit('error', {});
+    const banner = await screen.findByText('Mất kết nối — đang kết nối lại…');
+    expect(banner.closest('[role="status"]')).toBeTruthy();
+    FakeEventSource.last?.emit('snapshot', view());
+    await vi.waitFor(() => {
+      expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+    });
+  });
+
   it('shows the new code and the change notice after a snapshot with another bill', async () => {
     fakeApi({ 'POST /api/g/bill': { body: view() } });
     await renderWithApp(GuestBillPage, { paths: ['/t/:qrToken/hoa-don'], at: '/t/abc/hoa-don' });

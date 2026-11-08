@@ -1,6 +1,7 @@
 import { effectScope } from 'vue';
 import { render, screen, within } from '@testing-library/vue';
 import userEvent from '@testing-library/user-event';
+import { setUnauthorizedHandler } from '@/api/client';
 import { i18n } from '@/locales';
 import { jsonResponse, renderWithApp } from '@/test/render';
 import { FakeEventSource, installFakeEventSource } from '@/test/fake-event-source';
@@ -584,7 +585,7 @@ describe('KitchenPage voice (TQR-027/028)', () => {
       const spoken = installSpeech();
       const stored = memoryStorage();
       stored.set('tqr.kitchen.voice', JSON.stringify({ enabled: true, rate: 'normal' }));
-      const items = [ticket('1', { queueAt: new Date().toISOString() })];
+      let items = [ticket('1', { queueAt: new Date().toISOString() })];
       route(() => items);
       await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
       await screen.findByRole('region', { name: 'Đang chờ (1)' });
@@ -606,15 +607,60 @@ describe('KitchenPage voice (TQR-027/028)', () => {
       await vi.advanceTimersByTimeAsync(20_000);
       expect(spoken.map((s) => s.text)).toEqual(['Mất kết nối máy chủ']);
 
-      // Back: the snapshot repairs the queue, the banner goes, the old dish is not read again.
+      // Back (L6): the snapshot repairs the queue with a dish released during the outage; it is
+      // read once, the dish already on screen is not read again, the banner goes.
       const isOpen = (s: FakeEventSource) => s.url === '/api/stream/station/hot' && !s.closed;
-      while (!FakeEventSource.instances.some(isOpen)) await vi.advanceTimersByTimeAsync(500);
-      FakeEventSource.last('/api/stream/station/hot').emit('snapshot', queue(items));
+      const reopen = async () => {
+        while (!FakeEventSource.instances.some(isOpen)) await vi.advanceTimersByTimeAsync(500);
+        return FakeEventSource.last('/api/stream/station/hot');
+      };
+      items = [
+        ...items,
+        ticket('2', { orderId: 'o2', tableName: 'Bàn 2', queueAt: new Date().toISOString() }),
+      ];
+      (await reopen()).emit('snapshot', queue(items));
       await vi.waitFor(() => {
-        expect(spoken.map((s) => s.text)).toEqual(['Mất kết nối máy chủ', 'Đã kết nối lại']);
+        expect(spoken.map((s) => s.text)).toContain('Đã kết nối lại');
+      });
+      await screen.findByRole('region', { name: 'Đang chờ (2)' });
+      await vi.waitFor(() => {
+        expect(spoken.map((s) => s.text).sort()).toEqual(
+          ['Bàn 2: một phở bò tái', 'Mất kết nối máy chủ', 'Đã kết nối lại'].sort(),
+        );
       });
       expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+      // Another reconnect with the same dishes reads nothing again.
+      (await reopen()).emit('bye', {});
+      (await reopen()).emit('snapshot', queue(items));
+      await vi.advanceTimersByTimeAsync(100);
+      expect(spoken.filter((s) => s.text.startsWith('Bàn '))).toHaveLength(1);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('TQR-031 a revoked stream (signed out, disabled) goes to sign-in instead of "Mất kết nối"', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const signedOut = vi.fn<() => void>();
+    setUnauthorizedHandler(signedOut);
+    try {
+      const spoken = installSpeech();
+      const stored = memoryStorage();
+      stored.set('tqr.kitchen.voice', JSON.stringify({ enabled: true, rate: 'normal' }));
+      const items = [ticket('1', { queueAt: new Date().toISOString() })];
+      route(() => items);
+      await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+      await screen.findByRole('region', { name: 'Đang chờ (1)' });
+      const stream = FakeEventSource.last('/api/stream/station/hot');
+      stream.emit('snapshot', queue(items));
+      stream.emit('revoked', {});
+      expect(signedOut).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(FakeEventSource.instances.filter((s) => s.url === stream.url)).toHaveLength(1);
+      expect(screen.queryByText('Mất kết nối — đang kết nối lại…')).toBeNull();
+      expect(spoken.map((s) => s.text)).not.toContain('Mất kết nối máy chủ');
+    } finally {
+      setUnauthorizedHandler(undefined);
       vi.useRealTimers();
     }
   });

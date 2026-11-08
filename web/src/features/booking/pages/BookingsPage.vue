@@ -10,6 +10,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
+import { staffStream } from '@/composables/staff-stream';
 import { useStream } from '@/composables/useStream';
 import { useSessionStore } from '@/stores/session';
 import { useToastStore } from '@/stores/toast';
@@ -78,12 +79,16 @@ onUnmounted(() => clearInterval(timer));
 
 // Another device confirmed, seated or a guest booked: refresh from the server (ADR 0004).
 if (typeof EventSource !== 'undefined') {
-  useStream<unknown>('/api/stream/floor', {
-    onSnapshot: () => void load(true),
-    onDelta: (delta) => {
-      if (delta.type === 'booking.status') void load(true);
+  useStream<unknown>(
+    '/api/stream/floor',
+    {
+      onSnapshot: () => void load(true),
+      onDelta: (delta) => {
+        if (delta.type === 'booking.status') void load(true);
+      },
     },
-  });
+    staffStream,
+  );
 }
 
 const replace = (booking: Booking) => {
