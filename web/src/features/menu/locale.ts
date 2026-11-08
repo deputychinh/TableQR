@@ -11,6 +11,7 @@ export const menu = {
     preview: 'Xem như khách',
     save: 'Lưu',
     cancel: 'Huỷ',
+    close: 'Đóng',
     delete: 'Xoá',
     empty: {
       title: 'Chưa có món nào',
@@ -54,6 +55,10 @@ export const menu = {
       remove: 'Xoá món',
       confirmTitle: 'Xoá món?',
       confirmBody: 'Món "{name}" sẽ bị xoá khỏi thực đơn. Khách sẽ không thấy món này nữa.',
+      refusedTitle: 'Không xoá được {name}',
+      refusedBody:
+        'Món này đã có khách gọi, quán cần giữ món trong hoá đơn cũ nên không xoá được. Chọn "Ngừng bán": món hiện là Hết món và khách không gọi được nữa. Khi bán lại, bật Còn món.',
+      retire: 'Ngừng bán',
       lateHint: 'Trễ sau {n} phút',
     },
     station: {
@@ -90,6 +95,7 @@ export const menu = {
       deleted: 'Đã xoá {name}.',
       available: '{name} đã còn món.',
       soldOut: '{name} đã hết món.',
+      retired: 'Đã ngừng bán {name}.',
     },
     errors: {
       name: 'Tên cần từ 1 đến {max} ký tự.',

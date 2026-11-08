@@ -202,6 +202,27 @@ describe('MenuPage', () => {
     expect(screen.getByRole('status').textContent).toContain('Đã xoá Phở bò.');
   });
 
+  it('offers "Ngừng bán" when a dish that guests ordered cannot be deleted (409)', async () => {
+    const calls = fakeApi({
+      'GET /api/menu': () => jsonResponse(withItems()),
+      'DELETE /api/menu/items/i1': () => jsonResponse({ code: 'ITEM_HAS_ORDERS' }, 409),
+      'PUT /api/menu/items/i1/availability': () =>
+        jsonResponse({ ...withItems().categories[0]?.items[0], available: false }),
+    });
+    await renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Sửa món Phở bò' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Xoá món' }));
+    const confirm = screen.getByRole('dialog', { name: 'Xoá món?' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Xoá' }));
+    const refused = await screen.findByRole('dialog', { name: 'Không xoá được Phở bò' });
+    expect(refused.textContent).toContain('đã có khách gọi');
+    await userEvent.click(within(refused).getByRole('button', { name: 'Ngừng bán' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls.map((c) => c.key)).toContain('PUT /api/menu/items/i1/availability');
+    expect(screen.getByRole('status').textContent).toContain('Phở bò');
+    expect(screen.getByText('Phở bò')).toBeTruthy();
+  });
+
   it('edits an item, moves categories and manages stations', async () => {
     const calls = fakeApi({
       'GET /api/menu': () => jsonResponse(withItems()),
