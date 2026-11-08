@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ChefHat } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
@@ -16,17 +16,37 @@ import {
   type Ticket,
 } from '../services/kitchen.service';
 import { useStationQueue } from '../useStationQueue';
+import { useVoiceAnnouncements } from '../voice/useVoiceAnnouncements';
 import SkipReasonSheet from './SkipReasonSheet.vue';
 import TicketCard from './TicketCard.vue';
 
-/** One station's live queue in two columns, oldest first (the server's order, AC30). */
-const props = defineProps<{ stationId: string }>();
-/** The live number of waiting dishes, for the station tab's count. */
-const emit = defineEmits<{ waiting: [count: number] }>();
+/**
+ * One station's live queue in two columns, oldest first (the server's order, AC30). With `voice`
+ * on it also asks the page to say new orders and overdue reminders (TQR-027/028).
+ */
+const props = withDefaults(defineProps<{ stationId: string; voice?: boolean }>(), {
+  voice: false,
+});
+const emit = defineEmits<{
+  /** The live number of waiting dishes, for the station tab's count. */
+  waiting: [count: number];
+  /** A sentence for the page's speech queue. */
+  say: [text: string];
+}>();
 const { t } = useI18n();
-const { items, loaded, failed, now, status, refetch, applyLocal } = useStationQueue(
+const { items, loaded, failed, now, reminder, status, refetch, applyLocal } = useStationQueue(
   props.stationId,
 );
+useVoiceAnnouncements({
+  items,
+  loaded,
+  now,
+  reminder,
+  enabled: toRef(props, 'voice'),
+  say: (text) => {
+    emit('say', text);
+  },
+});
 
 const waiting = computed(() => items.value.filter((i) => i.status === 'waiting'));
 const cooking = computed(() => items.value.filter((i) => i.status === 'cooking'));
@@ -135,6 +155,7 @@ const confirmSkip = async (reason: string) => {
               :ticket="ticket"
               :now="now"
               :busy="busyId === ticket.id"
+              :reminder="reminder"
               @start="start(ticket)"
               @drop="dropping = ticket"
             />
@@ -154,6 +175,7 @@ const confirmSkip = async (reason: string) => {
               :ticket="ticket"
               :now="now"
               :busy="busyId === ticket.id"
+              :reminder="reminder"
               @done="done(ticket)"
               @drop="dropping = ticket"
             />

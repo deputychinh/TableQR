@@ -49,6 +49,7 @@ describe('kitchen queue and serving (e2e, real Postgres) — TQR-014/015', () =>
     (await get(r.kitchen, `/api/kitchen/stations/${stationId}/queue`).expect(200)).body as {
       station: { id: string; lateAfterMinutes: number };
       serverTime: string;
+      reminder: { minutes: number; repeatMinutes: number };
       items: Record<string, unknown>[];
     };
   const rowOf = async (id: string) => {
@@ -231,12 +232,42 @@ describe('kitchen queue and serving (e2e, real Postgres) — TQR-014/015', () =>
         queueAt: queueAt.toISOString(),
         lateAt: new Date(queueAt.getTime() + 15 * 60_000).toISOString(),
         startedAt: null,
+        orderId: expect.any(String),
       });
       const bar = await queueOf(a, a.floor.barId);
       expect(bar.items[0]?.lateAt).toBe(new Date(queueAt.getTime() + 5 * 60_000).toISOString());
       expect(Date.parse(bar.serverTime)).toBeGreaterThan(
         Date.parse(bar.items[0]?.lateAt as string),
       );
+    });
+  });
+
+  describe('TQR-027/028 voice: order id per ticket, the reminder rule with the queue', () => {
+    it('groups one order’s items by order id and sends the restaurant’s reminder rule', async () => {
+      const r = await restaurant();
+      await order(r, 0, [{ dish: r.floor.pho, quantity: 2 }, { dish: r.floor.pho }]);
+      await order(r, 1, [{ dish: r.floor.pho }]);
+      const before = await queueOf(r);
+      expect(before.reminder).toEqual({ minutes: 10, repeatMinutes: 10 });
+      const [first, second, third] = before.items.map((i) => i.orderId);
+      expect(first).toBe(second);
+      expect(third).not.toBe(first);
+
+      const settings = (await get(r.owner, '/api/restaurant/settings').expect(200)).body as {
+        rules: Record<string, unknown>;
+      };
+      await http()
+        .put('/api/restaurant/settings')
+        .set('origin', ORIGIN)
+        .set('cookie', r.owner)
+        .send({
+          rules: { ...settings.rules, kitchen: { reminderMinutes: 5, repeatMinutes: 15 } },
+          bank: null,
+        })
+        .expect(200);
+      expect((await queueOf(r)).reminder).toEqual({ minutes: 5, repeatMinutes: 15 });
+      // Another restaurant keeps its own rule (tenant from the session).
+      expect((await queueOf(b)).reminder).toEqual({ minutes: 10, repeatMinutes: 10 });
     });
   });
 

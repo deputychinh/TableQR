@@ -239,8 +239,129 @@ test('TQR-025 the kitchen drops a dish it cannot make ("Bỏ món") after a conf
   await expect(page.getByRole('article', { name: 'Bàn 3 · 2 khách' })).toHaveCount(0);
 });
 
+/**
+ * TQR-027/028: a stand-in for the browser's speech, installed before the app loads. It records
+ * every sentence in `window.__spoken` and ends each one at once, as a real voice would later.
+ */
+const recordSpeech = (page: Page) =>
+  page.addInitScript(() => {
+    const spoken: string[] = [];
+    (window as unknown as { __spoken: string[] }).__spoken = spoken;
+    class Utterance {
+      lang = '';
+      voice: unknown = null;
+      rate = 1;
+      volume = 1;
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(readonly text: string) {}
+    }
+    Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: Utterance });
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: {
+        speak: (u: Utterance) => {
+          if (u.text !== '') spoken.push(`${u.lang}|${u.text}`);
+          setTimeout(() => u.onend?.(), 0);
+        },
+        cancel: () => undefined,
+        getVoices: () => [],
+      },
+    });
+  });
+
+const spokenOn = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken);
+
+test('TQR-027/028 the kitchen hears new orders and overdue reminders until the dish is done', async ({
+  page,
+}, info) => {
+  const r = await setUpRestaurant(page, `voice-${info.project.name}`);
+  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await recordSpeech(page);
+  await page.clock.install();
+  await signIn(page, r.kitchenEmail, STAFF_PASSWORD);
+  await expect(page).toHaveURL(/\/bep$/);
+  await expect(page.getByText('Chưa có món nào cần làm')).toBeVisible();
+
+  // The first tap turns the voice on and says so (iOS needs a tap before any sound).
+  const toggle = page.getByRole('switch', { name: 'Bật đọc to' });
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(() => spokenOn(page)).toEqual(['vi-VN|Đã bật đọc to']);
+  await expectNoSeriousA11yIssues(page);
+
+  // A released order is read aloud as one sentence.
+  releaseOrder({
+    restaurantId: r.id,
+    tableName: 'Bàn 1',
+    items: [{ menuItemName: 'Phở bò tái', quantity: 2 }],
+  });
+  await expect.poll(() => spokenOn(page)).toContain('vi-VN|Bàn 1: hai phở bò tái');
+
+  // Ten minutes later (the default reminder) it is reminded, and the ticket says "Trễ".
+  await page.clock.fastForward('10:30');
+  await expect
+    .poll(() => spokenOn(page))
+    .toContain('vi-VN|Bàn 1 gọi hai phở bò tái đã 10 phút, chưa ra món');
+  const ticket = page.getByRole('article', { name: 'Bàn 1 · 2 khách' });
+  await expect(ticket).toContainText('Trễ 10 phút');
+
+  // Done → never reminded again.
+  await ticket.getByRole('button', { name: 'Bắt đầu nấu' }).click();
+  await page
+    .getByRole('region', { name: 'Đang nấu (1)' })
+    .getByRole('button', { name: 'Xong' })
+    .click();
+  await expect(page.getByText('Chưa có món nào cần làm')).toBeVisible();
+  const before = (await spokenOn(page)).length;
+  await page.clock.fastForward('21:00');
+  await page.clock.runFor(1_000);
+  expect(await spokenOn(page)).toHaveLength(before);
+
+  // The choice is remembered on this iPad.
+  await page.reload();
+  await expect(page.getByRole('switch', { name: 'Bật đọc to' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+});
+
 // Evidence for review, not part of CI: E2E_SCREENSHOTS=1 npx playwright test kitchen --project=ipad
 if (process.env.E2E_SCREENSHOTS) {
+  test('screenshots of the kitchen voice toggle (TQR-027)', async ({ page }) => {
+    const r = await setUpRestaurant(page, 'voice-shots');
+    releaseOrder({
+      restaurantId: r.id,
+      tableName: 'Bàn 3',
+      minutesAgo: 12,
+      partySize: 4,
+      items: [{ menuItemName: 'Phở bò tái', quantity: 2, note: 'Không hành' }],
+    });
+    releaseOrder({
+      restaurantId: r.id,
+      tableName: 'Bàn 1',
+      minutesAgo: 2,
+      items: [{ menuItemName: 'Trà đá', quantity: 3 }],
+    });
+    await page.getByRole('button', { name: 'Đăng xuất' }).click();
+    await recordSpeech(page);
+    await signIn(page, r.kitchenEmail, STAFF_PASSWORD);
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await page.getByRole('switch', { name: 'Bật đọc to' }).click();
+    await expect
+      .poll(() => spokenOn(page))
+      .toContain('vi-VN|Bàn 3 gọi hai phở bò tái đã 12 phút, chưa ra món');
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await settle(page);
+      await page.screenshot({
+        path: `${EVIDENCE}/kitchen-voice-1180-${scheme}.png`,
+        fullPage: true,
+      });
+    }
+  });
+
   test('screenshots of the kitchen and waiter screens', async ({ page, browser }) => {
     const r = await setUpRestaurant(page, 'shots');
     for (const [table, minutesAgo, items] of [

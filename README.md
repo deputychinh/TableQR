@@ -21,9 +21,9 @@ The platform admin (suspends abusive restaurants at `/quan-tri`) has no sign-up 
 
 ## Features
 
-- **Owner:** self sign-up, house rules (pay before/after eating, who opens a table, order approval, portions per person), VietQR bank account, menu with kitchen stations, tables with printable QR codes, staff accounts per role.
+- **Owner:** self sign-up, house rules (pay before/after eating, who opens a table, order approval, portions per person, kitchen reminder time), VietQR bank account, menu with kitchen stations, tables with printable QR codes, staff accounts per role.
 - **Guest (phone, no app):** scan the table QR, party size, order, live status per dish, bill with a VietQR code that follows new orders, online table booking at `/r/<slug>/dat-ban`.
-- **Kitchen (`/bep`):** one queue per station, oldest first; overtaking the same dish needs a reason.
+- **Kitchen (`/bep`):** one queue per station, oldest first; overtaking the same dish needs a reason; "Bật đọc to" reads new orders aloud in Vietnamese ("Bàn 1: hai phở bò, một trà đá") and reminds dishes waiting too long (5–20 min, set by the owner), offline on the iPad's own voice.
 - **Waiter (`/phuc-vu`):** ready dishes per table, unusual orders to confirm (`/phuc-vu/duyet`).
 - **Cashier (`/thu-ngan`):** confirm transfers against the bill code, close tables.
 

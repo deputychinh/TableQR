@@ -8,7 +8,16 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import StationQueue from '../components/StationQueue.vue';
+import VoiceBar from '../components/VoiceBar.vue';
 import { listStations, type KitchenStation } from '../services/kitchen.service';
+import { browserSpeech } from '../voice/browser-speech';
+import {
+  levelOf,
+  loadVoiceSettings,
+  saveVoiceSettings,
+  type VoiceSettings,
+} from '../voice/settings';
+import { createSpeechQueue } from '../voice/speech-queue';
 
 /** Kitchen screen `/bep` (S9): station tabs on top, the chosen station's live queue below. */
 const { t } = useI18n();
@@ -49,11 +58,42 @@ const refreshCounts = async () => {
     // Keep the last counts; the next tick tries again.
   }
 };
+/**
+ * Voice (TQR-027): the browser's own Vietnamese speech, one sentence at a time. The choice is
+ * remembered on this device; iOS only speaks after a tap, so turning it on speaks right inside the
+ * tap, and a remembered "on" is woken by the first tap anywhere on the page.
+ */
+const voice = ref<VoiceSettings>(loadVoiceSettings());
+const engine = browserSpeech(() => levelOf(voice.value));
+const speech = engine ? createSpeechQueue(engine) : undefined;
+const voiceOn = computed(() => voice.value.enabled && speech !== undefined);
+
+const setVoice = (next: VoiceSettings) => {
+  voice.value = next;
+  saveVoiceSettings(next);
+};
+const toggleVoice = () => {
+  setVoice({ ...voice.value, enabled: !voice.value.enabled });
+  speech?.clear();
+  if (voice.value.enabled) speech?.say(t('kitchen.voice.enabled'));
+};
+const say = (text: string) => {
+  if (voiceOn.value) speech?.say(text);
+};
+const unlock = () => {
+  if (voiceOn.value) engine?.unlock();
+};
+
 onMounted(async () => {
+  document.addEventListener('pointerdown', unlock, { once: true });
   await load();
   timer = setInterval(() => void refreshCounts(), COUNTS_EVERY_MS);
 });
-onUnmounted(() => clearInterval(timer));
+onUnmounted(() => {
+  clearInterval(timer);
+  document.removeEventListener('pointerdown', unlock);
+  speech?.clear();
+});
 
 const onWaiting = (count: number) => {
   if (selected.value) selected.value.waiting = count;
@@ -96,6 +136,12 @@ const onTabKey = (event: KeyboardEvent, index: number) => {
       <template #icon><Store :size="32" /></template>
     </EmptyState>
     <div v-else class="kitchen-page">
+      <VoiceBar
+        :settings="voice"
+        :supported="speech !== undefined"
+        @toggle="toggleVoice"
+        @change="setVoice"
+      />
       <div class="kitchen-page__tabs" role="tablist" :aria-label="t('kitchen.stations')">
         <button
           v-for="(station, index) in stations"
@@ -127,7 +173,13 @@ const onTabKey = (event: KeyboardEvent, index: number) => {
         class="kitchen-page__panel"
         :aria-labelledby="`station-tab-${selected.id}`"
       >
-        <StationQueue :key="selected.id" :station-id="selected.id" @waiting="onWaiting" />
+        <StationQueue
+          :key="selected.id"
+          :station-id="selected.id"
+          :voice="voiceOn"
+          @waiting="onWaiting"
+          @say="say"
+        />
       </div>
     </div>
   </RoleShell>

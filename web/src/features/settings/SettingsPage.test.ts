@@ -143,6 +143,31 @@ describe('SettingsPage', () => {
     expect(saveButton().disabled).toBe(true);
   });
 
+  it('TQR-028 picks the kitchen reminder and repeat times (default 10 minutes) and saves them', async () => {
+    const calls = stubApi(ownerSettings());
+    await renderPage();
+    const reminder = screen.getByRole('group', { name: 'Nhắc khi một món chờ quá' });
+    const repeat = screen.getByRole('group', { name: 'Nếu món vẫn chưa xong, nhắc lại sau mỗi' });
+    expect(
+      within(reminder)
+        .getAllByRole('radio')
+        .map((r) => (r as HTMLInputElement).value),
+    ).toEqual(['5', '10', '15', '20']);
+    expect(
+      (within(reminder).getByRole('radio', { name: /^10 phút/ }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(
+      (within(repeat).getByRole('radio', { name: /^10 phút/ }) as HTMLInputElement).checked,
+    ).toBe(true);
+    await userEvent.click(within(reminder).getByRole('radio', { name: /^5 phút/ }));
+    await userEvent.click(within(repeat).getByRole('radio', { name: /^15 phút/ }));
+    await userEvent.click(saveButton());
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.body).toMatchObject({
+      rules: { kitchen: { reminderMinutes: 5, repeatMinutes: 15 } },
+    });
+  });
+
   it('turning booking off hides the slot length and opening hours', async () => {
     stubApi(ownerSettings());
     await renderPage();

@@ -11,8 +11,14 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Added
 
+- Kitchen voice (TQR-027): `/bep` reads new orders aloud in Vietnamese with the device's own speech synthesis (`vi-VN`, voice "Linh" where present; offline, no new service) — one sentence per order, "Bàn 1: hai phở bò, một trà đá", notes after their dish; only dishes new since the screen started listening (deduped by item id, reconnects read nothing again), held orders when released, never cancelled ones; one sentence at a time. A big "Bật đọc to" switch (says "Đã bật đọc to" on the tap iOS needs) with speed and volume, remembered per device. Each queue ticket now carries `orderId`.
+- Spoken overdue reminders (TQR-028): house rule `kitchen.reminderMinutes` / `kitchen.repeatMinutes` (5, 10, 15 or 20; default 10/10) on the settings page ("Nhắc món chờ lâu"); the station queue sends it as `reminder`. A waiting or cooking dish past it is said — "Bàn 5 gọi phở bò đã 10 phút, chưa ra món" — and repeated until done, served or cancelled, counted on the server's clock; dishes due together share one sentence (3 named, then "và N món khác"); the ticket shows "Trễ N phút".
 - "Ẩn bàn": a table with history (that cannot be deleted) can be hidden from the refused-delete sheet — `POST /api/tables/:id/archive` / `unarchive` (owner only; 409 `TABLE_IN_USE` while guests sit at it), migration `0008_archive_tables` (`dining_tables.archived_at`); hidden tables leave the list (`GET /api/tables` → `{items, archived}`), the print sheet and booking assignment, their QR codes (current and old) answer "Không tìm thấy bàn", and "Bàn đã ẩn" lists them with "Hiện lại"; guest tokens resolve in one place (`TablesService.findLiveByToken`) (TQR-024).
 - Kitchen "Bỏ món": `POST /api/kitchen/items/:id/cancel` (waiting or cooking → cancelled, owner and kitchen) with a confirm sheet on `/bep`; the guest sees "Đã huỷ" (TQR-025).
+
+### Changed
+
+- The kitchen late badge reads "Trễ N phút" (was "Trễ") and also lights up past the restaurant's reminder time (TQR-028).
 
 ### Fixed
 

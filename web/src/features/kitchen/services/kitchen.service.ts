@@ -15,6 +15,8 @@ export interface Ticket {
   id: string;
   version: number;
   status: QueueStatus;
+  /** The order this line belongs to: a new order is read aloud as one sentence (TQR-027). */
+  orderId: string;
   menuItemId: string;
   name: string;
   quantity: number;
@@ -30,6 +32,8 @@ export interface Ticket {
 export interface StationQueue {
   station: { id: string; name: string; lateAfterMinutes: number };
   serverTime: string;
+  /** TQR-028: say an overdue dish after `minutes`, again every `repeatMinutes`. */
+  reminder: { minutes: number; repeatMinutes: number };
   items: Ticket[];
 }
 

@@ -4,10 +4,12 @@ import { syncOpenBill } from '../billing/bill-sync.js';
 import { CLOCK, type Clock } from '../common/clock.js';
 import type { TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
+import { restaurants } from '../db/schema.js';
 import { stations } from '../menu/menu.schema.js';
 import { FloorSnapshotRegistry } from '../realtime/floor-snapshot.js';
 import { publish } from '../realtime/publisher.js';
 import { orderItems, tableSessions } from '../service/service.schema.js';
+import { readStoredRules } from '../settings/domain/house-rules.js';
 import { diningTables } from '../tables/tables.schema.js';
 import type { DoneInput } from './dto/kitchen.dto.js';
 import { nextStatus, type ItemAction, type ItemStatus } from './domain/item-status.js';
@@ -29,6 +31,8 @@ export interface Ticket {
   id: string;
   version: number;
   status: 'waiting' | 'cooking';
+  /** TQR-027: the screen reads a new order's dishes together ("Bàn 1: hai phở bò, một trà đá"). */
+  orderId: string;
   menuItemId: string;
   name: string;
   quantity: number;
@@ -46,6 +50,8 @@ export interface StationQueue {
   station: { id: string; name: string; lateAfterMinutes: number };
   /** Lets a screen whose clock is off still count wait time and lateness right. */
   serverTime: string;
+  /** TQR-028: the restaurant's spoken overdue reminder (house rule `kitchen`), in minutes. */
+  reminder: { minutes: number; repeatMinutes: number };
   items: Ticket[];
 }
 
@@ -127,6 +133,7 @@ export class KitchenService implements OnModuleInit {
         id: orderItems.id,
         version: orderItems.version,
         status: orderItems.status,
+        orderId: orderItems.orderId,
         menuItemId: orderItems.menuItemId,
         name: orderItems.nameSnapshot,
         quantity: orderItems.quantity,
@@ -173,7 +180,25 @@ export class KitchenService implements OnModuleInit {
         },
       ];
     });
-    return { station, serverTime: this.clock.now().toISOString(), items };
+    return {
+      station,
+      serverTime: this.clock.now().toISOString(),
+      reminder: await this.reminder(tenant),
+      items,
+    };
+  }
+
+  /**
+   * TQR-028: the restaurant's current reminder rule. A screen setting, not a judgement of an
+   * order, so it is the rule in force now rather than the order's AC12 snapshot.
+   */
+  private async reminder(tenant: TenantId): Promise<StationQueue['reminder']> {
+    const [row] = await this.db
+      .select({ rules: restaurants.rules })
+      .from(restaurants)
+      .where(eq(restaurants.id, tenant));
+    const { reminderMinutes, repeatMinutes } = readStoredRules(row?.rules).kitchen;
+    return { minutes: reminderMinutes, repeatMinutes };
   }
 
   /** "Bắt đầu nấu": waiting → cooking. */

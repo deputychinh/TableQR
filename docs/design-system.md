@@ -70,6 +70,10 @@ What exists in `web/src/components/` (shells in `web/src/app/layouts/`). A scree
 | `Toast` (`ToastRegion` + `useToastStore`)     | outcome of an action; one polite live region per shell, messages queued and shown one at a time                                                            | success, error; close button                                            |
 | `BrandMark`                                   | product mark in shells                                                                                                                                     | —                                                                       |
 
+### Voice toggle (kitchen, TQR-027)
+
+A screen that talks has one switch, `VoiceBar` (`web/src/features/kitchen/components/`), above the station tabs: a 56 px pill, `role="switch"` named **"Bật đọc to"** (the name never changes), icon (loudspeaker / muted) + state word ("Đang bật" / "Đang tắt") + colour, and a one-line hint saying what it does. Turning it on speaks right away ("Đã bật đọc to") because iOS plays audio only inside a tap. While it is on, two rows of 56 px choices follow — "Tốc độ đọc" (Chậm / Vừa / Nhanh) and "Âm lượng" (Nhỏ / Vừa / To) — as native radios in a fieldset with a legend. The choice is remembered per device (`localStorage`, never required). A browser that cannot speak shows the switch disabled and says why. Spoken sentences are short, table first ("Bàn 1: hai phở bò, một trà đá"), one at a time.
+
 Planned, not built yet (add here when they arrive): `ListItem` / `CardItem` for menu items, queue tickets and tables (today each feature has its own card: `TableCard`, `MenuItemRow`).
 
 Every data view shows loading / empty / error / success. Screens are checked at 390 px (iPhone), 820 px (iPad portrait) and 1180 px (iPad landscape) with screenshots in review.
