@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RequestLimits } from '../common/http/request-limits.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { BookingController, GuestBookingController } from './booking.controller.js';
 import { BookingService } from './booking.service.js';
@@ -8,7 +9,7 @@ import { RetentionJob } from './retention.job.js';
 @Module({
   imports: [IdentityModule],
   controllers: [GuestBookingController, BookingController],
-  providers: [BookingService, RetentionJob],
+  providers: [BookingService, RetentionJob, RequestLimits],
   exports: [BookingService],
 })
 export class BookingModule {}

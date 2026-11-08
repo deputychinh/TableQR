@@ -1,14 +1,21 @@
-import { Body, Controller, Get, Header, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { RequestLimits, clientAddress } from '../common/http/request-limits.js';
 import { parseBody } from '../common/http/validate.js';
+import { hashToken } from '../identity/domain/session-token.js';
 import { MenuService, type GuestMenu } from '../menu/menu.service.js';
 import { StreamGate, stillAllowed } from '../realtime/stream-gate.js';
 import { CART_LIMITS, parseIdempotencyKey } from './domain/ordering.js';
 import { idempotencyKeyRequired } from './domain/service-errors.js';
 import { readGuestCookie, setGuestCookie } from './guest.cookie.js';
 import { OrdersService, type OrderView } from './orders.service.js';
-import { SessionsService, type GuestSessionView, type SessionView } from './sessions.service.js';
+import {
+  SessionsService,
+  type CheckInNext,
+  type GuestSessionView,
+  type SessionView,
+} from './sessions.service.js';
 
 const checkInSchema = z
   .object({
@@ -55,7 +62,19 @@ export class GuestController {
     private readonly orders: OrdersService,
     private readonly menu: MenuService,
     private readonly streams: StreamGate,
+    private readonly limits: RequestLimits,
   ) {}
+
+  /**
+   * TQR-011: what scanning `qr` leads to (join, party size, wait for staff), asked before check-in
+   * so the page never meets an expected 409 on load.
+   */
+  @Get('check-in')
+  @Header('Cache-Control', 'no-store')
+  checkInNext(@Query('qr') qr: unknown): Promise<CheckInNext> {
+    const qrToken = parseBody(checkInSchema, { qrToken: typeof qr === 'string' ? qr : '' }).qrToken;
+    return this.sessions.checkInNext(qrToken);
+  }
 
   /** AC17–AC19: check in (open with party size) or join the table's open session. */
   @Post('session')
@@ -65,6 +84,7 @@ export class GuestController {
     @Res({ passthrough: true }) response: Response,
     @Body() body: unknown,
   ): Promise<{ session: SessionView; opened: boolean }> {
+    this.limits.take('guest_check_in', clientAddress(request));
     const input = parseBody(checkInSchema, body);
     const result = await this.sessions.checkIn(
       input.qrToken,
@@ -97,7 +117,10 @@ export class GuestController {
     @Res({ passthrough: true }) response: Response,
     @Body() body: unknown,
   ): Promise<OrderView> {
-    const context = await this.sessions.guestContext(readGuestCookie(request));
+    const cookie = readGuestCookie(request);
+    const context = await this.sessions.guestContext(cookie);
+    // docs/security.md: 20 orders / 10 min per phone (429 TOO_MANY_ORDERS); the cookie is known here.
+    this.limits.take('guest_order', hashToken(cookie ?? ''));
     const key = parseIdempotencyKey(request.headers['idempotency-key']);
     if (!key) throw idempotencyKeyRequired();
     const input = parseBody(orderSchema, body);

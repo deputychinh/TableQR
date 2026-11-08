@@ -8,11 +8,14 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
+import { RequestLimits, clientAddress } from '../common/http/request-limits.js';
 import { parseBody } from '../common/http/validate.js';
 import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
@@ -83,7 +86,10 @@ const checkSlug = (slug: string): void => {
  */
 @Controller('g/r')
 export class GuestBookingController {
-  constructor(private readonly booking: BookingService) {}
+  constructor(
+    private readonly booking: BookingService,
+    private readonly limits: RequestLimits,
+  ) {}
 
   @Get(':slug/slots')
   @Header('Cache-Control', 'no-store')
@@ -102,11 +108,14 @@ export class GuestBookingController {
   @Post(':slug/bookings')
   @HttpCode(201)
   create(
+    @Req() request: Request,
     @Param('slug') slug: string,
     @Headers('idempotency-key') key: string | undefined,
     @Body() body: unknown,
   ): Promise<GuestBookingView> {
     checkSlug(slug);
+    // Public form: 10 requests per hour per client address (docs/security.md, TQR-020).
+    this.limits.take('public_booking', clientAddress(request));
     if (key === undefined || !isValidIdempotencyKey(key)) throw invalid('Idempotency-Key');
     return this.booking.create(slug, key, parseBody(bookingSchema, body));
   }

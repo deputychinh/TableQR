@@ -12,9 +12,11 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { RequestLimits } from '../common/http/request-limits.js';
 import { parseBody } from '../common/http/validate.js';
 import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
+import { hashToken } from '../identity/domain/session-token.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import { readCookie } from '../identity/session.cookie.js';
 import { StreamGate, stillAllowed } from '../realtime/stream-gate.js';
@@ -116,6 +118,7 @@ export class GuestBillController {
   constructor(
     private readonly billing: BillingService,
     private readonly streams: StreamGate,
+    private readonly limits: RequestLimits,
   ) {}
 
   @Get()
@@ -129,7 +132,10 @@ export class GuestBillController {
   @Post()
   @HttpCode(200)
   async request(@Req() request: Request): Promise<SessionBillView> {
-    const guest = await this.billing.guestContext(readCookie(request, GUEST_COOKIE));
+    const cookie = readCookie(request, GUEST_COOKIE);
+    const guest = await this.billing.guestContext(cookie);
+    // Each request may issue a new code: 6 per minute per phone (docs/security.md).
+    this.limits.take('guest_bill', hashToken(cookie ?? ''));
     return this.billing.requestBill(guest.tenant, guest.sessionId);
   }
 
