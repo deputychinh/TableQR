@@ -334,6 +334,21 @@ export class BookingService {
   async seat(tenant: TenantId, id: string): Promise<BookingView> {
     try {
       return await this.transition(tenant, id, 'seat', async (tx, current) => {
+        // A table hidden after the booking was made (TQR-024) seats nobody: 404 like staff open;
+        // staff move the booking to a shown table first. The row lock is the one archive takes.
+        const [table] = await tx
+          .select({ id: diningTables.id })
+          .from(diningTables)
+          .where(
+            and(
+              eq(diningTables.restaurantId, tenant),
+              eq(diningTables.id, current.tableId),
+              isNull(diningTables.archivedAt),
+            ),
+          )
+          .limit(1)
+          .for('update');
+        if (!table) throw notFound();
         const [session] = await tx
           .insert(tableSessions)
           .values({
