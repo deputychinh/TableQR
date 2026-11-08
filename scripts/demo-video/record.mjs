@@ -539,13 +539,20 @@ const main = async () => {
     // 9. Ten minutes later: the reminder
     await say(kitchen, 'later', 'bottom', 0.2);
     await idle();
-    await kp.clock.fastForward('10:30');
-    const deadline = Date.now() + 15_000;
+    // Move the phone's clock 10.5 min ahead without firing the timers that piled up meanwhile:
+    // fastForward would also fire the stream watchdog (TQR-031) and the screen would announce
+    // "Mất kết nối máy chủ". The reminder check (every 15 s) then sees the dish as overdue.
+    const pageNow = await kp.evaluate(() => Date.now());
+    await kp.clock.setSystemTime(pageNow + 10.5 * 60_000);
+    const deadline = Date.now() + 30_000;
     while (!timeline.speech.some((s) => s.text.includes('10 phút')) && Date.now() < deadline)
       await sleep(200);
     await sleep(500);
     await speechIdle();
-    await kp.getByText('Trễ 10 phút').first().waitFor();
+    await kp
+      .getByText(/Trễ 1[01] phút/)
+      .first()
+      .waitFor({ timeout: 30_000 });
     await say(kitchen, 'kitchen4', 'bottom');
     await sleep(1500);
 
