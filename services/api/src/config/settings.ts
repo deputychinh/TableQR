@@ -15,6 +15,15 @@ const settingsSchema = z.object({
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0),
     ),
+  /** Sign-up + sign-in requests per client address per minute (in memory, per process). */
+  TQR_AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+  /** Open SSE streams per staff member and per restaurant, per process (429 above). */
+  TQR_STREAMS_PER_USER: z.coerce.number().int().positive().default(10),
+  TQR_STREAMS_PER_RESTAURANT: z.coerce.number().int().positive().default(300),
+  /** Guest phones of one table session share this (order status + bill streams per phone). */
+  TQR_STREAMS_PER_GUEST_SESSION: z.coerce.number().int().positive().default(30),
+  /** SSE heartbeat; each beat also re-checks the stream's session (D4 backstop). */
+  TQR_SSE_HEARTBEAT_MS: z.coerce.number().int().min(100).default(15_000),
   PORT: z.coerce.number().int().positive().default(3310),
 });
 

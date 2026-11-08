@@ -10,6 +10,7 @@ import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import StatusChip from '@/components/StatusChip.vue';
+import { useToastStore } from '@/stores/toast';
 import {
   describeAdminError,
   listRestaurants,
@@ -25,7 +26,7 @@ const loadError = ref<string>();
 const pending = ref<AdminRestaurant>();
 const busy = ref(false);
 const actionError = ref<string>();
-const notice = ref<string>();
+const toast = useToastStore();
 
 const suspending = computed(() => pending.value?.status === 'active');
 const hasMore = computed(() => (restaurants.value?.length ?? 0) < total.value);
@@ -62,9 +63,11 @@ const confirm = async () => {
       target.status === 'active' ? 'suspend' : 'reactivate',
     );
     restaurants.value = restaurants.value?.map((r) => (r.id === updated.id ? updated : r));
-    notice.value = t(updated.status === 'suspended' ? 'admin.suspended' : 'admin.reactivated', {
-      name: updated.name,
-    });
+    toast.show(
+      t(updated.status === 'suspended' ? 'admin.suspended' : 'admin.reactivated', {
+        name: updated.name,
+      }),
+    );
     pending.value = undefined;
   } catch (error: unknown) {
     actionError.value = t(describeAdminError(error));
@@ -80,11 +83,6 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
   <StaffShell :title="t('admin.shellTitle')">
     <h1 class="admin-page__title">{{ t('admin.title') }}</h1>
     <p class="admin-page__lead">{{ t('admin.lead') }}</p>
-
-    <p v-if="notice" class="admin-page__notice" role="status">
-      <CircleCheck :size="20" aria-hidden="true" />
-      {{ notice }}
-    </p>
 
     <LoadingState v-if="loading && !restaurants" :label="t('admin.loading')" />
 
@@ -167,16 +165,6 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
 .admin-page__lead {
   margin-block: var(--space-2) var(--space-4);
   color: var(--color-text-muted);
-}
-
-.admin-page__notice {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  margin-block: 0 var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-1);
-  background: var(--color-success-bg);
 }
 
 .admin-page__count {

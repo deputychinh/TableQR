@@ -12,15 +12,12 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { ErrorCode } from '../common/enums/error-code.enum.js';
-import { DomainError } from '../common/errors/domain.error.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import { readCookie } from '../identity/session.cookie.js';
-import { RealtimeHub } from '../realtime/realtime.hub.js';
-import { openStream } from '../realtime/sse.js';
+import { StreamGate, stillAllowed } from '../realtime/stream-gate.js';
 import {
   BillingService,
   type BillView,
@@ -37,11 +34,6 @@ const paySchema = z.object({ method: z.enum(PAYMENT_METHODS) }).strict();
 const closeSchema = z
   .object({ reason: z.string().trim().min(1).max(CLOSE_REASON_MAX).optional() })
   .strict();
-
-const tenantOf = (principal: Principal): TenantId => {
-  if (principal.tenantId === null) throw new DomainError(ErrorCode.Forbidden, 403);
-  return principal.tenantId;
-};
 
 /** Staff side of billing (S12/S13): cashier screen, bill requests and payment confirmation. */
 @Controller('bills')
@@ -123,7 +115,7 @@ export class SessionCloseController {
 export class GuestBillController {
   constructor(
     private readonly billing: BillingService,
-    private readonly hub: RealtimeHub,
+    private readonly streams: StreamGate,
   ) {}
 
   @Get()
@@ -144,9 +136,14 @@ export class GuestBillController {
   /** Live bill status for the guest's session ("Đã thanh toán" without a refresh, AC44). */
   @Get('stream')
   async stream(@Req() request: Request, @Res() response: Response): Promise<void> {
-    const guest = await this.billing.guestContext(readCookie(request, GUEST_COOKIE));
-    await openStream(this.hub, request, response, {
-      restaurantId: guest.tenant,
+    const cookie = readCookie(request, GUEST_COOKIE);
+    const guest = await this.billing.guestContext(cookie);
+    const audience = {
+      tenant: guest.tenant,
+      sessionId: guest.sessionId,
+      isStillAllowed: stillAllowed(() => this.billing.guestContext(cookie)),
+    };
+    await this.streams.openGuest(audience, request, response, {
       topics: [`session:${guest.sessionId}`],
       snapshot: () => this.billing.view(guest.tenant, guest.sessionId),
     });

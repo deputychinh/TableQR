@@ -5,6 +5,7 @@ import { DomainError } from '../common/errors/domain.error.js';
 import { DB, type Database } from '../db/database.module.js';
 import { authSessions, restaurants } from '../db/schema.js';
 import type { RestaurantStatus } from '../identity/domain/restaurant-status.js';
+import { publishRevocation } from '../realtime/publisher.js';
 
 export interface AdminRestaurant {
   id: string;
@@ -87,6 +88,7 @@ export class AdminService {
       if (!updated) throw new DomainError(ErrorCode.NotFound, 404);
       if (status === 'suspended') {
         await tx.delete(authSessions).where(eq(authSessions.restaurantId, id));
+        await publishRevocation(tx, { restaurantId: id, userId: null });
       }
       const [row] = await tx.select(columns).from(restaurants).where(eq(restaurants.id, id));
       if (!row) throw new DomainError(ErrorCode.NotFound, 404);

@@ -12,6 +12,7 @@ import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import { useSessionStore } from '@/stores/session';
+import { useToastStore } from '@/stores/toast';
 import type { TableInput, TableItem } from '../api';
 import TableCard from '../components/TableCard.vue';
 import TableFormSheet from '../components/TableFormSheet.vue';
@@ -23,8 +24,8 @@ const session = useSessionStore();
 const { items, status, load, add, update, rotate, remove } = useTables();
 const canManage = computed(() => session.me?.user.role === 'owner');
 const origin = window.location.origin;
+const toast = useToastStore();
 
-const notice = ref('');
 const actionError = ref<string>();
 const formOpen = ref(false);
 const editing = ref<TableItem>();
@@ -47,7 +48,7 @@ const save = async (input: TableInput) => {
   const current = editing.value;
   const table = current ? await update(current.id, input) : await add(input);
   formOpen.value = false;
-  notice.value = t(current ? 'tables.saved' : 'tables.created', { name: table.name });
+  toast.show(t(current ? 'tables.saved' : 'tables.created', { name: table.name }));
 };
 
 const confirmAction = async () => {
@@ -58,10 +59,10 @@ const confirmAction = async () => {
   try {
     if (pending.kind === 'rotate') {
       await rotate(pending.table.id);
-      notice.value = t('tables.rotate.done', { name: pending.table.name });
+      toast.show(t('tables.rotate.done', { name: pending.table.name }));
     } else {
       await remove(pending.table.id);
-      notice.value = t('tables.delete.done', { name: pending.table.name });
+      toast.show(t('tables.delete.done', { name: pending.table.name }));
     }
   } catch (error: unknown) {
     if (error instanceof ApiError && error.code === 'NOT_FOUND') {
@@ -105,7 +106,6 @@ const printAll = () => router.push('/quan-ly/ban/in');
         </div>
       </header>
 
-      <p class="tables-page__notice" role="status" aria-live="polite">{{ notice }}</p>
       <FormAlert v-if="actionError" :message="actionError" />
       <p v-if="!canManage && status === 'ready'" class="tables-page__readonly">
         {{ t('tables.readOnly') }}
@@ -192,17 +192,6 @@ const printAll = () => router.push('/quan-ly/ban/in');
   display: flex;
   flex-direction: column-reverse;
   gap: var(--space-2);
-}
-
-.tables-page__notice {
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius-1);
-  background: var(--color-success-bg);
-}
-
-.tables-page__notice:empty {
-  display: none;
 }
 
 .tables-page__readonly,

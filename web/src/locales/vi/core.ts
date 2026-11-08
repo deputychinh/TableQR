@@ -44,6 +44,9 @@ export const core = {
         'Nhà hàng tạm ngưng. Liên hệ chủ quán hoặc bộ phận hỗ trợ TableQR để mở lại.',
     },
   },
+  toast: {
+    close: 'Đóng thông báo',
+  },
   nav: {
     label: 'Quản lý nhà hàng',
     overview: 'Tổng quan',

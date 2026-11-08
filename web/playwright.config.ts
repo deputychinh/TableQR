@@ -31,6 +31,8 @@ export default defineConfig({
           process.env.TQR_DATABASE_URL ?? 'postgresql://tableqr:tableqr@127.0.0.1:55432/tableqr',
         TQR_SESSION_SECRET: 'e2e-secret-e2e-secret-e2e-secret-e2e',
         TQR_WEB_ORIGINS: PREVIEW_URL,
+        // Every journey signs in from the preview proxy's address.
+        TQR_AUTH_RATE_LIMIT_PER_MINUTE: '100000',
       },
       reuseExistingServer: false,
       timeout: 120_000,

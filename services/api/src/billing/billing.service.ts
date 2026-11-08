@@ -5,6 +5,7 @@ import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import { AppLogger } from '../common/logging/app-logger.js';
 import { asTenantId, type TenantId } from '../common/tenant.js';
+import { isUuid } from '../common/http/params.js';
 import { DB, type Database } from '../db/database.module.js';
 import { restaurants, users } from '../db/schema.js';
 import { hashToken } from '../identity/domain/session-token.js';
@@ -25,7 +26,6 @@ import { VietQrInputError, buildVietQr } from './domain/vietqr.js';
 
 type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE_ATTEMPTS = 8;
 const LINES_MAX = 500;
 const OVERVIEW_MAX = 200;
@@ -157,7 +157,7 @@ export class BillingService {
 
   /** The session's bill as it stands, without issuing anything. */
   async view(tenant: TenantId, sessionId: string): Promise<SessionBillView> {
-    if (!UUID_PATTERN.test(sessionId)) throw notFound();
+    if (!isUuid(sessionId)) throw notFound();
     return this.buildView(this.db, tenant, sessionId);
   }
 
@@ -166,7 +166,7 @@ export class BillingService {
    * a different amount → supersede it and issue a new code; nothing due → no open bill.
    */
   async requestBill(tenant: TenantId, sessionId: string): Promise<SessionBillView> {
-    if (!UUID_PATTERN.test(sessionId)) throw notFound();
+    if (!isUuid(sessionId)) throw notFound();
     await this.db.transaction(async (tx) => {
       const session = await this.lockSession(tx, tenant, sessionId);
       if (session.status !== 'open') {
@@ -213,7 +213,7 @@ export class BillingService {
     billId: string,
     method: PaymentMethod,
   ): Promise<SessionBillView> {
-    if (!UUID_PATTERN.test(billId)) throw notFound();
+    if (!isUuid(billId)) throw notFound();
     const { sessionId, paid, released } = await this.db.transaction(async (tx) => {
       const [target] = await tx
         .select({ sessionId: bills.sessionId })
@@ -339,7 +339,7 @@ export class BillingService {
     sessionId: string,
     reason: string | undefined,
   ): Promise<{ sessionId: string; status: 'closed'; closeReason: string | null }> {
-    if (!UUID_PATTERN.test(sessionId)) throw notFound();
+    if (!isUuid(sessionId)) throw notFound();
     const result = await this.db.transaction(async (tx) => {
       const session = await this.lockSession(tx, tenant, sessionId);
       if (session.status !== 'open') {
@@ -419,7 +419,7 @@ export class BillingService {
 
   /** One bill by id (staff), e.g. to check an old code: status `superseded` = "Hoá đơn đã thay đổi". */
   async getBill(tenant: TenantId, billId: string): Promise<BillView> {
-    if (!UUID_PATTERN.test(billId)) throw notFound();
+    if (!isUuid(billId)) throw notFound();
     const [row] = await this.db
       .select()
       .from(bills)

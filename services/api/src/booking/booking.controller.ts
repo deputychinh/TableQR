@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import {
@@ -111,11 +111,6 @@ export class GuestBookingController {
     return this.booking.create(slug, key, parseBody(bookingSchema, body));
   }
 }
-
-const tenantOf = (principal: Principal): TenantId => {
-  if (principal.tenantId === null) throw new DomainError(ErrorCode.Forbidden, 403);
-  return principal.tenantId;
-};
 
 /** Staff booking list and actions (S15): owner, cashier and waiter; never the kitchen. */
 @Controller('bookings')

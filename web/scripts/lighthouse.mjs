@@ -82,7 +82,8 @@ try {
 
 const lcp = report.audits['largest-contentful-paint'].numericValue;
 const result = {
-  workload: 'guest-menu-cold-load',
+  // The landing page; the guest menu page measurement is TQR-016 (benchmarks/plan.md).
+  workload: 'landing-cold-load',
   passed: lcp <= LCP_BUDGET_MS,
   lcp_ms: Math.round(lcp),
   performance_score: report.categories.performance.score,

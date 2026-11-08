@@ -4,17 +4,23 @@ import { SETTINGS, type Settings } from '../config/settings.js';
 import { AppLogger } from '../common/logging/app-logger.js';
 import {
   NOTIFY_CHANNEL,
+  REVOKE_CHANNEL,
   decodeEvent,
+  decodeRevocation,
   reconnectDelayMs,
   type RealtimeEvent,
+  type Revocation,
 } from './domain/event.js';
 
-export type Listener = (event: RealtimeEvent | 'resync') => void;
+/** `revoked`: the person's access ended (D4); the stream must close. */
+export type Listener = (event: RealtimeEvent | 'resync' | 'revoked') => void;
 
 interface Subscription {
   restaurantId: string;
   topics: ReadonlySet<string>;
   listener: Listener;
+  /** The signed-in person behind the stream; revocations for them close it. */
+  userId: string | undefined;
 }
 
 /**
@@ -44,8 +50,13 @@ export class RealtimeHub implements OnModuleInit, OnApplicationShutdown {
     await this.client?.end().catch(() => undefined);
   }
 
-  subscribe(restaurantId: string, topics: Iterable<string>, listener: Listener): () => void {
-    const subscription: Subscription = { restaurantId, topics: new Set(topics), listener };
+  subscribe(
+    restaurantId: string,
+    topics: Iterable<string>,
+    listener: Listener,
+    userId?: string,
+  ): () => void {
+    const subscription: Subscription = { restaurantId, topics: new Set(topics), listener, userId };
     this.subscriptions.add(subscription);
     return () => {
       this.subscriptions.delete(subscription);
@@ -70,15 +81,50 @@ export class RealtimeHub implements OnModuleInit, OnApplicationShutdown {
         event === 'resync' ||
         (subscription.restaurantId === event.restaurantId && subscription.topics.has(event.topic))
       ) {
-        try {
-          subscription.listener(event);
-        } catch (error: unknown) {
-          this.logger.error('realtime_listener_failed', {
-            error: error instanceof Error ? error.name : typeof error,
-          });
-        }
+        this.deliver(subscription, event);
       }
     }
+  }
+
+  private revoke(revocation: Revocation): void {
+    for (const subscription of this.subscriptions) {
+      if (
+        subscription.restaurantId === revocation.restaurantId &&
+        (revocation.userId === null || subscription.userId === revocation.userId)
+      ) {
+        this.deliver(subscription, 'revoked');
+      }
+    }
+  }
+
+  private deliver(subscription: Subscription, event: RealtimeEvent | 'resync' | 'revoked'): void {
+    try {
+      subscription.listener(event);
+    } catch (error: unknown) {
+      this.logger.error('realtime_listener_failed', {
+        error: error instanceof Error ? error.name : typeof error,
+      });
+    }
+  }
+
+  /** Routes one NOTIFY by channel; a malformed payload is dropped and logged without content. */
+  private onNotification(channel: string, payload: string | undefined): void {
+    if (channel === REVOKE_CHANNEL) {
+      const revocation = decodeRevocation(payload);
+      if (revocation) this.revoke(revocation);
+      else this.logDropped(channel, payload);
+      return;
+    }
+    const event = decodeEvent(payload);
+    if (event) this.dispatch(event);
+    else this.logDropped(channel, payload);
+  }
+
+  private logDropped(channel: string, payload: string | undefined): void {
+    this.logger.warn('realtime_payload_dropped', {
+      channel,
+      bytes: payload === undefined ? 0 : Buffer.byteLength(payload),
+    });
   }
 
   private async connect(): Promise<void> {
@@ -88,8 +134,7 @@ export class RealtimeHub implements OnModuleInit, OnApplicationShutdown {
       connectionTimeoutMillis: 3000,
     });
     client.on('notification', (message) => {
-      const event = decodeEvent(message.payload);
-      if (event) this.dispatch(event);
+      this.onNotification(message.channel, message.payload);
     });
     client.on('error', () => {
       // 'end' follows; reconnect happens there
@@ -103,6 +148,7 @@ export class RealtimeHub implements OnModuleInit, OnApplicationShutdown {
     try {
       await client.connect();
       await client.query(`LISTEN ${NOTIFY_CHANNEL}`);
+      await client.query(`LISTEN ${REVOKE_CHANNEL}`);
       const wasReconnect = this.attempt > 0;
       this.client = client;
       this.attempt = 0;

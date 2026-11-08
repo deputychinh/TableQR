@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n';
 import { ChefHat, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
+import IconButton from '@/components/IconButton.vue';
 import type { Station } from '../types';
 
 defineProps<{ stations: Station[]; canEdit: boolean }>();
@@ -25,22 +26,16 @@ const { t } = useI18n();
           }}</span>
         </span>
         <template v-if="canEdit">
-          <button
-            type="button"
-            class="station-panel__icon"
-            :aria-label="t('menu.station.edit', { name: station.name })"
+          <IconButton
+            :icon="Pencil"
+            :label="t('menu.station.edit', { name: station.name })"
             @click="emit('edit', station)"
-          >
-            <Pencil :size="18" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="station-panel__icon"
-            :aria-label="t('menu.station.remove', { name: station.name })"
+          />
+          <IconButton
+            :icon="Trash2"
+            :label="t('menu.station.remove', { name: station.name })"
             @click="emit('remove', station)"
-          >
-            <Trash2 :size="18" aria-hidden="true" />
-          </button>
+          />
         </template>
       </li>
     </ul>
@@ -104,25 +99,5 @@ const { t } = useI18n();
 .station-panel__late {
   font-size: var(--font-size-small);
   color: var(--color-text-muted);
-}
-
-.station-panel__icon {
-  display: grid;
-  flex: none;
-  place-items: center;
-  inline-size: var(--target-min);
-  block-size: var(--target-min);
-  border: 0;
-  border-radius: var(--radius-2);
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .station-panel__icon:hover {
-    color: var(--color-text);
-    background: var(--color-surface-muted);
-  }
 }
 </style>

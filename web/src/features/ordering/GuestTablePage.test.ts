@@ -205,11 +205,20 @@ describe('guest check-in (S6)', () => {
     },
   );
 
-  it('AC54 a suspended restaurant says so', async () => {
-    fakeApi({
-      [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
-      'POST /api/g/session': jsonResponse({ code: 'RESTAURANT_SUSPENDED' }, 403),
-    });
+  it.each([
+    [
+      'when the code is resolved',
+      { [`GET /api/g/t/${TOKEN}`]: jsonResponse({ code: 'RESTAURANT_SUSPENDED' }, 403) },
+    ],
+    [
+      'at check-in',
+      {
+        [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
+        'POST /api/g/session': jsonResponse({ code: 'RESTAURANT_SUSPENDED' }, 403),
+      },
+    ],
+  ])('AC54 a suspended restaurant says so %s', async (_when, routes) => {
+    fakeApi(routes);
     await renderGuest();
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Nhà hàng tạm ngưng' }),

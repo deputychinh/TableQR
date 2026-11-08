@@ -1,9 +1,7 @@
 import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import { ErrorCode } from '../common/enums/error-code.enum.js';
-import { DomainError } from '../common/errors/domain.error.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import {
@@ -29,12 +27,6 @@ const bankSchema = z
   .strict();
 
 const updateSchema = z.object({ rules: houseRulesSchema, bank: bankSchema.nullable() }).strict();
-
-/** Tenant from the session only (ADR 0003); a principal without a restaurant has nothing here. */
-const tenantOf = (principal: Principal): TenantId => {
-  if (principal.tenantId === null) throw new DomainError(ErrorCode.NotFound, 404);
-  return principal.tenantId;
-};
 
 @Controller('restaurant')
 @UseGuards(StaffGuard)

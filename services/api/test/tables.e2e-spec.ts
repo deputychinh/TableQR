@@ -313,7 +313,7 @@ describe('tables and QR codes (e2e)', () => {
       });
     });
 
-    it('answers 404 for current and old codes of a suspended restaurant', async () => {
+    it('AC54 answers 403 RESTAURANT_SUSPENDED for current and old codes of a suspended restaurant', async () => {
       const a = await owner();
       const table = await addTable(a.cookie);
       const rotated = await http()
@@ -325,8 +325,13 @@ describe('tables and QR codes (e2e)', () => {
         .update(restaurants)
         .set({ status: 'suspended' })
         .where(eq(restaurants.id, a.restaurantId));
-      await guest(rotated.body.qrToken as string).expect(404);
-      await guest(table.qrToken).expect(404);
+      for (const token of [rotated.body.qrToken as string, table.qrToken]) {
+        const response = await guest(token).expect(403);
+        expect(response.body).toMatchObject({
+          code: 'RESTAURANT_SUSPENDED',
+          detail: 'Nhà hàng tạm ngưng',
+        });
+      }
     });
   });
 

@@ -13,6 +13,7 @@ import FormAlert from '@/components/FormAlert.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import { useStream } from '@/composables/useStream';
 import { useSessionStore } from '@/stores/session';
+import { useToastStore } from '@/stores/toast';
 import {
   bookingAction,
   listBookings,
@@ -40,7 +41,7 @@ const shareUrl = computed(
 const date = ref(restaurantToday());
 const items = ref<Booking[]>([]);
 const status = ref<'loading' | 'ready' | 'error'>('loading');
-const notice = ref('');
+const toast = useToastStore();
 const actionError = ref<string>();
 const now = ref(Date.now());
 
@@ -125,10 +126,11 @@ const submitTable = async (tableId: string) => {
     const updated = await bookingAction(current.booking.id, 'confirm', { tableId });
     replace(updated);
     sheet.value = undefined;
-    notice.value =
+    toast.show(
       current.mode === 'move'
         ? t('booking.staff.done.move', { name: nameOf(updated), table: updated.tableName })
-        : t('booking.staff.done.confirm', { name: nameOf(updated) });
+        : t('booking.staff.done.confirm', { name: nameOf(updated) }),
+    );
   } catch (error: unknown) {
     if (error instanceof ApiError && error.code === 'TABLE_BUSY') {
       sheetError.value = t('booking.staff.tableSheet.busy');
@@ -152,10 +154,12 @@ const confirmAction = async () => {
   try {
     const updated = await bookingAction(pending.booking.id, ACTIONS[pending.kind]);
     replace(updated);
-    notice.value = t(`booking.staff.done.${pending.kind}`, {
-      name: nameOf(updated),
-      table: updated.tableName,
-    });
+    toast.show(
+      t(`booking.staff.done.${pending.kind}`, {
+        name: nameOf(updated),
+        table: updated.tableName,
+      }),
+    );
   } catch (error: unknown) {
     actionError.value = await describe(error, pending.booking);
   } finally {
@@ -167,7 +171,7 @@ const confirmAction = async () => {
 const copyLink = async () => {
   try {
     await navigator.clipboard.writeText(shareUrl.value);
-    notice.value = t('booking.staff.share.copied');
+    toast.show(t('booking.staff.share.copied'));
   } catch {
     actionError.value = t('booking.staff.share.copyFailed');
   }
@@ -245,7 +249,6 @@ const shell = computed(() => (isOwner.value ? OwnerShell : StaffShell));
         </BaseButton>
       </div>
 
-      <p class="bookings-page__notice" role="status" aria-live="polite">{{ notice }}</p>
       <FormAlert v-if="actionError" :message="actionError" />
 
       <LoadingState v-if="status === 'loading'" :label="t('booking.staff.loading')" />
@@ -395,17 +398,6 @@ const shell = computed(() => (isOwner.value ? OwnerShell : StaffShell));
   align-items: center;
   justify-content: space-between;
   min-block-size: var(--target-min);
-}
-
-.bookings-page__notice {
-  margin: 0;
-  padding: var(--space-3);
-  border-radius: var(--radius-1);
-  background: var(--color-success-bg);
-}
-
-.bookings-page__notice:empty {
-  display: none;
 }
 
 .bookings-page__count {

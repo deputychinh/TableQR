@@ -3,8 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { parseBody } from '../common/http/validate.js';
 import { MenuService, type GuestMenu } from '../menu/menu.service.js';
-import { RealtimeHub } from '../realtime/realtime.hub.js';
-import { openStream } from '../realtime/sse.js';
+import { StreamGate, stillAllowed } from '../realtime/stream-gate.js';
 import { CART_LIMITS, parseIdempotencyKey } from './domain/ordering.js';
 import { idempotencyKeyRequired } from './domain/service-errors.js';
 import { readGuestCookie, setGuestCookie } from './guest.cookie.js';
@@ -55,7 +54,7 @@ export class GuestController {
     private readonly sessions: SessionsService,
     private readonly orders: OrdersService,
     private readonly menu: MenuService,
-    private readonly hub: RealtimeHub,
+    private readonly streams: StreamGate,
   ) {}
 
   /** AC17–AC19: check in (open with party size) or join the table's open session. */
@@ -110,9 +109,14 @@ export class GuestController {
   /** AC38/AC39: live statuses of the session; snapshot on every (re)connect (ADR 0004). */
   @Get('stream')
   async stream(@Req() request: Request, @Res() response: Response): Promise<void> {
-    const context = await this.sessions.guestContext(readGuestCookie(request));
-    await openStream(this.hub, request, response, {
-      restaurantId: context.tenant,
+    const cookie = readGuestCookie(request);
+    const context = await this.sessions.guestContext(cookie);
+    const audience = {
+      tenant: context.tenant,
+      sessionId: context.sessionId,
+      isStillAllowed: stillAllowed(() => this.sessions.guestContext(cookie)),
+    };
+    await this.streams.openGuest(audience, request, response, {
       topics: [`session:${context.sessionId}`],
       snapshot: () => this.sessions.guestView(context),
     });

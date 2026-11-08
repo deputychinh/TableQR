@@ -166,6 +166,7 @@ describe('MenuPage', () => {
     await userEvent.click(toggle);
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     expect(await screen.findByText('Hết món', { selector: '.status-chip' })).toBeTruthy();
+    expect(await screen.findByText('Phở bò đã hết món.')).toBeTruthy();
 
     fail = true;
     await userEvent.click(toggle);
@@ -198,6 +199,7 @@ describe('MenuPage', () => {
     await userEvent.click(within(confirmItem).getByRole('button', { name: 'Xoá' }));
     await vi.waitFor(() => expect(screen.queryByText('Phở bò')).toBeNull());
     expect(screen.getByText('Chưa có món nào')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('Đã xoá Phở bò.');
   });
 
   it('edits an item, moves categories and manages stations', async () => {

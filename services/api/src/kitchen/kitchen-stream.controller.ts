@@ -2,8 +2,7 @@ import { Controller, Get, Param, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
-import { RealtimeHub } from '../realtime/realtime.hub.js';
-import { openStream } from '../realtime/sse.js';
+import { StreamGate } from '../realtime/stream-gate.js';
 import { COOKS, idParam, tenantOf } from './kitchen.http.js';
 import { KitchenService } from './kitchen.service.js';
 
@@ -12,7 +11,7 @@ import { KitchenService } from './kitchen.service.js';
 @UseGuards(StaffGuard)
 export class KitchenStreamController {
   constructor(
-    private readonly hub: RealtimeHub,
+    private readonly streams: StreamGate,
     private readonly kitchen: KitchenService,
   ) {}
 
@@ -27,8 +26,7 @@ export class KitchenStreamController {
     const tenant = tenantOf(principal);
     const stationId = idParam(id);
     await this.kitchen.assertStation(tenant, stationId);
-    await openStream(this.hub, request, response, {
-      restaurantId: tenant,
+    await this.streams.open(principal, request, response, {
       topics: [`station:${stationId}`],
       snapshot: () => this.kitchen.queue(tenant, stationId),
     });

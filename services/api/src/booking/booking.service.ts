@@ -4,6 +4,7 @@ import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import { asTenantId, type TenantId } from '../common/tenant.js';
+import { isUuid } from '../common/http/params.js';
 import { DB, type Database } from '../db/database.module.js';
 import { pgCode, pgConstraint } from '../db/pg-error.js';
 import { restaurants } from '../db/schema.js';
@@ -45,7 +46,6 @@ const DEADLOCK = '40P01';
 const NO_OVERLAP = 'bookings_no_overlap';
 const IDEMPOTENCY_KEY = 'bookings_tenant_idempotency_key';
 const ONE_OPEN_SESSION = 'table_sessions_one_open_per_table';
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 const DAY_LIST_MAX = 200;
@@ -299,7 +299,7 @@ export class BookingService {
     try {
       return await this.transition(tenant, id, 'confirm', async (tx, current) => {
         if (tableId === undefined || tableId === current.tableId) return {};
-        if (!UUID_PATTERN.test(tableId)) throw notFound();
+        if (!isUuid(tableId)) throw notFound();
         const [table] = await tx
           .select({ seats: diningTables.seats })
           .from(diningTables)
@@ -577,7 +577,7 @@ export class BookingService {
     action: BookingAction,
     apply: (tx: Tx, current: BookingRow) => Promise<{ tableId?: string; sessionId?: string }>,
   ): Promise<BookingView> {
-    if (!UUID_PATTERN.test(id)) throw notFound();
+    if (!isUuid(id)) throw notFound();
     const row = await this.db.transaction(async (tx) => {
       const [current] = await tx
         .select(bookingColumns)

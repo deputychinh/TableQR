@@ -1,4 +1,5 @@
 export const UNIQUE_VIOLATION = '23505';
+export const FOREIGN_KEY_VIOLATION = '23503';
 
 const findOnChain = (error: unknown, key: 'code' | 'constraint'): string | undefined => {
   let current: unknown = error;

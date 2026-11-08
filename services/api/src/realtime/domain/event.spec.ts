@@ -1,7 +1,9 @@
 import {
   MAX_PAYLOAD_BYTES,
   decodeEvent,
+  decodeRevocation,
   encodeEvent,
+  encodeRevocation,
   formatSse,
   reconnectDelayMs,
 } from './event.js';
@@ -51,4 +53,20 @@ describe('reconnectDelayMs', () => {
     expect(reconnectDelayMs(20, () => 1)).toBe(10_000);
     expect(reconnectDelayMs(20, () => 0)).toBe(5000);
   });
+});
+
+describe('revocation codec (D4)', () => {
+  it('round-trips a revocation for one person and for a whole restaurant', () => {
+    const one = { restaurantId: 'r1', userId: 'u1' };
+    const all = { restaurantId: 'r1', userId: null };
+    expect(decodeRevocation(encodeRevocation(one))).toEqual(one);
+    expect(decodeRevocation(encodeRevocation(all))).toEqual(all);
+  });
+
+  it.each([undefined, '', 'not json', '[]', '{"restaurantId":1}', '{"restaurantId":"r"}'])(
+    'drops the malformed payload %s',
+    (payload) => {
+      expect(decodeRevocation(payload)).toBeUndefined();
+    },
+  );
 });

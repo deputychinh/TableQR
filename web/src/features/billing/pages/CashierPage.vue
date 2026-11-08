@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { CircleCheck, Info, ReceiptText, TriangleAlert } from 'lucide-vue-next';
+import { Info, ReceiptText, TriangleAlert } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
 import StaffShell from '@/app/layouts/StaffShell.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
@@ -12,6 +12,7 @@ import LoadingState from '@/components/LoadingState.vue';
 import TextAreaField from '@/components/TextAreaField.vue';
 import { useStream } from '@/composables/useStream';
 import { formatVnd } from '@/features/menu/price';
+import { useToastStore } from '@/stores/toast';
 import CashierSessionCard from '../components/CashierSessionCard.vue';
 import {
   FLOOR_STREAM,
@@ -31,7 +32,7 @@ const CLOSE_REASON_MAX = 200;
 const { t } = useI18n();
 const overview = ref<CashierOverview>();
 const loadFailed = ref(false);
-const notice = ref<string>();
+const toast = useToastStore();
 const paying = ref<{ session: CashierSession; method: PaymentMethod }>();
 const closing = ref<CashierSession>();
 const reason = ref('');
@@ -67,16 +68,17 @@ const describe = (error: unknown): string => {
 };
 
 const makeBill = async (session: CashierSession) => {
-  notice.value = undefined;
   actionError.value = undefined;
   try {
     const view = await requestStaffBill(session.sessionId);
     if (view.bill?.status === 'open') {
-      notice.value = t('billing.cashier.billReady', {
-        table: session.tableName,
-        amount: formatVnd(view.bill.amountVnd),
-        code: view.bill.code,
-      });
+      toast.show(
+        t('billing.cashier.billReady', {
+          table: session.tableName,
+          amount: formatVnd(view.bill.amountVnd),
+          code: view.bill.code,
+        }),
+      );
     }
   } catch (error: unknown) {
     actionError.value = describe(error);
@@ -97,10 +99,12 @@ const confirmPay = async () => {
   actionError.value = undefined;
   try {
     await payBill(bill.id, target.method);
-    notice.value = t('billing.cashier.paid', {
-      amount: formatVnd(bill.amountVnd),
-      table: target.session.tableName,
-    });
+    toast.show(
+      t('billing.cashier.paid', {
+        amount: formatVnd(bill.amountVnd),
+        table: target.session.tableName,
+      }),
+    );
     paying.value = undefined;
   } catch (error: unknown) {
     actionError.value = describe(error);
@@ -129,7 +133,7 @@ const confirmClose = async () => {
   actionError.value = undefined;
   try {
     await closeSession(target.sessionId, target.dueVnd > 0 ? text : undefined);
-    notice.value = t('billing.cashier.closed', { table: target.tableName });
+    toast.show(t('billing.cashier.closed', { table: target.tableName }));
     closing.value = undefined;
   } catch (error: unknown) {
     if (error instanceof ApiError && error.code === 'CLOSE_REASON_REQUIRED') {
@@ -165,10 +169,6 @@ const payBillOf = computed(() => paying.value?.session.bill);
         {{ t('billing.cashier.noBank') }}
       </p>
 
-      <p v-if="notice" class="cashier-page__notice" role="status">
-        <CircleCheck :size="20" aria-hidden="true" />
-        {{ notice }}
-      </p>
       <FormAlert v-if="actionError && !paying && !closing" :message="actionError" />
 
       <LoadingState v-if="!overview && !loadFailed" :label="t('billing.cashier.loading')" />
@@ -283,8 +283,7 @@ const payBillOf = computed(() => paying.value?.session.bill);
   color: var(--color-text-muted);
 }
 
-.cashier-page__banner,
-.cashier-page__notice {
+.cashier-page__banner {
   display: flex;
   gap: var(--space-2);
   align-items: flex-start;
@@ -294,8 +293,7 @@ const payBillOf = computed(() => paying.value?.session.bill);
   background: var(--color-surface-muted);
 }
 
-.cashier-page__banner > svg,
-.cashier-page__notice > svg {
+.cashier-page__banner > svg {
   flex: none;
 }
 
@@ -303,11 +301,6 @@ const payBillOf = computed(() => paying.value?.session.bill);
   font-weight: var(--font-weight-medium);
   color: var(--color-warning);
   background: var(--color-warning-bg);
-}
-
-.cashier-page__notice {
-  color: var(--color-primary-hover);
-  background: var(--color-success-bg);
 }
 
 .cashier-page__list {

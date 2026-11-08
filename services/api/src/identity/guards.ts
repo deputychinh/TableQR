@@ -10,6 +10,8 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
+import { CLOCK, type Clock } from '../common/clock.js';
+import { FixedWindowLimiter } from '../common/http/rate-limit.js';
 import { SETTINGS, type Settings } from '../config/settings.js';
 import { AuthService, type Principal, type StaffRole } from './auth.service.js';
 import { STAFF_COOKIE, readCookie } from './session.cookie.js';
@@ -71,5 +73,36 @@ export class OriginGuard implements CanActivate {
     }
     if (this.settings.TQR_WEB_ORIGINS.includes(origin)) return true;
     throw new DomainError('BAD_ORIGIN', 403);
+  }
+}
+
+const AUTH_RATE_WINDOW_MS = 60_000;
+
+/**
+ * Per-address limit on sign-up and sign-in (default 20 / minute, `TQR_AUTH_RATE_LIMIT_PER_MINUTE`),
+ * on top of the per-email throttle (AC4). In memory, one process: see docs/security.md. Behind a
+ * reverse proxy Express must trust it (`trust proxy`) or every client shares the proxy's address.
+ */
+@Injectable()
+export class AuthRateLimitGuard implements CanActivate {
+  private readonly limiter: FixedWindowLimiter;
+
+  constructor(
+    @Inject(SETTINGS) settings: Settings,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {
+    this.limiter = new FixedWindowLimiter(
+      settings.TQR_AUTH_RATE_LIMIT_PER_MINUTE,
+      AUTH_RATE_WINDOW_MS,
+    );
+  }
+
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<Request>();
+    const key = request.ip ?? request.socket.remoteAddress ?? 'unknown';
+    if (this.limiter.hit(key, this.clock.now().getTime())) return true;
+    throw new DomainError(ErrorCode.TooManyRequests, 429, {
+      detail: 'Bạn thử quá nhiều lần. Hãy đợi một phút rồi thử lại.',
+    });
   }
 }

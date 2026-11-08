@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import {
@@ -11,20 +12,47 @@ import {
   UtensilsCrossed,
 } from 'lucide-vue-next';
 import BrandMark from '@/components/BrandMark.vue';
+import ToastRegion from '@/components/ToastRegion.vue';
+import { roleHome } from '@/features/roles/role-home';
+import { ROLE_ICONS } from '@/features/roles/role-icons';
 import { useSessionStore } from '@/stores/session';
+import { useReachable } from './reachable';
 
 const { t } = useI18n();
 const session = useSessionStore();
 const router = useRouter();
+const reachable = useReachable();
 
-const nav = [
-  { to: '/quan-ly', label: 'nav.overview', icon: LayoutDashboard, exact: true },
+const sections = [
   { to: '/quan-ly/thuc-don', label: 'nav.menu', icon: UtensilsCrossed, exact: false },
   { to: '/quan-ly/ban', label: 'nav.tables', icon: QrCode, exact: false },
   { to: '/dat-ban', label: 'booking.nav', icon: CalendarDays, exact: false },
   { to: '/quan-ly/nhan-vien', label: 'nav.staff', icon: Users, exact: false },
   { to: '/quan-ly/cai-dat', label: 'nav.settings', icon: Settings, exact: false },
 ] as const;
+
+/**
+ * Only what the signed-in role can open (D5): the owner sees every section; floor staff who reach
+ * an owner-area page (Bàn & QR) see their own home first, then the sections open to them.
+ */
+const nav = computed(() => {
+  const role = session.me?.user.role;
+  const home =
+    role === undefined || role === 'owner'
+      ? { to: '/quan-ly', label: t('nav.overview'), icon: LayoutDashboard, exact: true }
+      : {
+          to: roleHome(role),
+          label: t(`roles.names.${role}`),
+          icon: ROLE_ICONS[role],
+          exact: true,
+        };
+  return [
+    home,
+    ...sections
+      .filter((section) => reachable(section.to))
+      .map((section) => ({ ...section, label: t(section.label) })),
+  ];
+});
 
 const signOut = async () => {
   await session.signOut();
@@ -52,12 +80,13 @@ const signOut = async () => {
         :active-class="item.exact ? '' : 'owner-shell__link--active'"
       >
         <component :is="item.icon" :size="22" aria-hidden="true" />
-        <span class="owner-shell__link-label">{{ t(item.label) }}</span>
+        <span class="owner-shell__link-label">{{ item.label }}</span>
       </RouterLink>
     </nav>
     <main class="owner-shell__main">
       <slot />
     </main>
+    <ToastRegion />
   </div>
 </template>
 

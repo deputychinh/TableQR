@@ -10,11 +10,9 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { z } from 'zod';
-import { ErrorCode } from '../common/enums/error-code.enum.js';
-import { DomainError } from '../common/errors/domain.error.js';
+import { uuidParam } from '../common/http/params.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import {
@@ -34,25 +32,11 @@ import {
   type StaffMenu,
   type Station,
 } from './menu.service.js';
-import { notFound } from './menu.errors.js';
 
 /** Who may do what with the menu (story TQR-006, "Roles"). */
 const MENU_READERS = ['owner', 'cashier', 'waiter', 'kitchen'] as const;
 /** The kitchen knows first when a dish runs out, so it may flip availability. */
 const AVAILABILITY_WRITERS = ['owner', 'kitchen'] as const;
-
-const uuid = z.uuid();
-
-/** A malformed id is just an id that does not exist here: 404, never 500 or 422. */
-const idParam = (value: string): string => {
-  if (!uuid.safeParse(value).success) throw notFound();
-  return value;
-};
-
-const tenantOf = (principal: Principal): TenantId => {
-  if (!principal.tenantId) throw new DomainError(ErrorCode.Forbidden, 403);
-  return principal.tenantId;
-};
 
 @Controller('menu')
 @UseGuards(StaffGuard)
@@ -80,7 +64,7 @@ export class MenuController {
   ): Promise<Station> {
     return this.menu.updateStation(
       tenantOf(principal),
-      idParam(id),
+      uuidParam(id),
       parseBody(updateStationSchema, body),
     );
   }
@@ -88,7 +72,7 @@ export class MenuController {
   @Delete('stations/:id')
   @HttpCode(204)
   deleteStation(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<void> {
-    return this.menu.deleteStation(tenantOf(principal), idParam(id));
+    return this.menu.deleteStation(tenantOf(principal), uuidParam(id));
   }
 
   @Post('categories')
@@ -108,7 +92,7 @@ export class MenuController {
   ): Promise<Category> {
     return this.menu.updateCategory(
       tenantOf(principal),
-      idParam(id),
+      uuidParam(id),
       parseBody(updateCategorySchema, body),
     );
   }
@@ -121,14 +105,14 @@ export class MenuController {
     @Body() body: unknown,
   ): Promise<{ categories: Category[] }> {
     const { direction } = parseBody(moveCategorySchema, body);
-    const categories = await this.menu.moveCategory(tenantOf(principal), idParam(id), direction);
+    const categories = await this.menu.moveCategory(tenantOf(principal), uuidParam(id), direction);
     return { categories };
   }
 
   @Delete('categories/:id')
   @HttpCode(204)
   deleteCategory(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<void> {
-    return this.menu.deleteCategory(tenantOf(principal), idParam(id));
+    return this.menu.deleteCategory(tenantOf(principal), uuidParam(id));
   }
 
   @Post('items')
@@ -145,7 +129,7 @@ export class MenuController {
   ): Promise<MenuItem> {
     return this.menu.updateItem(
       tenantOf(principal),
-      idParam(id),
+      uuidParam(id),
       parseBody(updateItemSchema, body),
     );
   }
@@ -158,12 +142,12 @@ export class MenuController {
     @Body() body: unknown,
   ): Promise<MenuItem> {
     const { available } = parseBody(availabilitySchema, body);
-    return this.menu.setAvailability(tenantOf(principal), idParam(id), available);
+    return this.menu.setAvailability(tenantOf(principal), uuidParam(id), available);
   }
 
   @Delete('items/:id')
   @HttpCode(204)
   deleteItem(@CurrentPrincipal() principal: Principal, @Param('id') id: string): Promise<void> {
-    return this.menu.deleteItem(tenantOf(principal), idParam(id));
+    return this.menu.deleteItem(tenantOf(principal), uuidParam(id));
   }
 }

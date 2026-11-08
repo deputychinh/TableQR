@@ -288,9 +288,7 @@ describe('CashierPage', () => {
     expect(sheet.textContent).toContain('Bàn 3: 115.000\u00a0₫, mã hoá đơn 7F3K2.');
     expect(sheet.textContent).toContain('TQR 7F3K2');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Đã nhận 115.000\u00a0₫' }));
-    expect((await screen.findByRole('status')).textContent).toContain(
-      'Đã ghi nhận 115.000\u00a0₫ cho Bàn 3.',
-    );
+    expect(await screen.findByText(/Đã ghi nhận 115\.000\s₫ cho Bàn 3\./)).toBeTruthy();
     expect(calls.find((c) => c.path === '/api/bills/b1/pay')?.body).toEqual({ method: 'transfer' });
     expect(await screen.findByText(/Chuyển khoản · Lan/)).toBeTruthy();
     expect(screen.getAllByText('Đã thanh toán').length).toBeGreaterThan(0);
@@ -326,7 +324,7 @@ describe('CashierPage', () => {
       'Khách quen',
     );
     await userEvent.click(within(sheet).getByRole('button', { name: 'Đóng bàn' }));
-    expect((await screen.findByRole('status')).textContent).toContain('Đã đóng Bàn 3.');
+    expect(await screen.findByText(/Đã đóng Bàn 3\./)).toBeTruthy();
     expect(calls.find((c) => c.path === '/api/sessions/s1/close')?.body).toEqual({
       reason: 'Khách quen',
     });
@@ -377,9 +375,7 @@ describe('CashierPage', () => {
     expect(screen.getByText('Hoá đơn đã thay đổi')).toBeTruthy();
     expect(screen.getByText('Chưa có hoá đơn')).toBeTruthy();
     await userEvent.click(buttons[0] as HTMLElement);
-    expect((await screen.findByRole('status')).textContent).toContain(
-      'Hoá đơn Bàn 3: 115.000\u00a0₫, mã 7F3K2.',
-    );
+    expect(await screen.findByText(/Hoá đơn Bàn 3: 115\.000\s₫, mã 7F3K2\./)).toBeTruthy();
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ sessionId: 's1' });
   });
 

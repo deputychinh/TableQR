@@ -9,6 +9,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import StatusChip from '@/components/StatusChip.vue';
+import { useToastStore } from '@/stores/toast';
 import ReadyTableCard from '../components/ReadyTableCard.vue';
 import { serveItem, type FloorTable, type ReadyItem } from '../services/serving.service';
 import { useReadyBoard } from '../useReadyBoard';
@@ -21,18 +22,17 @@ const withReady = computed(() => board.value.tables.filter((x) => x.ready.length
 const others = computed(() => board.value.tables.filter((x) => x.ready.length === 0));
 
 const busyId = ref<string | undefined>();
-const message = ref('');
+const toast = useToastStore();
 
 const serve = async (table: FloorTable, item: ReadyItem) => {
   busyId.value = item.id;
-  message.value = '';
   try {
     const change = await serveItem(item);
     applyChange({ itemId: change.id, status: change.status, version: change.version });
-    message.value = t('serving.served', { dish: item.name, table: table.tableName });
+    toast.show(t('serving.served', { dish: item.name, table: table.tableName }));
   } catch (error: unknown) {
     const stale = error instanceof ApiError && (error.status === 409 || error.status === 404);
-    message.value = t(stale ? 'serving.errors.changed' : 'serving.errors.failed');
+    toast.show(t(stale ? 'serving.errors.changed' : 'serving.errors.failed'), 'error');
     if (stale) await refetch();
   } finally {
     busyId.value = undefined;
@@ -50,9 +50,9 @@ const serve = async (table: FloorTable, item: ReadyItem) => {
           {{ t('serving.heldOrders') }}
         </RouterLink>
       </div>
-      <p class="serving-page__message" role="status">
+      <!-- Live connection state only; action outcomes go to the shell's toast. -->
+      <p class="serving-page__message" aria-live="polite">
         <template v-if="status === 'reconnecting'">{{ t('serving.live.reconnecting') }}</template>
-        <template v-else>{{ message }}</template>
       </p>
       <LoadingState v-if="!loaded && !failed" :label="t('serving.loading')" :rows="3" />
       <ErrorState

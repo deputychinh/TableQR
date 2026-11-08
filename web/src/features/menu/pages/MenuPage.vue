@@ -9,9 +9,11 @@ import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FormAlert from '@/components/FormAlert.vue';
+import IconButton from '@/components/IconButton.vue';
 import LoadingState from '@/components/LoadingState.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import { useSessionStore } from '@/stores/session';
+import { useToastStore } from '@/stores/toast';
 import { menuApi } from '../api';
 import CategorySheet from '../components/CategorySheet.vue';
 import ItemSheet from '../components/ItemSheet.vue';
@@ -35,6 +37,7 @@ type Sheet =
 
 const { t } = useI18n();
 const session = useSessionStore();
+const toast = useToastStore();
 const state = useMenu();
 const { status, categories, stations, itemCount, stationName } = state;
 
@@ -64,19 +67,30 @@ const addItem = (categoryId?: string) => {
 };
 
 const onItemSaved = (item: MenuItem) => {
+  const edited = sheet.value?.kind === 'item' && sheet.value.item !== undefined;
   state.putItem(item);
   close();
+  toast.show(t(edited ? 'menu.toast.itemSaved' : 'menu.toast.itemCreated', { name: item.name }));
 };
 
 const onCategorySaved = (category: Category) => {
-  const first = sheet.value?.kind === 'category' && sheet.value.first;
+  const current = sheet.value?.kind === 'category' ? sheet.value : undefined;
   state.putCategory(category);
-  sheet.value = first ? { kind: 'item', categoryId: category.id } : null;
+  sheet.value = current?.first ? { kind: 'item', categoryId: category.id } : null;
+  toast.show(
+    t(current?.category ? 'menu.toast.categorySaved' : 'menu.toast.categoryCreated', {
+      name: category.name,
+    }),
+  );
 };
 
 const onStationSaved = (station: Station) => {
+  const edited = sheet.value?.kind === 'station' && sheet.value.station !== undefined;
   state.putStation(station);
   close();
+  toast.show(
+    t(edited ? 'menu.toast.stationSaved' : 'menu.toast.stationCreated', { name: station.name }),
+  );
 };
 
 /** A row someone else removed (404) reloads the menu; other failures keep the screen as it was. */
@@ -90,6 +104,7 @@ const toggle = async (item: MenuItem, available: boolean) => {
   notice.value = undefined;
   try {
     await state.setAvailability(item, available);
+    toast.show(t(available ? 'menu.toast.available' : 'menu.toast.soldOut', { name: item.name }));
   } catch (error: unknown) {
     await reportFailure(error, { key: 'menu.errors.toggleFailed', params: { name: item.name } });
   }
@@ -137,6 +152,7 @@ const remove = async () => {
       state.removeStation(target.id);
     }
     close();
+    toast.show(t('menu.toast.deleted', { name: target.name }));
   } catch (error: unknown) {
     const message = describeMenuError(error, target.kind).form ?? { key: 'errors.unexpected' };
     confirmError.value = t(message.key, message.params ?? {});
@@ -206,40 +222,28 @@ const remove = async () => {
                 t('menu.category.count', { n: category.items.length })
               }}</span>
               <div v-if="canEdit" class="menu-page__category-actions">
-                <button
-                  type="button"
-                  class="menu-page__icon"
+                <IconButton
+                  :icon="ArrowUp"
                   :disabled="index === 0"
-                  :aria-label="t('menu.category.moveUp', { name: category.name })"
+                  :label="t('menu.category.moveUp', { name: category.name })"
                   @click="move(category, 'up')"
-                >
-                  <ArrowUp :size="18" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  class="menu-page__icon"
+                />
+                <IconButton
+                  :icon="ArrowDown"
                   :disabled="index === categories.length - 1"
-                  :aria-label="t('menu.category.moveDown', { name: category.name })"
+                  :label="t('menu.category.moveDown', { name: category.name })"
                   @click="move(category, 'down')"
-                >
-                  <ArrowDown :size="18" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  class="menu-page__icon"
-                  :aria-label="t('menu.category.edit', { name: category.name })"
+                />
+                <IconButton
+                  :icon="Pencil"
+                  :label="t('menu.category.edit', { name: category.name })"
                   @click="sheet = { kind: 'category', category }"
-                >
-                  <Pencil :size="18" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  class="menu-page__icon"
-                  :aria-label="t('menu.category.remove', { name: category.name })"
+                />
+                <IconButton
+                  :icon="Trash2"
+                  :label="t('menu.category.remove', { name: category.name })"
                   @click="askRemove({ kind: 'category', id: category.id, name: category.name })"
-                >
-                  <Trash2 :size="18" aria-hidden="true" />
-                </button>
+                />
               </div>
             </header>
             <ul v-if="category.items.length > 0" class="menu-page__items">
@@ -334,11 +338,8 @@ const remove = async () => {
 }
 
 .menu-page__header {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: var(--space-3);
-  align-items: flex-end;
-  justify-content: space-between;
 }
 
 .menu-page__title {
@@ -354,15 +355,15 @@ const remove = async () => {
 
 .menu-page__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column-reverse;
   gap: var(--space-2);
-  align-items: center;
 }
 
 .menu-page__preview {
   display: inline-flex;
   gap: var(--space-2);
   align-items: center;
+  justify-content: center;
   min-block-size: var(--target-min);
   padding-inline: var(--space-3);
   border: 1px solid var(--color-border-strong);
@@ -380,6 +381,16 @@ const remove = async () => {
 }
 
 @media (width >= 840px) {
+  .menu-page__header {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .menu-page__actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .menu-page__layout {
     grid-template-columns: minmax(0, 1fr) 20rem;
   }
@@ -425,29 +436,6 @@ const remove = async () => {
 .menu-page__category-actions {
   display: flex;
   margin-inline-start: auto;
-}
-
-.menu-page__icon {
-  display: grid;
-  place-items: center;
-  inline-size: var(--target-min);
-  block-size: var(--target-min);
-  border: 0;
-  border-radius: var(--radius-2);
-  color: var(--color-text);
-  background: transparent;
-  cursor: pointer;
-}
-
-.menu-page__icon:disabled {
-  cursor: not-allowed;
-  opacity: 0.35;
-}
-
-@media (hover: hover) {
-  .menu-page__icon:hover:not(:disabled) {
-    background: var(--color-surface);
-  }
 }
 
 .menu-page__items {

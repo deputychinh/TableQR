@@ -9,6 +9,7 @@ import FormAlert from '@/components/FormAlert.vue';
 import FormField from '@/components/FormField.vue';
 import { describeAuthError, type FieldErrors } from '@/features/auth/errors';
 import RadioCardGroup from '@/components/RadioCardGroup.vue';
+import { useToastStore } from '@/stores/toast';
 import {
   NEW_STAFF_ROLES,
   createStaff,
@@ -21,6 +22,7 @@ type FieldName = 'displayName' | 'email' | 'password' | 'role';
 
 const { t } = useI18n();
 const router = useRouter();
+const toast = useToastStore();
 const form = reactive<{
   displayName: string;
   email: string;
@@ -82,7 +84,9 @@ const submit = async () => {
   busy.value = true;
   try {
     const member = await createStaff({ ...form, role: form.role });
-    await router.push({ path: '/quan-ly/nhan-vien', state: { added: nameOf(member) } });
+    await router.push('/quan-ly/nhan-vien');
+    // After the list page is up, so its live region announces the outcome.
+    toast.show(t('staff.added', { name: nameOf(member) }));
   } catch (error: unknown) {
     const described = describeAuthError(error, FIELD_KEYS);
     fieldErrors.value = described.fields;

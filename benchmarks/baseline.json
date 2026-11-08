@@ -11,8 +11,8 @@
       "rps": 3673.8,
       "error_rate": 0
     },
-    "guest-menu-cold-load": {
-      "workload": "guest-menu-cold-load",
+    "landing-cold-load": {
+      "workload": "landing-cold-load",
       "lcp_ms": 1869,
       "performance_score": 1
     },

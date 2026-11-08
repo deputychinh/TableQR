@@ -87,7 +87,7 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
   const captureEvents = (restaurantId: string, topics: string[]) => {
     const events: RealtimeEvent[] = [];
     const stop = hub.subscribe(restaurantId, topics, (event) => {
-      if (event !== 'resync') events.push(event);
+      if (event !== 'resync' && event !== 'revoked') events.push(event);
     });
     return { events, stop };
   };

@@ -42,6 +42,39 @@ export const decodeEvent = (payload: string | undefined): RealtimeEvent | undefi
   return undefined;
 };
 
+/**
+ * Ends open streams (D4): every stream of a restaurant (suspension) or of one person (disabled,
+ * new password, new role). A separate channel, so no topic subscriber can receive it by mistake.
+ */
+export interface Revocation {
+  restaurantId: string;
+  /** null = every person of the restaurant */
+  userId: string | null;
+}
+
+export const REVOKE_CHANNEL = 'tqr_revoke';
+
+export const encodeRevocation = (revocation: Revocation): string =>
+  JSON.stringify({ restaurantId: revocation.restaurantId, userId: revocation.userId });
+
+/** Parses a revocation payload; anything malformed is dropped (returns undefined). */
+export const decodeRevocation = (payload: string | undefined): Revocation | undefined => {
+  if (!payload) return undefined;
+  try {
+    const value: unknown = JSON.parse(payload);
+    if (
+      isRecord(value) &&
+      typeof value.restaurantId === 'string' &&
+      (typeof value.userId === 'string' || value.userId === null)
+    ) {
+      return { restaurantId: value.restaurantId, userId: value.userId };
+    }
+  } catch {
+    // malformed payload: dropped, the hub logs it without its content
+  }
+  return undefined;
+};
+
 /** Server-Sent Events wire format for one event. */
 export const formatSse = (event: string, data: unknown, id?: string): string =>
   `${id === undefined ? '' : `id: ${id}\n`}event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

@@ -3,17 +3,17 @@ import { and, asc, count, eq } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
-import type { TenantId } from '../common/tenant.js';
+import { asTenantId, type TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
+import { isUniqueViolation } from '../db/pg-error.js';
 import { restaurants } from '../db/schema.js';
+import { RestaurantStatusService } from '../identity/restaurant-status.service.js';
 import { isWellFormedQrToken, newQrToken } from './domain/qr-token.js';
 import { TableErrorCode } from './domain/table-error-code.js';
 import { TABLES_PER_RESTAURANT_MAX } from './domain/table-rules.js';
 import { diningTables, retiredQrTokens } from './tables.schema.js';
 
-const UNIQUE_VIOLATION = '23505';
 const NAME_CONSTRAINT = 'dining_tables_tenant_name_key';
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface TableView {
   id: string;
@@ -58,16 +58,6 @@ const toView = (row: Row): TableView => ({
   createdAt: row.createdAt.toISOString(),
 });
 
-const dbErrorField = (error: unknown, field: 'code' | 'constraint'): string | undefined => {
-  let current: unknown = error;
-  while (current instanceof Error) {
-    const value: unknown = (current as Error & Record<string, unknown>)[field];
-    if (typeof value === 'string') return value;
-    current = current.cause;
-  }
-  return undefined;
-};
-
 const tableNotFound = (): DomainError => new DomainError(ErrorCode.NotFound, 404);
 
 const nameTaken = (): DomainError =>
@@ -78,21 +68,20 @@ const nameTaken = (): DomainError =>
 
 /** Maps the name unique index to 409; everything else propagates. */
 const rethrowNameClash = (error: unknown): never => {
-  if (
-    dbErrorField(error, 'code') === UNIQUE_VIOLATION &&
-    dbErrorField(error, 'constraint') === NAME_CONSTRAINT
-  ) {
-    throw nameTaken();
-  }
+  if (isUniqueViolation(error, NAME_CONSTRAINT)) throw nameTaken();
   throw error;
 };
 
-/** Tables and their QR tokens. Every query is scoped by the caller's tenant (ADR 0003). */
+/**
+ * Tables and their QR tokens. Every query is scoped by the caller's tenant (ADR 0003); ids arrive
+ * already parsed as UUIDs by the controller.
+ */
 @Injectable()
 export class TablesService {
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly restaurantStatus: RestaurantStatusService,
   ) {}
 
   async list(tenant: TenantId): Promise<TableView[]> {
@@ -141,7 +130,6 @@ export class TablesService {
   }
 
   async update(tenant: TenantId, id: string, patch: Partial<TableInput>): Promise<TableView> {
-    if (!UUID_PATTERN.test(id)) throw tableNotFound();
     try {
       const [row] = await this.db
         .update(diningTables)
@@ -156,7 +144,6 @@ export class TablesService {
   }
 
   async remove(tenant: TenantId, id: string): Promise<void> {
-    if (!UUID_PATTERN.test(id)) throw tableNotFound();
     const deleted = await this.db
       .delete(diningTables)
       .where(and(eq(diningTables.restaurantId, tenant), eq(diningTables.id, id)))
@@ -187,7 +174,8 @@ export class TablesService {
 
   /**
    * Guest entry (AC8, AC10, AC11): the token alone identifies restaurant and table.
-   * Unknown, malformed or suspended-restaurant tokens are all "not found".
+   * Unknown or malformed tokens are "not found"; any code of a suspended restaurant answers 403
+   * `RESTAURANT_SUSPENDED` (AC54), so the guest reads "Nhà hàng tạm ngưng".
    */
   async resolveGuestToken(token: string): Promise<GuestTableView> {
     if (!isWellFormedQrToken(token)) throw guestTableNotFound();
@@ -196,31 +184,29 @@ export class TablesService {
         tableId: diningTables.id,
         tableName: diningTables.name,
         seats: diningTables.seats,
+        restaurantId: restaurants.id,
         restaurantName: restaurants.name,
         slug: restaurants.slug,
-        status: restaurants.status,
       })
       .from(diningTables)
       .innerJoin(restaurants, eq(restaurants.id, diningTables.restaurantId))
       .where(eq(diningTables.qrToken, token))
       .limit(1);
     if (current) {
-      if (current.status !== 'active') throw guestTableNotFound();
+      await this.restaurantStatus.assertActive(asTenantId(current.restaurantId));
       return {
         restaurant: { name: current.restaurantName, slug: current.slug },
         table: { id: current.tableId, name: current.tableName, seats: current.seats },
       };
     }
     const [retired] = await this.db
-      .select({ status: restaurants.status })
+      .select({ restaurantId: retiredQrTokens.restaurantId })
       .from(retiredQrTokens)
-      .innerJoin(restaurants, eq(restaurants.id, retiredQrTokens.restaurantId))
       .where(eq(retiredQrTokens.qrToken, token))
       .limit(1);
-    if (retired?.status === 'active') {
-      throw new DomainError(TableErrorCode.QrExpired, 410, { detail: 'Mã QR đã hết hạn' });
-    }
-    throw guestTableNotFound();
+    if (!retired) throw guestTableNotFound();
+    await this.restaurantStatus.assertActive(asTenantId(retired.restaurantId));
+    throw new DomainError(TableErrorCode.QrExpired, 410, { detail: 'Mã QR đã hết hạn' });
   }
 
   private async findOwn(
@@ -229,7 +215,6 @@ export class TablesService {
     id: string,
     lock = false,
   ): Promise<Row> {
-    if (!UUID_PATTERN.test(id)) throw tableNotFound();
     const query = executor
       .select(columns)
       .from(diningTables)

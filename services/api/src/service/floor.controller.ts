@@ -10,10 +10,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { ErrorCode } from '../common/enums/error-code.enum.js';
-import { DomainError } from '../common/errors/domain.error.js';
 import { parseBody } from '../common/http/validate.js';
-import type { TenantId } from '../common/tenant.js';
+import { tenantOf } from '../common/tenant.js';
 import type { Principal } from '../identity/auth.service.js';
 import { CurrentPrincipal, Roles, StaffGuard } from '../identity/guards.js';
 import { OrdersService, type OrderView, type ReviewOrder } from './orders.service.js';
@@ -25,11 +23,6 @@ const FLOOR = ['owner', 'cashier', 'waiter'] as const;
 const partySize = z.number().int();
 const openSchema = z.object({ tableId: z.string().max(64), partySize }).strict();
 const partySizeSchema = z.object({ partySize }).strict();
-
-const tenantOf = (principal: Principal): TenantId => {
-  if (principal.tenantId === null) throw new DomainError(ErrorCode.Forbidden, 403);
-  return principal.tenantId;
-};
 
 /** Staff open a table for a party and change its size (S6, AC20). */
 @Controller('sessions')

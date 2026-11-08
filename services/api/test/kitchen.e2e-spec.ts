@@ -447,7 +447,9 @@ describe('kitchen queue and serving (e2e, real Postgres) — TQR-014/015', () =>
       const unsubscribe = t.app
         .get(RealtimeHub)
         .subscribe(a.id, [`session:${row?.sessionId ?? ''}`], (event) => {
-          if (event !== 'resync') sessionEvents.push({ event, at: performance.now() });
+          if (event !== 'resync' && event !== 'revoked') {
+            sessionEvents.push({ event, at: performance.now() });
+          }
         });
       const station = await openSse(`${base}/api/stream/station/${a.floor.stationId}`, a.kitchen);
       const floor = await openSse(`${base}/api/stream/floor`, a.waiter);
