@@ -1,5 +1,16 @@
 import type { NextFunction, Request, Response } from 'express';
-import { API_SECURITY_HEADERS, HSTS_VALUE, securityHeadersMiddleware } from './security-headers.js';
+import { securityHeadersMiddleware } from './security-headers.js';
+
+/** TQR-022 H1/H2 as literals, not the constants under test (review round 1). */
+const API_SECURITY_HEADERS = {
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'same-origin',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+};
+const HSTS_VALUE = 'max-age=63072000; includeSubDomains';
 
 const run = (hsts: boolean) => {
   const set = new Map<string, string>();

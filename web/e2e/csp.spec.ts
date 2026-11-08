@@ -7,13 +7,28 @@ const HEADERS = JSON.parse(
   readFileSync(new URL('../../deploy/security-headers.json', import.meta.url), 'utf8'),
 ) as Record<string, string>;
 
+/** TQR-022 H3 as literals, so a header dropped from the JSON file fails too (review round 1). */
+const PINNED: Record<string, string> = {
+  'Content-Security-Policy':
+    "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'same-origin',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+};
+
+test('the SPA header file holds exactly the six pinned headers (TQR-022)', () => {
+  expect(HEADERS).toEqual(PINNED);
+});
+
 test('the preview serves the production header set on every SPA route (TQR-022)', async ({
   page,
 }) => {
   for (const path of ['/', '/quan-ly/cai-dat', '/t/khong-co-ma']) {
     const response = await page.goto(path);
     const headers = response?.headers() ?? {};
-    for (const [name, value] of Object.entries(HEADERS)) {
+    for (const [name, value] of Object.entries(PINNED)) {
       expect(headers[name.toLowerCase()], `${path} ${name}`).toBe(value);
     }
     expect(headers['x-powered-by'], path).toBeUndefined();

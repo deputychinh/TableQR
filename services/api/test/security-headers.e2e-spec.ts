@@ -1,13 +1,21 @@
 import type { AddressInfo } from 'node:net';
 import request from 'supertest';
-import { API_SECURITY_HEADERS, HSTS_VALUE } from '../src/common/http/security-headers.js';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, signUp } from './support/http.js';
 
-/** What every API response must carry (TQR-022); header names compared in lower case. */
-const EXPECTED = Object.fromEntries(
-  Object.entries(API_SECURITY_HEADERS).map(([name, value]) => [name.toLowerCase(), value]),
-);
+/**
+ * What every API response must carry (TQR-022 H1), as literals — never read from the constant
+ * under test, so dropping or weakening a header in the source fails here (review round 1).
+ */
+const EXPECTED = {
+  'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'same-origin',
+  'cross-origin-opener-policy': 'same-origin',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+};
+const HSTS_VALUE = 'max-age=63072000; includeSubDomains';
 
 const expectSecurityHeaders = (headers: Record<string, unknown>) => {
   expect(headers).toMatchObject(EXPECTED);
