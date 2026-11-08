@@ -3,9 +3,9 @@
 Request (verbatim): "Tôi muốn làm 1 website chạy chủ yếu trên ipad và mobile mục đích chính là cung cấp QR để dán lên các bàn ăn trong quán ăn xong r khách hàng có thể nhanh chóng đặt bàn và thanh toán luôn khi thanh toán thì sẽ là hình thức quét mã QR ở ngay bàn thông qua hình thức chuyển khoản hoặc có thể thanh toán sau khi ăn tuỳ nhưng nhìn chung là như vậy có timeline ra đồ ăn và quy trình rõ ràng để tránh trường hợp khách vào sau mà lại nhận món trước khách vào hay quy trình ví dụ bàn đi 5 người mà ra đồ ăn sai hay bàn đi 1 ngừoi mà lại order nhiều kiểu vậy hiểu ý tôi rồi chứ" + "mỗi nhà hàng nên có 1 tài khoản riêng" + "và quy cách vận hành riêng nhé"
 Path: Full — because new product, several features (multi-tenant, ordering, kitchen queue, payment, booking)
 Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 5.0 of 6 days**
-Status: done
+Status: doing
 
-**Next action:** Wait for owner feedback on the demo; next slice candidates: deploy target (hosting + domain, then TQR-022/023 before first deploy), pilot in one restaurant, PayOS/SePay adapter, TQR-024–026.
+**Next action:** Merge the review-fix branch (TQR-017/025) and the kitchen voice branch (TQR-027/028); then build TQR-029 (QR payment optional, default off); independent review of 017, 025, 027, 028, 029; release v0.6.0.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -88,6 +88,8 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 | TQR-021 | 9.5   | 9.5                                                                                                        |
 
 ## Rulings (decisions taken without asking)
+
+- 2026-11-08 Owner re-prioritised: "các tính năng thanh toán thông qua qr code là option … nhiệm vụ chính của chúng ta là order và hỗ trợ tương tác bằng giọng nói với bếp". New items: TQR-027 kitchen voice announcements (browser Speech Synthesis vi-VN, offline), TQR-028 overdue reminders (per-restaurant 5/10/15/20 min, repeat), TQR-029 QR payment as a per-restaurant option (default off; bill shows "Thanh toán tại quầy" when off). Cook voice commands (speech recognition) deferred as TQR-030 — browser vi-VN recognition on iPad needs Apple's servers and is unreliable in a noisy kitchen; ask the owner before building.
 
 - 2026-11-08 Web only, responsive PWA (iPad + phone first) — owner said "website"; reversible by adding native apps on the same API.
 - 2026-11-08 Multi-tenant, each restaurant self-registers; a platform-admin page can suspend a restaurant — owner answer.
