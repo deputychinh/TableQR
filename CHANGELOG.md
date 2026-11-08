@@ -20,6 +20,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Fixed
 
+- Floor staff on "Bàn & QR" no longer see owner navigation or print buttons that bounce them: the print sheet is open to owner, cashier and waiter, the owner-area navigation lists only pages the role can open, and the waiter / cashier homes link to "Bàn & QR" (TQR-007).
 - Menu caps per restaurant: 20 stations, 50 categories, 500 items → 409 `STATION_LIMIT_REACHED` / `CATEGORY_LIMIT_REACHED` / `ITEM_LIMIT_REACHED`, creation serialised per restaurant; the staff and guest menu reads stay bounded by them (TQR-006).
 - AC54 guest half: `GET /api/g/t/:token` and `GET /api/g/r/:slug/menu` answer 403 `RESTAURANT_SUSPENDED` for a suspended restaurant (was 404) and the guest table page now really shows "Nhà hàng tạm ngưng" (TQR-009).
 - The AC15 role matrix now covers the 12 staff menu endpoints and the floor stream (status only), and a test proves a guarded route without `@Roles` refuses every role (TQR-005, TQR-006, TQR-010).
