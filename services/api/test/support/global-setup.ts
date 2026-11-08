@@ -12,6 +12,12 @@ export const setup = async (): Promise<void> => {
   process.env.TQR_AUTH_RATE_LIMIT_PER_MINUTE = '100000';
   // The realtime spike opens 300 streams with one owner; the caps spec lowers these for its app.
   process.env.TQR_STREAMS_PER_USER = '1000';
+  // Guest and booking throttles: every spec calls from 127.0.0.1 with a few phones; the limit specs
+  // lower these for their own app.
+  process.env.TQR_GUEST_CHECKINS_PER_MINUTE = '100000';
+  process.env.TQR_GUEST_ORDERS_PER_10_MINUTES = '100000';
+  process.env.TQR_GUEST_BILL_REQUESTS_PER_MINUTE = '100000';
+  process.env.TQR_BOOKINGS_PER_HOUR = '100000';
   await runMigrations(container.getConnectionUri());
 };
 

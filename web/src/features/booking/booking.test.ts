@@ -148,6 +148,68 @@ describe('guest booking page', () => {
     );
   });
 
+  it('TQR-020 keeps the chosen time when the party size changes and it is still free', async () => {
+    fakeApi({ 'GET /api/g/r/quan-ngon/slots': () => jsonResponse(slots()) });
+    await renderGuest();
+    const time = await screen.findByLabelText<HTMLSelectElement>('Giờ đến');
+    await userEvent.selectOptions(time, '19:00');
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm một khách' }));
+    await waitFor(() => expect(screen.queryByText('Đang xem giờ còn trống…')).toBeNull());
+    const after = await screen.findByLabelText<HTMLSelectElement>('Giờ đến');
+    expect(after.value).toBe('19:00');
+    expect(screen.queryByText(/không còn bàn/u)).toBeNull();
+  });
+
+  it('TQR-020 never swaps a chosen time silently: says it is gone and asks for a new one', async () => {
+    const calls = fakeApi({
+      'GET /api/g/r/quan-ngon/slots': (call) =>
+        jsonResponse(
+          call.path.endsWith('party=3')
+            ? slots({
+                times: [
+                  { time: '18:30', free: true },
+                  { time: '19:00', free: false },
+                ],
+              })
+            : slots(),
+        ),
+      'POST /api/g/r/quan-ngon/bookings': () => jsonResponse(guestBooking, 201),
+    });
+    await renderGuest();
+    const time = await screen.findByLabelText<HTMLSelectElement>('Giờ đến');
+    await userEvent.selectOptions(time, '19:00');
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm một khách' }));
+    expect(
+      await screen.findByText('Giờ 19:00 không còn bàn cho 3 khách. Hãy chọn giờ khác.'),
+    ).toBeTruthy();
+    const after = screen.getByLabelText<HTMLSelectElement>('Giờ đến');
+    expect(after.value).toBe('');
+    expect([...after.options].map((o) => o.value)).toEqual(['', '18:30']);
+    await fillGuest();
+    await userEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu đặt bàn' }));
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    expect(await screen.findByText('Chọn giờ đến.')).toBeTruthy();
+    await userEvent.selectOptions(after, '18:30');
+    await userEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu đặt bàn' }));
+    expect(await screen.findByRole('heading', { name: 'Đã gửi yêu cầu đặt bàn' })).toBeTruthy();
+    expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({
+      time: '18:30',
+      partySize: 3,
+    });
+  });
+
+  it('TQR-020 says plainly when this address sent too many booking requests (429)', async () => {
+    fakeApi({
+      'GET /api/g/r/quan-ngon/slots': () => jsonResponse(slots()),
+      'POST /api/g/r/quan-ngon/bookings': () => jsonResponse({ code: 'TOO_MANY_REQUESTS' }, 429),
+    });
+    await renderGuest();
+    await screen.findByLabelText('Giờ đến');
+    await fillGuest();
+    await userEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu đặt bàn' }));
+    expect(await screen.findByText(/Bạn đã gửi nhiều yêu cầu đặt bàn/u)).toBeTruthy();
+  });
+
   it('checks name and phone before sending and focuses the first wrong field', async () => {
     const calls = fakeApi({ 'GET /api/g/r/quan-ngon/slots': () => jsonResponse(slots()) });
     await renderGuest();

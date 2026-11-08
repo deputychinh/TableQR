@@ -48,7 +48,12 @@ export interface CashierSession {
   totalVnd: number;
   paidVnd: number;
   dueVnd: number;
-  bill: (Bill & { paidByName: string | null }) | null;
+  bill: (Bill & PaidBy) | null;
+}
+
+/** Who confirmed a paid bill (TQR-019): the server never sends a blank name. */
+export interface PaidBy {
+  paidByName: string | null;
 }
 
 export interface CashierOverview {

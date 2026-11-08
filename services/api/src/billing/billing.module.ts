@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RequestLimits } from '../common/http/request-limits.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import {
   BillsController,
@@ -11,7 +12,7 @@ import { BillingService } from './billing.service.js';
 @Module({
   imports: [IdentityModule],
   controllers: [BillsController, SessionCloseController, GuestBillController],
-  providers: [BillingService],
+  providers: [BillingService, RequestLimits],
   exports: [BillingService],
 })
 export class BillingModule {}

@@ -1,4 +1,5 @@
 import type { AddressInfo } from 'node:net';
+import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import request from 'supertest';
 import { DB, type Database } from '../src/db/database.module.js';
@@ -235,6 +236,155 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
     });
   });
 
+  describe('AC42 live: an open bill follows the items released after it', () => {
+    /** A restaurant with a bank account and the given rules, for the rule-specific cases. */
+    const withRules = async (patch: Partial<typeof DEFAULT_RULES>): Promise<Restaurant> => {
+      const r = await restaurant(true);
+      await http()
+        .put('/api/restaurant/settings')
+        .set('origin', ORIGIN)
+        .set('cookie', r.owner)
+        .send({ rules: { ...DEFAULT_RULES, ...patch }, bank: BANK })
+        .expect(200);
+      return r;
+    };
+    const guestOrder = (r: Restaurant, session: SessionFixture, quantity = 1) =>
+      http()
+        .post('/api/g/orders')
+        .set('origin', ORIGIN)
+        .set('cookie', session.guestCookie)
+        .set('idempotency-key', randomUUID())
+        .send({ lines: [{ menuItemId: r.floor.menuItemId, quantity, priceVnd: 50_000 }] });
+    const openBillStream = async (session: SessionFixture) => {
+      const stream = await openSse(`${base}/api/g/bill/stream`, session.guestCookie);
+      clients.push(stream);
+      await stream.waitFor((m) => m.event === 'snapshot');
+      return stream;
+    };
+    const billEvent = (stream: SseClient, status: string, billId?: string) =>
+      stream.waitFor(
+        (m) =>
+          m.event === 'delta' &&
+          m.data.type === 'bill.status' &&
+          m.data.status === status &&
+          (billId === undefined || m.data.billId === billId),
+      );
+
+    it('a guest order released after the bill supersedes it in the same transaction: the open page gets the new code, amount and QR', async () => {
+      const session = await openSession(db, a.floor);
+      await addOrder(db, a.floor, session, 'released', [{ priceVnd: 50_000, quantity: 1 }]);
+      const first = (await guestBill(session)).body.bill as { id: string; code: string };
+      const stream = await openBillStream(session);
+
+      await guestOrder(a, session).expect(201);
+
+      const superseded = await billEvent(stream, 'superseded', first.id);
+      expect(superseded.data).toMatchObject({ code: first.code, amountVnd: 50_000 });
+      const issued = await billEvent(stream, 'open');
+      expect(issued.data.amountVnd).toBe(100_000);
+      expect(issued.data.code).not.toBe(first.code);
+      // No new request needed: the bill as it stands already carries the new code and QR.
+      const view = (await http().get('/api/g/bill').set('cookie', session.guestCookie).expect(200))
+        .body;
+      expect(view.bill).toMatchObject({
+        id: issued.data.billId,
+        status: 'open',
+        amountVnd: 100_000,
+      });
+      expect(decodeVietQr(view.transfer.payload as string)).toMatchObject({
+        amountVnd: 100_000,
+        memo: `TQR ${issued.data.code as string}`,
+      });
+      const old = await post(`/api/bills/${first.id}/pay`, a.cashier, { method: 'cash' }).expect(
+        409,
+      );
+      expect(old.body.code).toBe('BILL_SUPERSEDED');
+    });
+
+    it('a held order is not billed; the waiter confirming it supersedes the open bill', async () => {
+      const r = await withRules({ orderApproval: 'every_order' });
+      const session = await openSession(db, r.floor);
+      await addOrder(db, r.floor, session, 'released', [{ priceVnd: 50_000, quantity: 1 }]);
+      const first = (await guestBill(session)).body.bill as { id: string };
+      const stream = await openBillStream(session);
+      const held = await guestOrder(r, session).expect(201);
+      expect(held.body.status).toBe('held');
+      const [stillOpen] = await db.select().from(bills).where(eq(bills.id, first.id));
+      expect(stillOpen?.status).toBe('open');
+
+      await post(`/api/orders/${held.body.id as string}/confirm`, r.waiter).expect(200);
+
+      await billEvent(stream, 'superseded', first.id);
+      expect((await billEvent(stream, 'open')).data.amountVnd).toBe(100_000);
+    });
+
+    it('pay before cooking: a second order supersedes the bill; paying the new one releases both and the order cards turn "released" live', async () => {
+      const r = await withRules({ paymentTiming: 'pay_before' });
+      const session = await openSession(db, r.floor);
+      const one = await guestOrder(r, session).expect(201);
+      expect(one.body.status).toBe('awaiting_payment');
+      const first = (await guestBill(session)).body.bill as { id: string };
+      const billStream = await openBillStream(session);
+      const orderStream = await openSse(`${base}/api/g/stream`, session.guestCookie);
+      clients.push(orderStream);
+      await orderStream.waitFor((m) => m.event === 'snapshot');
+      const two = await guestOrder(r, session).expect(201);
+      await billEvent(billStream, 'superseded', first.id);
+      const issued = await billEvent(billStream, 'open');
+      expect(issued.data.amountVnd).toBe(100_000);
+
+      await post(`/api/bills/${issued.data.billId as string}/pay`, r.cashier, {
+        method: 'transfer',
+      }).expect(200);
+
+      for (const order of [one.body.id, two.body.id]) {
+        await orderStream.waitFor(
+          (m) =>
+            m.event === 'delta' &&
+            m.data.type === 'order.status' &&
+            m.data.orderId === order &&
+            m.data.status === 'released',
+        );
+      }
+      const rows = await db.select().from(orders).where(eq(orders.sessionId, session.sessionId));
+      expect(rows.map((row) => row.status)).toEqual(['released', 'released']);
+    });
+
+    it('a payment that covers only part of what is due issues a bill for the rest, live on the guest page', async () => {
+      const session = await openSession(db, a.floor);
+      const older = await addOrder(
+        db,
+        a.floor,
+        session,
+        'awaiting_payment',
+        [{ priceVnd: 40_000, quantity: 1 }],
+        new Date(t.clock.now().getTime() - 60_000),
+      );
+      const bill = (await guestBill(session)).body.bill as { id: string };
+      // An order recorded after the bill without going through the bill (seeded straight in).
+      const later = await addOrder(
+        db,
+        a.floor,
+        session,
+        'awaiting_payment',
+        [{ priceVnd: 15_000, quantity: 1 }],
+        new Date(t.clock.now().getTime() + 60_000),
+      );
+      const stream = await openBillStream(session);
+
+      const paid = await post(`/api/bills/${bill.id}/pay`, a.cashier, { method: 'cash' }).expect(
+        200,
+      );
+
+      expect(paid.body).toMatchObject({ paidVnd: 40_000, dueVnd: 15_000 });
+      expect(paid.body.bill).toMatchObject({ status: 'open', amountVnd: 15_000 });
+      expect((await billEvent(stream, 'open')).data.amountVnd).toBe(15_000);
+      const [o1] = await db.select().from(orders).where(eq(orders.id, older.orderId));
+      const [o2] = await db.select().from(orders).where(eq(orders.id, later.orderId));
+      expect([o1?.status, o2?.status]).toEqual(['released', 'awaiting_payment']);
+    });
+  });
+
   describe('S13 cashier confirms, closes, pay before cooking', () => {
     it('AC44: the cashier confirms a transfer; who, when, method and amount are recorded and the guest sees it live', async () => {
       const session = await openSession(db, a.floor);
@@ -280,7 +430,10 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
         (s: { sessionId: string }) => s.sessionId === session.sessionId,
       );
       expect(card).toMatchObject({ totalVnd: 150_000, paidVnd: 150_000, dueVnd: 0 });
-      expect(card.bill).toMatchObject({ status: 'paid', paidByName: 'Nhân viên cashier' });
+      expect(card.bill).toMatchObject({
+        status: 'paid',
+        paidByName: 'Nhân viên cashier',
+      });
     });
 
     it('AC44: the owner can take cash', async () => {
@@ -291,6 +444,12 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
         200,
       );
       expect(body.bill).toMatchObject({ status: 'paid', method: 'cash' });
+      // TQR-019: an owner without a display name is named by role (the screen says "Chủ quán").
+      const overview = await http().get('/api/bills/overview').set('cookie', a.owner).expect(200);
+      const card = overview.body.sessions.find(
+        (s: { sessionId: string }) => s.sessionId === session.sessionId,
+      );
+      expect(card.bill).toMatchObject({ paidByName: 'Chủ quán' });
     });
 
     it('AC45: a second confirmation is refused with 409 ALREADY_PAID', async () => {

@@ -144,6 +144,55 @@ describe('guest check-in, ordering and waiter review (e2e, real Postgres)', () =
       ).toHaveLength(1);
     });
 
+    it('AC3/AC18: a phone of table A scanning table B gets a device for B; its A cookie never reads or orders in B', async () => {
+      const floor = await setupFloor(t);
+      const tableB = (
+        await staffPost(floor.ownerCookie, '/api/tables', { name: 'Bàn 2', seats: 4 }).expect(201)
+      ).body as { qrToken: string };
+      const phoneA = await joinPhone(t, floor, 2);
+      const phoneB = await joinPhone(t, { ...floor, qrToken: tableB.qrToken }, 2);
+      const sessionA = (await guestView(phoneA)).body.session.id as string;
+      const sessionB = (await guestView(phoneB)).body.session.id as string;
+      expect(sessionB).not.toBe(sessionA);
+
+      const scan = await checkIn(t, tableB.qrToken, undefined, phoneA.cookie).expect(200);
+      expect(scan.body.session.id).toBe(sessionB);
+      const joinedB = guestCookieOf(scan);
+      expect(joinedB).toBeDefined();
+      expect((await guestView({ cookie: joinedB ?? '' })).body.session.id).toBe(sessionB);
+      // The old cookie still belongs to A only: what it reads and orders stays in A.
+      expect((await guestView(phoneA)).body.session.id).toBe(sessionA);
+      const placed = await placeOrder(t, phoneA, [line(floor.items.tra)]).expect(201);
+      const [row] = await db
+        .select({ sessionId: orders.sessionId })
+        .from(orders)
+        .where(eq(orders.id, placed.body.id as string));
+      expect(row?.sessionId).toBe(sessionA);
+      expect((await guestView(phoneB)).body.orders).toEqual([]);
+    });
+
+    it('TQR-011: GET /api/g/check-in tells the next step without opening anything (no 409 on page load)', async () => {
+      const floor = await setupFloor(t, 4);
+      const next = (qr: string) => http().get(`/api/g/check-in?qr=${encodeURIComponent(qr)}`);
+      expect((await next(floor.qrToken).expect(200)).body).toEqual({
+        next: 'party_size',
+        maxPartySize: 8,
+      });
+      expect(await sessionsOf(floor.tableId)).toHaveLength(0);
+      await joinPhone(t, floor, 2);
+      expect((await next(floor.qrToken).expect(200)).body.next).toBe('join');
+      const staffOnly = await setupFloor(t, 2);
+      await setRules(t, staffOnly.ownerCookie, (rules) => {
+        rules.sessionOpening = 'staff_opens';
+      });
+      expect((await next(staffOnly.qrToken).expect(200)).body).toEqual({
+        next: 'wait_for_staff',
+        maxPartySize: 6,
+      });
+      await next('unknown-token').expect(404);
+      await http().get('/api/g/check-in').expect(422);
+    });
+
     it('AC17/AC18: two phones opening the table at the same moment end in one session', async () => {
       const floor = await setupFloor(t);
       const [a, b] = await Promise.all([
@@ -474,13 +523,20 @@ describe('guest check-in, ordering and waiter review (e2e, real Postgres)', () =
         expect(item.queueAt).toBeNull();
       }
       const view = (await guestView(phone)).body;
-      expect(view.orders[1]).toMatchObject({ status: 'held', holdReason: 'anomaly_over' });
+      expect(view.orders[1]).toMatchObject({
+        status: 'held',
+        holdReason: 'anomaly_over',
+        maxMainPerPerson: 2,
+      });
       const list = await review(waiterCookie);
       expect(list).toHaveLength(1);
+      // TQR-013: the waiter sees the session total (3) against the limit (1 × 2).
       expect(list[0]).toMatchObject({
         id: held.body.id,
         holdReason: 'anomaly_over',
         mainPortions: 1,
+        sessionMainPortions: 3,
+        maxMainPerPerson: 2,
         table: { name: 'Bàn 1' },
         session: { partySize: 1 },
         items: [{ name: 'Cơm tấm', quantity: 1 }],

@@ -45,6 +45,12 @@ export interface GuestSessionView {
   orders: OrderView[];
 }
 
+/** What a scan leads to, asked before check-in so the expected "party size" step is no error. */
+export interface CheckInNext {
+  next: 'join' | 'party_size' | 'wait_for_staff';
+  maxPartySize: number;
+}
+
 export interface CheckInResult {
   session: SessionView;
   /** A new device token to set as the guest cookie; undefined when the phone already belongs here. */
@@ -170,6 +176,48 @@ export class SessionsService {
       throw notFound();
     }
     return result;
+  }
+
+  /**
+   * TQR-011: the step a scan leads to — join the open session, ask the party size (self check-in)
+   * or wait for staff — without opening anything. Same 404 / 410 / 403 answers as check-in.
+   */
+  async checkInNext(qrToken: string): Promise<CheckInNext> {
+    const [table] = await this.db
+      .select({
+        id: diningTables.id,
+        restaurantId: diningTables.restaurantId,
+        seats: diningTables.seats,
+        rules: restaurants.rules,
+      })
+      .from(diningTables)
+      .innerJoin(restaurants, eq(restaurants.id, diningTables.restaurantId))
+      .where(eq(diningTables.qrToken, qrToken));
+    if (!table) {
+      await this.tables.resolveGuestToken(qrToken);
+      throw notFound();
+    }
+    const tenant = asTenantId(table.restaurantId);
+    await this.restaurantStatus.assertActive(tenant);
+    const maxPartySizeOfTable = maxPartySize(table.seats);
+    const [open] = await this.db
+      .select({ id: tableSessions.id })
+      .from(tableSessions)
+      .where(
+        and(
+          eq(tableSessions.restaurantId, tenant),
+          eq(tableSessions.tableId, table.id),
+          eq(tableSessions.status, 'open'),
+        ),
+      );
+    if (open) return { next: 'join', maxPartySize: maxPartySizeOfTable };
+    return {
+      next:
+        readStoredRules(table.rules).sessionOpening === 'staff_opens'
+          ? 'wait_for_staff'
+          : 'party_size',
+      maxPartySize: maxPartySizeOfTable,
+    };
   }
 
   /** The phone's session from its cookie; 401 without one, 403 when the restaurant is suspended. */

@@ -28,6 +28,7 @@ export const bookingLocale = {
       timeHint: 'Mỗi lượt giữ bàn {minutes} phút.',
       timesLoading: 'Đang xem giờ còn trống…',
       noTimes: 'Ngày này không còn giờ trống cho {n} khách. Hãy chọn ngày khác hoặc bớt số khách.',
+      timePlaceholder: 'Chọn giờ',
       party: 'Số khách',
       partyUnit: 'khách',
       partyDecrease: 'Bớt một khách',
@@ -50,6 +51,9 @@ export const bookingLocale = {
         noNearest: 'Ngày này đã kín chỗ. Hãy chọn ngày khác.',
         pickTime: 'Chọn {time}',
         tooMany: 'Số điện thoại này đã đặt 5 lần trong hôm nay. Vui lòng gọi trực tiếp cho quán.',
+        tooManyRequests:
+          'Bạn đã gửi nhiều yêu cầu đặt bàn. Vui lòng thử lại sau một giờ hoặc gọi cho quán.',
+        timeGone: 'Giờ {time} không còn bàn cho {n} khách. Hãy chọn giờ khác.',
         network:
           'Không gửi được vì mất mạng. Kiểm tra kết nối rồi bấm gửi lại — bạn sẽ không bị đặt trùng.',
         unexpected: 'Có lỗi xảy ra. Vui lòng thử lại.',
@@ -132,7 +136,7 @@ export const bookingLocale = {
         body: '{table} sẽ được trả lại. Thao tác này không hoàn tác được.',
         confirm: 'Khách không đến',
       },
-      keep: 'Quay lại',
+      keep: 'Huỷ',
       guest: 'khách',
       done: {
         confirm: 'Đã xác nhận đặt bàn của {name}',

@@ -117,6 +117,20 @@ describe('checkOrder (AC26–AC29)', () => {
     });
   });
 
+  it('TQR-013: an order without main dishes never gets the anomaly reason, even in a session already over', () => {
+    const over = {
+      partySize: 1,
+      mainPortionsBefore: 5,
+      mainPortionsInOrder: 0,
+      isFirstOrder: false,
+    };
+    expect(checkOrder(input({ ...over, rules: rules({ orderApproval: 'every_order' }) }))).toEqual({
+      decision: 'hold',
+      reason: 'every_order',
+    });
+    expect(checkOrder(input(over))).toEqual({ decision: 'ok' });
+  });
+
   it('prefers the anomaly reason when an every_order order is also over the limit', () => {
     expect(
       checkOrder(

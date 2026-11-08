@@ -295,7 +295,7 @@ describe('CashierPage', () => {
   });
 
   it('AC45: a second confirmation shows that the bill was already paid', async () => {
-    fakeApi({
+    const calls = fakeApi({
       'GET /api/bills/overview': { body: overview() },
       'POST /api/bills/b1/pay': { status: 409, body: { code: 'ALREADY_PAID' } },
     });
@@ -304,7 +304,10 @@ describe('CashierPage', () => {
     const sheet = screen.getByRole('dialog', { name: 'Xác nhận đã nhận tiền mặt?' });
     expect(sheet.textContent).toContain('Chỉ xác nhận khi đã cầm đủ tiền.');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Đã nhận 115.000\u00a0₫' }));
-    expect((await within(sheet).findByRole('alert')).textContent).toContain('đã được xác nhận rồi');
+    // TQR-019: the stale sheet closes; the page says why and shows the current list.
+    expect((await screen.findByRole('alert')).textContent).toContain('đã được xác nhận rồi');
+    expect(screen.queryByRole('dialog', { name: 'Xác nhận đã nhận tiền mặt?' })).toBeNull();
+    expect(calls.filter((c) => c.path === '/api/bills/overview').length).toBe(2);
   });
 
   it('AC47: closing an unpaid table asks for a reason and sends it', async () => {

@@ -35,6 +35,7 @@ const order = (over: Partial<Order> = {}): Order => ({
   id: 'o1',
   status: 'released',
   holdReason: null,
+  maxMainPerPerson: 2,
   requestedAt: '2026-11-08T12:05:00.000Z',
   totalVnd: 90000,
   items: [
@@ -107,8 +108,13 @@ class FakeEventSource extends EventTarget {
   }
 }
 
+const CHECK_IN = `GET /api/g/check-in?qr=${TOKEN}`;
+const next = (step: 'join' | 'party_size' | 'wait_for_staff') =>
+  jsonResponse({ next: step, maxPartySize: 8 });
+
 const joinedRoutes = (extra: Record<string, Reply | Reply[]> = {}) => ({
   [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
+  [CHECK_IN]: next('join'),
   'POST /api/g/session': jsonResponse({ opened: false }),
   'GET /api/g/session': jsonResponse(session()),
   'GET /api/g/menu': jsonResponse(MENU),
@@ -116,7 +122,7 @@ const joinedRoutes = (extra: Record<string, Reply | Reply[]> = {}) => ({
 });
 
 const renderGuest = (at = `/t/${TOKEN}`) =>
-  renderWithApp(GuestTablePage, { paths: ['/t/:qrToken'], at });
+  renderWithApp(GuestTablePage, { paths: ['/t/:qrToken', '/t/:qrToken/hoa-don'], at });
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -128,10 +134,8 @@ describe('guest check-in (S6)', () => {
   it('AC17 asks for the party size (1 … seats + 4) and opens the table', async () => {
     const calls = fakeApi({
       [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
-      'POST /api/g/session': [
-        jsonResponse({ code: 'PARTY_SIZE_REQUIRED', maxPartySize: 8 }, 409),
-        jsonResponse({ opened: true }, 201),
-      ],
+      [CHECK_IN]: next('party_size'),
+      'POST /api/g/session': jsonResponse({ opened: true }, 201),
       'GET /api/g/session': jsonResponse(session()),
       'GET /api/g/menu': jsonResponse(MENU),
     });
@@ -144,8 +148,8 @@ describe('guest check-in (S6)', () => {
     expect(screen.getByText('Từ 1 đến 8 người. Nhân viên có thể sửa lại sau.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Thêm một người' }));
     await userEvent.click(screen.getByRole('button', { name: 'Bắt đầu gọi món' }));
+    // TQR-011: the party-size step comes from GET /api/g/check-in, never from a 409 on load.
     expect(calls.filter((c) => c.key === 'POST /api/g/session').map((c) => c.body)).toEqual([
-      { qrToken: TOKEN },
       { qrToken: TOKEN, partySize: 3 },
     ]);
     expect(await screen.findByRole('heading', { level: 1, name: 'Thực đơn' })).toBeTruthy();
@@ -155,10 +159,11 @@ describe('guest check-in (S6)', () => {
   it('shows the field error when the server refuses the party size', async () => {
     fakeApi({
       [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
-      'POST /api/g/session': [
-        jsonResponse({ code: 'PARTY_SIZE_REQUIRED' }, 409),
-        jsonResponse({ code: 'VALIDATION_FAILED', fields: [{ path: 'partySize' }] }, 422),
-      ],
+      [CHECK_IN]: next('party_size'),
+      'POST /api/g/session': jsonResponse(
+        { code: 'VALIDATION_FAILED', fields: [{ path: 'partySize' }] },
+        422,
+      ),
     });
     await renderGuest();
     await userEvent.click(await screen.findByRole('button', { name: 'Bắt đầu gọi món' }));
@@ -176,10 +181,8 @@ describe('guest check-in (S6)', () => {
   it('AC19 "staff opens": asks to wait and offers no ordering; retry joins once opened', async () => {
     fakeApi({
       [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
-      'POST /api/g/session': [
-        jsonResponse({ code: 'WAIT_FOR_STAFF' }, 409),
-        jsonResponse({ opened: false }),
-      ],
+      [CHECK_IN]: [next('wait_for_staff'), next('join')],
+      'POST /api/g/session': jsonResponse({ opened: false }),
       'GET /api/g/session': jsonResponse(session()),
       'GET /api/g/menu': jsonResponse(MENU),
     });
@@ -214,6 +217,7 @@ describe('guest check-in (S6)', () => {
       'at check-in',
       {
         [`GET /api/g/t/${TOKEN}`]: jsonResponse(TABLE),
+        [CHECK_IN]: next('join'),
         'POST /api/g/session': jsonResponse({ code: 'RESTAURANT_SUSPENDED' }, 403),
       },
     ],
@@ -356,6 +360,19 @@ describe('guest ordering (S7)', () => {
     expect(screen.getByRole('button', { name: 'Giỏ hàng (1)' })).toBeTruthy();
   });
 
+  it('TQR-012 a phone over its order limit (429 TOO_MANY_ORDERS) keeps the cart and is told to wait', async () => {
+    fakeApi(
+      joinedRoutes({
+        'POST /api/g/orders': jsonResponse({ code: 'TOO_MANY_ORDERS' }, 429),
+      }),
+    );
+    await renderGuest();
+    await userEvent.click(await screen.findByRole('button', { name: 'Thêm một Phở bò' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Gửi món' }));
+    expect(await screen.findByText(/Bạn đã gửi rất nhiều đơn trong ít phút/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Giỏ hàng (1)' })).toBeTruthy();
+  });
+
   it('AC21 a closed session shows "Bàn đã đóng" and no way to order', async () => {
     fakeApi(joinedRoutes({ 'GET /api/g/session': jsonResponse(session([], 'closed')) }));
     await renderGuest();
@@ -395,7 +412,10 @@ describe('guest live status (S11)', () => {
       }),
     );
     await renderGuest(`/t/${TOKEN}?xem=da-goi`);
-    expect(await screen.findByText(/số món chính nhiều hơn thường lệ cho 2 người/)).toBeTruthy();
+    // TQR-013: the session total (2 portions of the held order) against the limit (2 × 2).
+    expect(
+      await screen.findByText(/bàn 2 người đã gọi 2 phần món chính, quá mức thường lệ 4 phần/),
+    ).toBeTruthy();
     expect(screen.getAllByText('Chờ xác nhận').length).toBe(2);
     expect(screen.getByText(/Nhân viên đã huỷ đơn này/)).toBeTruthy();
     expect(screen.getAllByText('Đã huỷ').length).toBe(2);
@@ -452,6 +472,103 @@ describe('guest live status (S11)', () => {
       await screen.findByText('Quán xác nhận mọi đơn trước khi nấu. Nhân viên sẽ xác nhận ngay.'),
     ).toBeTruthy();
     expect(calls.filter((c) => c.key === 'GET /api/g/session')).toHaveLength(2);
+  });
+
+  it('TQR-013 a drinks-only order held under "every order" never talks about main dishes', async () => {
+    fakeApi(
+      joinedRoutes({
+        'GET /api/g/session': jsonResponse(
+          session([
+            order({
+              status: 'held',
+              holdReason: 'every_order',
+              items: [{ ...order().items[0]!, name: 'Trà đá', isMain: false, status: 'pending' }],
+            }),
+          ]),
+        ),
+      }),
+    );
+    await renderGuest(`/t/${TOKEN}?xem=da-goi`);
+    expect(
+      await screen.findByText('Quán xác nhận mọi đơn trước khi nấu. Nhân viên sẽ xác nhận ngay.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/món chính/)).toBeNull();
+  });
+
+  it('TQR-016 a pay-before order leaves "Chờ thanh toán" live when the payment releases it', async () => {
+    const paying = order({
+      status: 'awaiting_payment',
+      items: [{ ...order().items[0]!, status: 'pending' }],
+    });
+    const released = order({ items: [{ ...order().items[0]!, status: 'waiting', version: 2 }] });
+    const calls = fakeApi(
+      joinedRoutes({
+        'GET /api/g/session': [
+          jsonResponse(session([paying])),
+          jsonResponse(session([paying])),
+          jsonResponse(session([released])),
+        ],
+      }),
+    );
+    await renderGuest(`/t/${TOKEN}?xem=da-goi`);
+    expect(await screen.findByText('Quán nấu sau khi bạn thanh toán.')).toBeTruthy();
+    const stream = FakeEventSource.last;
+    if (!stream) throw new Error('no stream');
+    stream.emit('delta', {
+      topic: 'session:s1',
+      type: 'item.status',
+      itemId: 'i1',
+      status: 'waiting',
+      version: 2,
+    });
+    stream.emit('delta', {
+      topic: 'session:s1',
+      type: 'order.status',
+      orderId: 'o1',
+      status: 'released',
+    });
+    // Patched at once: no order-level "Chờ thanh toán" next to dishes that say "Đang chờ".
+    await waitFor(() => expect(screen.queryByText('Quán nấu sau khi bạn thanh toán.')).toBeNull());
+    expect(screen.getByText('Đã gửi')).toBeTruthy();
+    expect(screen.getByText('Đang chờ')).toBeTruthy();
+    const before = calls.filter((c) => c.key === 'GET /api/g/session').length;
+    stream.emit('delta', {
+      topic: 'session:s1',
+      type: 'bill.status',
+      billId: 'b1',
+      status: 'paid',
+    });
+    await waitFor(() =>
+      expect(calls.filter((c) => c.key === 'GET /api/g/session').length).toBeGreaterThan(before),
+    );
+    expect(screen.queryByText('Chờ thanh toán')).toBeNull();
+  });
+
+  it('TQR-018 the guest reaches the bill by tapping: the bottom bar and the pay-before banner', async () => {
+    fakeApi(
+      joinedRoutes({
+        'GET /api/g/session': jsonResponse(
+          session([
+            order({
+              status: 'awaiting_payment',
+              items: [{ ...order().items[0]!, status: 'pending' }],
+            }),
+          ]),
+        ),
+      }),
+    );
+    const { router } = await renderGuest(`/t/${TOKEN}?xem=da-goi`);
+    const banner = await screen.findByRole('link', { name: 'Thanh toán tại quầy hoặc bằng mã QR' });
+    expect(banner.getAttribute('href')).toBe(`/t/${TOKEN}/hoa-don`);
+    await userEvent.click(screen.getByRole('button', { name: 'Xem hoá đơn / Thanh toán' }));
+    await waitFor(() => expect(router.currentRoute.value.path).toBe(`/t/${TOKEN}/hoa-don`));
+  });
+
+  it('TQR-018 no bill button before anything is ordered, and the cart bar takes its place', async () => {
+    fakeApi(joinedRoutes());
+    await renderGuest();
+    await screen.findByRole('heading', { level: 1, name: 'Thực đơn' });
+    expect(screen.queryByRole('button', { name: 'Xem hoá đơn / Thanh toán' })).toBeNull();
   });
 
   it('AC39 says it is reconnecting and replaces everything with the next snapshot', async () => {

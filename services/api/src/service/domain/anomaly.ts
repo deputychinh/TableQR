@@ -38,7 +38,10 @@ export const minimumMainPortions = (partySize: number, minMainPerPerson: number)
 export const checkOrder = (input: AnomalyInput): AnomalyResult => {
   const { partySize, mainPortionsBefore, mainPortionsInOrder, isFirstOrder, rules } = input;
   const total = mainPortionsBefore + mainPortionsInOrder;
-  const over = isOverLimit(partySize, total, rules.anomaly.maxMainPerPerson);
+  // Only an order that adds main dishes can take the session over the limit (TQR-013): a drinks
+  // order in a session already over is judged by the approval rule alone.
+  const over =
+    mainPortionsInOrder > 0 && isOverLimit(partySize, total, rules.anomaly.maxMainPerPerson);
   if (rules.orderApproval !== 'none' && over) return { decision: 'hold', reason: 'anomaly_over' };
   if (rules.orderApproval === 'every_order') return { decision: 'hold', reason: 'every_order' };
   if (isFirstOrder && total < minimumMainPortions(partySize, rules.anomaly.minMainPerPerson)) {

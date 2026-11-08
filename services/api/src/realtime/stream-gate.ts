@@ -28,6 +28,9 @@ interface Audience {
   /** Counted per key against `perKeyLimit` (a staff member, or a guest table session). */
   key: string;
   perKeyLimit: number;
+  /** Staff and guests draw from separate per-restaurant pools, so guests never lock out staff. */
+  pool: 'staff' | 'guest';
+  poolLimit: number;
   /** Set for staff: revocations for this person close the stream. */
   userId: string | undefined;
   isStillAllowed: () => Promise<boolean>;
@@ -35,7 +38,8 @@ interface Audience {
 
 /**
  * The one way an SSE stream opens (TQR-010): caps per staff member / guest table session and per
- * restaurant (in memory, per process; 429 `TOO_MANY_STREAMS`), the audience re-checked on every
+ * restaurant — one pool for staff streams and a separate one for guest streams (in memory, per
+ * process; 429 `TOO_MANY_STREAMS`), the audience re-checked on every
  * heartbeat and closed on revocation (D4: staff by person, everyone of a restaurant on
  * suspension), snapshot failures logged without content.
  */
@@ -63,6 +67,8 @@ export class StreamGate {
         restaurantId: tenantOf(principal),
         key: `user:${principal.userId}`,
         perKeyLimit: this.settings.TQR_STREAMS_PER_USER,
+        pool: 'staff',
+        poolLimit: this.settings.TQR_STREAMS_PER_RESTAURANT,
         userId: principal.userId,
         isStillAllowed: () => this.auth.isSessionActive(principal.tokenHash),
       },
@@ -84,6 +90,8 @@ export class StreamGate {
         restaurantId: guest.tenant,
         key: `session:${guest.sessionId}`,
         perKeyLimit: this.settings.TQR_STREAMS_PER_GUEST_SESSION,
+        pool: 'guest',
+        poolLimit: this.settings.TQR_GUEST_STREAMS_PER_RESTAURANT,
         userId: undefined,
         isStillAllowed: guest.isStillAllowed,
       },
@@ -100,16 +108,17 @@ export class StreamGate {
     options: GateStreamOptions<S>,
   ): Promise<void> {
     const { restaurantId, key } = audience;
+    const poolKey = `${audience.pool}:${restaurantId}`;
     if (
       (this.perKey.get(key) ?? 0) >= audience.perKeyLimit ||
-      (this.perRestaurant.get(restaurantId) ?? 0) >= this.settings.TQR_STREAMS_PER_RESTAURANT
+      (this.perRestaurant.get(poolKey) ?? 0) >= audience.poolLimit
     ) {
       throw new DomainError(TOO_MANY_STREAMS, 429, {
         detail: 'Đã mở quá nhiều màn hình trực tiếp. Hãy đóng bớt rồi thử lại.',
       });
     }
     increment(this.perKey, key);
-    increment(this.perRestaurant, restaurantId);
+    increment(this.perRestaurant, poolKey);
     await openStream(this.hub, request, response, {
       restaurantId,
       topics: options.topics,
@@ -118,7 +127,7 @@ export class StreamGate {
       audience: { userId: audience.userId, isStillAllowed: audience.isStillAllowed },
       onClose: () => {
         decrement(this.perKey, key);
-        decrement(this.perRestaurant, restaurantId);
+        decrement(this.perRestaurant, poolKey);
       },
       onError: (what, error) => {
         this.logger.error(`realtime_${what}_failed`, {

@@ -71,7 +71,7 @@ bench: ## Performance benchmark (k6) against a running API; see benchmarks/plan.
 budget: ## Build the web app and check the initial JS budget (150 kB gzip)
 	$(WEB) npm run build-only && npm run budget
 
-lighthouse: ## Lighthouse (mobile, slow 4G) on the preview build; fails when LCP > 2.5 s
+lighthouse: ## Lighthouse (mobile, slow 4G) on the preview build; fails when LCP > 2.5 s (LH_GUEST_MENU=1: also the guest menu, needs the API)
 	$(WEB) npm run build-only && npm run lighthouse
 
 baseline: ## Record benchmarks/results/*.json into benchmarks/baseline.json (run bench, budget, lighthouse first)

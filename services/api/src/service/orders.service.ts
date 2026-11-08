@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
+import { syncOpenBill } from '../billing/bill-sync.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
 import type { TenantId } from '../common/tenant.js';
@@ -52,12 +53,16 @@ export interface OrderView {
   holdReason: HoldReason | null;
   requestedAt: string;
   totalVnd: number;
+  /** From the order's rules snapshot (AC12): the anomaly limit is party size × this. */
+  maxMainPerPerson: number;
   items: OrderItemView[];
 }
 
 export interface ReviewOrder extends OrderView {
   flag: string | null;
   mainPortions: number;
+  /** Main portions of the whole session that still count (not cancelled), this order included. */
+  sessionMainPortions: number;
   session: { id: string; partySize: number; openedAt: string };
   table: { id: string; name: string };
 }
@@ -91,6 +96,7 @@ const orderColumns = {
   requestedAt: orders.requestedAt,
   totalVnd: orders.totalVnd,
   sessionId: orders.sessionId,
+  rulesSnapshot: orders.rulesSnapshot,
 };
 
 interface ItemRow {
@@ -114,6 +120,7 @@ interface OrderRow {
   requestedAt: Date;
   totalVnd: number;
   sessionId: string;
+  rulesSnapshot: unknown;
 }
 
 const toItemView = (row: ItemRow): OrderItemView => ({
@@ -128,18 +135,19 @@ const toItemView = (row: ItemRow): OrderItemView => ({
   version: row.version,
 });
 
+/** Rules an order was placed under (AC12): its snapshot, never the restaurant's current rules. */
+const rulesOf = (snapshot: unknown): HouseRules =>
+  readStoredRules((snapshot as Partial<RulesSnapshot> | null)?.rules ?? {});
+
 const toOrderView = (row: OrderRow, items: readonly ItemRow[]): OrderView => ({
   id: row.id,
   status: row.status,
   holdReason: (row.holdReason as HoldReason | null) ?? null,
   requestedAt: row.requestedAt.toISOString(),
   totalVnd: row.totalVnd,
+  maxMainPerPerson: rulesOf(row.rulesSnapshot).anomaly.maxMainPerPerson,
   items: items.filter((item) => item.orderId === row.id).map(toItemView),
 });
-
-/** Rules an order was placed under (AC12): its snapshot, never the restaurant's current rules. */
-const rulesOf = (snapshot: unknown): HouseRules =>
-  readStoredRules((snapshot as Partial<RulesSnapshot> | null)?.rules ?? {});
 
 /**
  * Orders of the service floor: guest placement with price check, anomaly hold and idempotency
@@ -255,6 +263,9 @@ export class OrdersService {
 
       await this.publishOrder(tx, tenant, sessionId, order.id, status);
       if (released) await this.publishReleasedItems(tx, tenant, items);
+      // AC42: a released or pay-before order changes what the table owes; an open bill follows.
+      if (status !== 'held')
+        await syncOpenBill(tx, tenant, sessionId, now, { issueWhenNone: false });
       return { order: await this.loadOrder(tx, tenant, order.id), created: true };
     });
   }
@@ -326,12 +337,29 @@ export class OrdersService {
         ),
       )
       .orderBy(asc(orderItems.seq));
+    const sessionIds = [...new Set(rows.map((row) => row.sessionId))];
+    const sessionMains = await this.db
+      .select({
+        sessionId: orderItems.sessionId,
+        main: sql<number>`coalesce(sum(${orderItems.quantity}) filter (where ${orderItems.isMain} = 'yes'), 0)::int`,
+      })
+      .from(orderItems)
+      .where(
+        and(
+          eq(orderItems.restaurantId, tenant),
+          inArray(orderItems.sessionId, sessionIds),
+          ne(orderItems.status, 'cancelled'),
+        ),
+      )
+      .groupBy(orderItems.sessionId);
+    const mainsOf = new Map(sessionMains.map((row) => [row.sessionId, row.main]));
     return rows.map((row) => {
       const view = toOrderView(row, items);
       return {
         ...view,
         flag: row.flag,
         mainPortions: view.items.reduce((sum, item) => sum + (item.isMain ? item.quantity : 0), 0),
+        sessionMainPortions: mainsOf.get(row.sessionId) ?? 0,
         session: {
           id: row.sessionId,
           partySize: row.partySize,
@@ -344,7 +372,20 @@ export class OrdersService {
 
   /** AC28: release with the original request time as queue position (ADR 0005). */
   async confirm(tenant: TenantId, orderId: string, userId: string): Promise<OrderView> {
+    if (!isUuid(orderId)) throw notFound();
     return this.db.transaction(async (tx) => {
+      // Session row first, as bill requests, payments and closing do, so an open bill is updated
+      // in step (AC42) and the lock order never deadlocks with closing the table.
+      const [target] = await tx
+        .select({ sessionId: orders.sessionId })
+        .from(orders)
+        .where(and(eq(orders.restaurantId, tenant), eq(orders.id, orderId)));
+      if (!target) throw notFound();
+      await tx
+        .select({ id: tableSessions.id })
+        .from(tableSessions)
+        .where(and(eq(tableSessions.restaurantId, tenant), eq(tableSessions.id, target.sessionId)))
+        .for('update');
       const order = await this.lockHeld(tx, tenant, orderId);
       await this.approve(tx, tenant, order, userId);
       return this.loadOrder(tx, tenant, orderId);
@@ -508,6 +549,8 @@ export class OrdersService {
     } else {
       await this.publishOrder(tx, tenant, order.sessionId, order.id, status);
     }
+    // AC42: an accepted order is billable now; an open bill on the guest's phone follows.
+    await syncOpenBill(tx, tenant, order.sessionId, this.clock.now(), { issueWhenNone: false });
   }
 
   private async menuEntries(

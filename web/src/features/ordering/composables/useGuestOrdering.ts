@@ -16,12 +16,14 @@ import {
   type CartItemRef,
   type CartLine,
 } from '../cart';
-import { applyItemDelta } from '../status';
+import type { OrderStatus } from '../api';
+import { applyItemDelta, applyOrderDelta } from '../status';
 
 export type Notice =
   | { kind: 'sent' }
   | { kind: 'network' }
   | { kind: 'changed'; changes: CartChange[] }
+  | { kind: 'too-many' }
   | { kind: 'error' };
 
 const storageKey = (sessionId: string) => `tqr:cart:${sessionId}`;
@@ -121,6 +123,10 @@ export const useGuestOrdering = (initial: GuestSession) => {
           cart.value = result.cart;
           notice.value = { kind: 'changed', changes: result.changes };
         }
+      } else if (error instanceof ApiError && error.code === 'TOO_MANY_ORDERS') {
+        // docs/security.md: 20 orders / 10 min per phone; the cart stays for a later try.
+        pendingKey = undefined;
+        notice.value = { kind: 'too-many' };
       } else if (error instanceof ApiError && error.code === 'SESSION_CLOSED') {
         pendingKey = undefined;
         await refreshSession();
@@ -152,6 +158,18 @@ export const useGuestOrdering = (initial: GuestSession) => {
       });
       if (next) session.value = { ...session.value, orders: next };
     } else if (delta.type === 'order.status') {
+      // Patch the card at once (a pay-before order leaving "Chờ thanh toán", TQR-016), then
+      // refetch: a new order from another phone is only in the snapshot.
+      if (typeof delta.orderId === 'string' && typeof delta.status === 'string') {
+        const next = applyOrderDelta(session.value.orders, {
+          orderId: delta.orderId,
+          status: delta.status as OrderStatus,
+        });
+        if (next) session.value = { ...session.value, orders: next };
+      }
+      void refreshSession();
+    } else if (delta.type === 'bill.status' && delta.status === 'paid') {
+      // A payment releases pay-before orders: the cards follow without a reload.
       void refreshSession();
     }
   };

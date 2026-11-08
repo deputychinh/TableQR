@@ -53,6 +53,8 @@ export const orderingLocale = {
       changePrice: '{name}: giá mới {price}',
       tooMany: 'Giỏ hàng tối đa {max} món khác nhau.',
       error: 'Chưa gửi được món. Vui lòng thử lại.',
+      tooManyOrders:
+        'Bạn đã gửi rất nhiều đơn trong ít phút. Giỏ hàng vẫn còn: đợi một lát rồi gửi lại, hoặc gọi nhân viên.',
     },
     orders: {
       empty: 'Bạn chưa gọi món nào.',
@@ -61,12 +63,13 @@ export const orderingLocale = {
       total: 'Tổng {total}',
       quantity: '× {n}',
       heldOver:
-        'Đơn này đang chờ nhân viên xác nhận vì số món chính nhiều hơn thường lệ cho {n} người. Nhân viên sẽ xác nhận ngay.',
+        'Đơn này đang chờ nhân viên xác nhận: bàn {n} người đã gọi {total} phần món chính, quá mức thường lệ {limit} phần. Nhân viên sẽ xác nhận ngay.',
       heldEvery: 'Quán xác nhận mọi đơn trước khi nấu. Nhân viên sẽ xác nhận ngay.',
-      awaitingPayment:
-        'Quán nấu sau khi bạn thanh toán. Vui lòng thanh toán tại quầy hoặc bằng mã QR.',
+      awaitingPayment: 'Quán nấu sau khi bạn thanh toán.',
+      awaitingPaymentLink: 'Thanh toán tại quầy hoặc bằng mã QR',
       rejected: 'Nhân viên đã huỷ đơn này. Bạn hỏi nhân viên nếu cần nhé.',
       live: 'Đang cập nhật trực tiếp',
+      bill: 'Xem hoá đơn / Thanh toán',
       reconnecting: 'Mất kết nối, đang thử lại…',
     },
     closed: {
@@ -101,7 +104,7 @@ export const orderingLocale = {
     party: '{n} người',
     at: 'Gửi lúc {time}',
     mains: '{n} phần món chính',
-    heldOver: 'Nhiều món chính hơn thường lệ cho {n} người',
+    heldOver: 'Bàn đã gọi {total} phần món chính, quá mức {limit} phần cho {n} người',
     heldEvery: 'Quán xác nhận mọi đơn',
     flagShort: 'Có thể thiếu món',
     flagShortBody: 'Bàn {n} người mới gọi {mains} phần món chính. Hỏi khách có cần gọi thêm không.',
@@ -114,7 +117,7 @@ export const orderingLocale = {
     rejectTitle: 'Từ chối đơn của {table}?',
     rejectBody: 'Các món trong đơn sẽ bị huỷ, không vào bếp. Khách sẽ thấy đơn đã bị huỷ.',
     rejectConfirm: 'Từ chối đơn',
-    cancel: 'Quay lại',
+    cancel: 'Huỷ',
     confirmed: 'Đã xác nhận đơn của {table}. Món đã vào bếp.',
     rejected: 'Đã từ chối đơn của {table}.',
     seenDone: 'Đã đánh dấu đã xem đơn của {table}.',

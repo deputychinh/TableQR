@@ -117,7 +117,7 @@ const seed = async (api: APIRequestContext, stamp: string) => {
         (${r}, '${ids.order}', '${ids.session}', '${ids.item}', '${ids.station}', 'Trà đá',
           5000, 'no', 3, 'served', now(), now());
   `);
-  return { qrToken, guestToken, cashierEmail };
+  return { qrToken, guestToken, cashierEmail, itemId: ids.item };
 };
 
 /** A second device of the same kind with its own cookies (the guest's phone, the cashier's iPad). */
@@ -143,6 +143,68 @@ const signIn = async (page: Page, email: string) => {
   await expect(page).toHaveURL(/\/thu-ngan$/);
 };
 
+const EVIDENCE = '../docs/delivery/001-qr-table-ordering/evidence';
+/** 390 px evidence (iPhone project) when `E2E_SCREENSHOTS=1`; never part of a CI assertion. */
+const evidence = async (page: Page, info: TestInfo, name: string) => {
+  if (process.env.E2E_SCREENSHOTS && info.project.name === 'iphone') {
+    await page.screenshot({ path: `${EVIDENCE}/${name}-390-light.png`, fullPage: true });
+  }
+};
+
+/** From the table page (`/t/:qrToken`), the bottom bar's "Xem hoá đơn / Thanh toán". */
+const openBillByTapping = async (guest: Page, qrToken: string, info?: TestInfo) => {
+  await guest.goto(`/t/${qrToken}`);
+  const entry = guest.getByRole('button', { name: 'Xem hoá đơn / Thanh toán' });
+  await expect(entry).toBeVisible();
+  if (info) await evidence(guest, info, 'guest-bill-entry');
+  await entry.click();
+  await expect(guest).toHaveURL(new RegExp(`/t/${qrToken}/hoa-don$`));
+};
+
+const withGuestCookie = async (
+  browser: Browser,
+  info: TestInfo,
+  baseURL: string,
+  token: string,
+) => {
+  const guest = await newPage(browser, info, baseURL);
+  await guest
+    .context()
+    .addCookies([
+      { name: 'tqr_guest', value: token, url: baseURL, httpOnly: true, sameSite: 'Lax' },
+    ]);
+  return guest;
+};
+
+test('AC42 live: with the bill open, a newly released dish changes the code, amount and QR without a reload', async ({
+  page,
+  browser,
+  baseURL,
+}, info) => {
+  const stamp = `live-${info.project.name}-${String(Date.now())}`;
+  const { qrToken, guestToken, itemId } = await seed(page.request, stamp);
+  const guest = await withGuestCookie(browser, info, baseURL ?? '', guestToken);
+  await openBillByTapping(guest, qrToken, info);
+  await expect(guest.getByRole('img', { name: /Mã VietQR thanh toán 125\.000/ })).toBeVisible();
+  const oldMemo = (await guest.getByText(/^TQR [0-9A-Z]{5}$/).textContent()) ?? '';
+
+  // Another phone of the table orders one more dish; it is released straight to the kitchen.
+  const other = await guest.context().request.post('/api/g/orders', {
+    headers: { origin: baseURL ?? '', 'idempotency-key': randomUUID() },
+    data: { lines: [{ menuItemId: itemId, quantity: 1, priceVnd: 55000, note: null }] },
+  });
+  expect(other.status()).toBe(201);
+
+  await expect(guest.getByText(/Hoá đơn đã thay đổi/)).toBeVisible();
+  await expect(guest.getByRole('img', { name: /Mã VietQR thanh toán 180\.000/ })).toBeVisible();
+  await expect(guest.getByRole('img', { name: /Mã VietQR thanh toán 125\.000/ })).toHaveCount(0);
+  await expect(guest.getByText(oldMemo, { exact: true })).toHaveCount(0);
+  await expect(guest.getByText(/^TQR [0-9A-Z]{5}$/)).not.toHaveText(oldMemo);
+  await evidence(guest, info, 'guest-bill-superseded-live');
+  await expectNoSeriousA11yIssues(guest);
+  await guest.context().close();
+});
+
 test('AC40/AC44/AC46: guest sees the VietQR bill, the cashier confirms the transfer, the guest page turns "Đã thanh toán"', async ({
   page,
   browser,
@@ -152,13 +214,9 @@ test('AC40/AC44/AC46: guest sees the VietQR bill, the cashier confirms the trans
   const { qrToken, guestToken, cashierEmail } = await seed(page.request, stamp);
 
   // Guest phone: the bill with the QR, amount, bank, holder and memo.
-  const guest = await newPage(browser, info, baseURL ?? '');
-  await guest
-    .context()
-    .addCookies([
-      { name: 'tqr_guest', value: guestToken, url: baseURL ?? '', httpOnly: true, sameSite: 'Lax' },
-    ]);
-  await guest.goto(`/t/${qrToken}/hoa-don`);
+  const guest = await withGuestCookie(browser, info, baseURL ?? '', guestToken);
+  // TQR-018: the guest reaches the bill from the ordering page by tapping, never by typing a URL.
+  await openBillByTapping(guest, qrToken);
   await expect(guest.getByRole('heading', { level: 1, name: 'Hoá đơn · Bàn 7' })).toBeVisible();
   const qr = guest.getByRole('img', { name: /Mã VietQR thanh toán 125\.000/ });
   await expect(qr).toBeVisible();

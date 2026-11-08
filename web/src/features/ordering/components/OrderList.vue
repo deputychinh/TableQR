@@ -1,19 +1,35 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import StatusChip from '@/components/StatusChip.vue';
 import { formatVnd } from '@/features/menu/price';
 import type { Order } from '../api';
-import { ITEM_STATE, ORDER_STATE, formatTime, guestItemState } from '../status';
+import {
+  ITEM_STATE,
+  ORDER_STATE,
+  formatTime,
+  guestItemState,
+  sessionMainPortions,
+} from '../status';
 
-/** The guest's orders, oldest first, each dish with its live status (AC38) and why it waits. */
-defineProps<{ orders: readonly Order[]; partySize: number }>();
+/**
+ * The guest's orders, oldest first, each dish with its live status (AC38) and why it waits; an
+ * order waiting for payment links to the bill (`billTo`, TQR-018).
+ */
+const props = defineProps<{ orders: readonly Order[]; partySize: number; billTo: string }>();
 const { t } = useI18n();
+const mains = computed(() => sessionMainPortions(props.orders));
 
+/** One reason per hold reason (TQR-013); the anomaly one shows the session total and the limit. */
 const explain = (order: Order, partySize: number): string | undefined => {
   if (order.status === 'held') {
     return order.holdReason === 'every_order'
       ? t('ordering.orders.heldEvery')
-      : t('ordering.orders.heldOver', { n: partySize });
+      : t('ordering.orders.heldOver', {
+          n: partySize,
+          total: mains.value,
+          limit: partySize * order.maxMainPerPerson,
+        });
   }
   if (order.status === 'awaiting_payment') return t('ordering.orders.awaitingPayment');
   if (order.status === 'rejected') return t('ordering.orders.rejected');
@@ -41,6 +57,13 @@ const explain = (order: Order, partySize: number): string | undefined => {
           :class="`order-list__explain--${ORDER_STATE[order.status].tone}`"
         >
           {{ explain(order, partySize) }}
+          <RouterLink
+            v-if="order.status === 'awaiting_payment'"
+            class="order-list__pay"
+            :to="billTo"
+          >
+            {{ t('ordering.orders.awaitingPaymentLink') }}
+          </RouterLink>
         </p>
         <ul class="order-list__items">
           <li v-for="item in order.items" :key="item.id" class="order-list__item">
@@ -101,6 +124,14 @@ const explain = (order: Order, partySize: number): string | undefined => {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-2);
   background: var(--color-surface-muted);
+}
+
+.order-list__pay {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--target-min);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
 }
 
 .order-list__explain--warning {

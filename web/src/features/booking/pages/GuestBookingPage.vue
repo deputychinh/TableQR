@@ -75,9 +75,11 @@ let idempotencyKey = crypto.randomUUID();
 let lastRequest = '';
 
 const freeTimes = computed(() => slots.value?.times.filter((slot) => slot.free) ?? []);
-const timeOptions = computed(() =>
-  freeTimes.value.map((slot) => ({ value: slot.time, label: slot.time })),
-);
+const timeOptions = computed(() => [
+  // No time chosen (the one picked is gone): the select asks for one instead of showing another.
+  ...(form.time === '' ? [{ value: '', label: t('booking.guest.timePlaceholder') }] : []),
+  ...freeTimes.value.map((slot) => ({ value: slot.time, label: slot.time })),
+]);
 const restaurantName = computed(() => slots.value?.restaurant.name ?? '');
 
 const fetchSlots = async (first = false) => {
@@ -91,8 +93,16 @@ const fetchSlots = async (first = false) => {
     const view = await loadSlots(slug.value, form.date, form.partySize);
     slots.value = view;
     document.title = `${t('booking.guest.title')} · ${view.restaurant.name}`;
-    if (!view.times.some((slot) => slot.free && slot.time === form.time)) {
-      form.time = view.times.find((slot) => slot.free)?.time ?? '';
+    const chosen = form.time;
+    if (!view.times.some((slot) => slot.free && slot.time === chosen)) {
+      if (chosen === '') {
+        // Nothing chosen yet: offer the first free time.
+        form.time = view.times.find((slot) => slot.free)?.time ?? '';
+      } else {
+        // TQR-020: never swap the guest's time silently; say it is gone and ask for a new one.
+        form.time = '';
+        errors.time = t('booking.guest.errors.timeGone', { time: chosen, n: form.partySize });
+      }
     }
     if (first) page.value = { kind: 'ready' };
   } catch (error: unknown) {
@@ -116,6 +126,12 @@ const start = async () => {
 };
 
 onMounted(start);
+watch(
+  () => form.time,
+  (time) => {
+    if (time !== '') errors.time = undefined;
+  },
+);
 watch(
   () => [form.date, form.partySize],
   () => {
@@ -174,6 +190,8 @@ const explain = async (error: unknown) => {
     await fetchSlots();
   } else if (error.code === 'TOO_MANY_BOOKINGS') {
     alert.value = t('booking.guest.errors.tooMany');
+  } else if (error.code === 'TOO_MANY_REQUESTS') {
+    alert.value = t('booking.guest.errors.tooManyRequests');
   } else if (error.code === 'RESTAURANT_SUSPENDED') {
     page.value = { kind: 'suspended' };
   } else if (error.code === 'VALIDATION_FAILED' && error.fields.length > 0) {
@@ -322,7 +340,7 @@ const again = async () => {
           {{ t('booking.guest.timesLoading') }}
         </p>
         <SelectField
-          v-else-if="timeOptions.length > 0"
+          v-else-if="freeTimes.length > 0"
           v-model="form.time"
           :label="t('booking.guest.time')"
           :options="timeOptions"
@@ -380,7 +398,7 @@ const again = async () => {
           size="lg"
           block
           :loading="submitting"
-          :disabled="timeOptions.length === 0"
+          :disabled="freeTimes.length === 0"
         >
           {{ t('booking.guest.submit') }}
         </BaseButton>

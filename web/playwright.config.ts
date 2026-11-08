@@ -33,6 +33,11 @@ export default defineConfig({
         TQR_WEB_ORIGINS: PREVIEW_URL,
         // Every journey signs in from the preview proxy's address.
         TQR_AUTH_RATE_LIMIT_PER_MINUTE: '100000',
+        // Every guest journey checks in, orders and books from the same address.
+        TQR_GUEST_CHECKINS_PER_MINUTE: '100000',
+        TQR_GUEST_ORDERS_PER_10_MINUTES: '100000',
+        TQR_GUEST_BILL_REQUESTS_PER_MINUTE: '100000',
+        TQR_BOOKINGS_PER_HOUR: '100000',
       },
       reuseExistingServer: false,
       timeout: 120_000,

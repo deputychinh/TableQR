@@ -25,6 +25,8 @@ export interface Order {
   holdReason: HoldReason | null;
   requestedAt: string;
   totalVnd: number;
+  /** From the order's rules snapshot: the anomaly limit is party size × this (AC26). */
+  maxMainPerPerson: number;
   items: OrderItem[];
 }
 
@@ -47,14 +49,24 @@ export type LineProblem =
   | { menuItemId: string; reason: 'unknown' | 'unavailable' }
   | { menuItemId: string; reason: 'price_changed'; priceVnd: number };
 
+/** TQR-011: what a scan leads to, asked before check-in (no expected 409 on page load). */
+export interface CheckInNext {
+  next: 'join' | 'party_size' | 'wait_for_staff';
+  maxPartySize: number;
+}
+
 export interface ReviewOrder extends Order {
   flag: string | null;
   mainPortions: number;
+  /** Main portions of the whole session that still count, this order included. */
+  sessionMainPortions: number;
   session: { id: string; partySize: number; openedAt: string };
   table: { id: string; name: string };
 }
 
 export const guestApi = {
+  checkInNext: (qrToken: string) =>
+    getJson<CheckInNext>(`/g/check-in?qr=${encodeURIComponent(qrToken)}`),
   /** Check in (with the party size when opening the table) or join its open session. */
   checkIn: (qrToken: string, partySize?: number) =>
     sendJson<{ opened: boolean }>(

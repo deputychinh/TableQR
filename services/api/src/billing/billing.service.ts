@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
@@ -13,20 +13,26 @@ import { publish } from '../realtime/publisher.js';
 import { guestDevices, orderItems, orders, tableSessions } from '../service/service.schema.js';
 import { bankByBin } from '../settings/domain/banks.js';
 import { diningTables } from '../tables/tables.schema.js';
+import {
+  billableIn,
+  publishBill,
+  sessionAmounts,
+  syncOpenBill,
+  type BillRow,
+  type Executor,
+} from './bill-sync.js';
 import { bills } from './billing.schema.js';
-import { billMemo, newBillCode } from './domain/bill-code.js';
+import { billMemo } from './domain/bill-code.js';
 import { BillingErrorCode } from './domain/billing-error-code.js';
 import {
   closeNeedsReason,
   isBankChangeRecent,
+  payerName,
   type PaymentMethod,
 } from './domain/cashier-rules.js';
-import { BILLABLE_ORDER_STATUSES, amountDue, decideBill } from './domain/totals.js';
+import { amountDue } from './domain/totals.js';
 import { VietQrInputError, buildVietQr } from './domain/vietqr.js';
 
-type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
-
-const CODE_ATTEMPTS = 8;
 const LINES_MAX = 500;
 const OVERVIEW_MAX = 200;
 
@@ -80,7 +86,13 @@ export interface CashierSession {
   totalVnd: number;
   paidVnd: number;
   dueVnd: number;
-  bill: (BillView & { paidByName: string | null }) | null;
+  bill: (BillView & PaidBy) | null;
+}
+
+/** Who confirmed a paid bill, never blank (TQR-019). */
+export interface PaidBy {
+  /** Display name; without one "Chủ quán" for the owner, else the email's local part. */
+  paidByName: string | null;
 }
 
 export interface CashierOverview {
@@ -95,8 +107,6 @@ export interface GuestContext {
   tenant: TenantId;
   sessionId: string;
 }
-
-type BillRow = typeof bills.$inferSelect;
 
 const toBillView = (row: BillRow): BillView => ({
   id: row.id,
@@ -172,32 +182,7 @@ export class BillingService {
       if (session.status !== 'open') {
         throw new DomainError(BillingErrorCode.SessionClosed, 409, { detail: 'Bàn đã đóng' });
       }
-      const { dueVnd } = await this.amounts(tx, tenant, sessionId);
-      const [open] = await tx
-        .select()
-        .from(bills)
-        .where(
-          and(
-            eq(bills.restaurantId, tenant),
-            eq(bills.sessionId, sessionId),
-            eq(bills.status, 'open'),
-          ),
-        )
-        .limit(1);
-      const decision = decideBill(dueVnd, open?.amountVnd ?? null);
-      if (decision.supersede && open) {
-        await tx
-          .update(bills)
-          .set({ status: 'superseded' })
-          .where(
-            and(eq(bills.restaurantId, tenant), eq(bills.id, open.id), eq(bills.status, 'open')),
-          );
-        await this.publishBill(tx, tenant, sessionId, { ...open, status: 'superseded' });
-      }
-      if (decision.issue) {
-        const issued = await this.issue(tx, tenant, sessionId, dueVnd);
-        await this.publishBill(tx, tenant, sessionId, issued);
-      }
+      await syncOpenBill(tx, tenant, sessionId, this.clock.now(), { issueWhenNone: true });
     });
     return this.buildView(this.db, tenant, sessionId);
   }
@@ -247,12 +232,14 @@ export class BillingService {
           detail: 'Hoá đơn đã thay đổi',
         });
       }
-      await this.publishBill(tx, tenant, row.sessionId, row);
+      await publishBill(tx, tenant, row.sessionId, row);
       // Everything paid up → every pay-before order goes to the kitchen (also covers a reused bill
       // whose orders changed at the same amount); otherwise only orders placed before the bill.
-      const { dueVnd } = await this.amounts(tx, tenant, row.sessionId);
+      const { dueVnd } = await sessionAmounts(tx, tenant, row.sessionId);
       const coveredUntil = dueVnd === 0 ? null : row.createdAt;
       const count = await this.releaseAfterPayment(tx, tenant, row.sessionId, coveredUntil, now);
+      // AC42: money still due after this payment gets its own bill, live on the guest's page.
+      await syncOpenBill(tx, tenant, row.sessionId, now, { issueWhenNone: dueVnd > 0 });
       return { sessionId: row.sessionId, paid: row, released: count };
     });
     // Audit trail (docs/security.md, repudiation): who confirmed which bill, how and when.
@@ -295,6 +282,17 @@ export class BillingService {
       )
       .returning({ id: orders.id });
     if (released.length === 0) return 0;
+    // TQR-016: the guest's order cards leave "Chờ thanh toán" without a reload.
+    for (const order of released) {
+      for (const topic of ['floor', `session:${sessionId}`]) {
+        await publish(tx, {
+          restaurantId: tenant,
+          topic,
+          type: 'order.status',
+          data: { orderId: order.id, status: 'released' },
+        });
+      }
+    }
     const items = await tx
       .update(orderItems)
       .set({ status: 'waiting', queueAt: paidAt, version: sql`${orderItems.version} + 1` })
@@ -345,7 +343,7 @@ export class BillingService {
       if (session.status !== 'open') {
         throw new DomainError(BillingErrorCode.SessionClosed, 409, { detail: 'Bàn đã đóng' });
       }
-      const { dueVnd } = await this.amounts(tx, tenant, sessionId);
+      const { dueVnd } = await sessionAmounts(tx, tenant, sessionId);
       if (closeNeedsReason(dueVnd) && reason === undefined) {
         throw new DomainError(BillingErrorCode.CloseReasonRequired, 422, {
           detail: 'Bàn chưa thanh toán: hãy ghi lý do đóng bàn',
@@ -366,7 +364,7 @@ export class BillingService {
           ),
         )
         .returning();
-      for (const bill of superseded) await this.publishBill(tx, tenant, sessionId, bill);
+      for (const bill of superseded) await publishBill(tx, tenant, sessionId, bill);
       const dropped = await tx
         .update(orders)
         .set({ status: 'cancelled' })
@@ -461,7 +459,7 @@ export class BillingService {
     const ids = sessions.map((session) => session.id);
     const totals = new Map<string, number>();
     const paid = new Map<string, number>();
-    const latest = new Map<string, BillRow & { paidByName: string | null }>();
+    const latest = new Map<string, BillRow & PaidBy>();
     if (ids.length > 0) {
       const totalRows = await this.db
         .select({
@@ -473,20 +471,30 @@ export class BillingService {
           orders,
           and(eq(orders.restaurantId, orderItems.restaurantId), eq(orders.id, orderItems.orderId)),
         )
-        .where(this.billableIn(tenant, ids))
+        .where(billableIn(tenant, ids))
         .groupBy(orderItems.sessionId);
       for (const row of totalRows) totals.set(row.sessionId, Number(row.total));
       const billRows = await this.db
-        .select({ bill: bills, paidByName: users.displayName })
+        .select({
+          bill: bills,
+          paidByName: users.displayName,
+          paidByEmail: users.email,
+          paidByRole: users.role,
+        })
         .from(bills)
         .leftJoin(users, eq(users.id, bills.paidBy))
         .where(and(eq(bills.restaurantId, tenant), inArray(bills.sessionId, ids)))
         .orderBy(desc(sql`${bills.status} = 'open'`), desc(bills.createdAt));
-      for (const { bill, paidByName } of billRows) {
+      for (const { bill, paidByName, paidByEmail, paidByRole } of billRows) {
         if (bill.status === 'paid') {
           paid.set(bill.sessionId, (paid.get(bill.sessionId) ?? 0) + bill.amountVnd);
         }
-        if (!latest.has(bill.sessionId)) latest.set(bill.sessionId, { ...bill, paidByName });
+        if (!latest.has(bill.sessionId)) {
+          latest.set(bill.sessionId, {
+            ...bill,
+            paidByName: payerName(paidByName, paidByEmail, paidByRole),
+          });
+        }
       }
     }
     return {
@@ -540,83 +548,9 @@ export class BillingService {
         orders,
         and(eq(orders.restaurantId, orderItems.restaurantId), eq(orders.id, orderItems.orderId)),
       )
-      .where(this.billableIn(tenant, [sessionId]))
+      .where(billableIn(tenant, [sessionId]))
       .orderBy(asc(orderItems.seq))
       .limit(LINES_MAX);
-  }
-
-  /** SQL form of `isBillable` (domain/totals.ts) for the given sessions of the tenant. */
-  private billableIn(tenant: TenantId, sessionIds: string[]) {
-    return and(
-      eq(orderItems.restaurantId, tenant),
-      inArray(orderItems.sessionId, sessionIds),
-      ne(orderItems.status, 'cancelled'),
-      inArray(orders.status, [...BILLABLE_ORDER_STATUSES]),
-    );
-  }
-
-  /** Total, paid and due in SQL over every billable line (no display cap). */
-  private async amounts(executor: Executor, tenant: TenantId, sessionId: string) {
-    const [totalRow] = await executor
-      .select({
-        total: sql<string>`coalesce(sum(${orderItems.priceVnd}::bigint * ${orderItems.quantity}), 0)`,
-      })
-      .from(orderItems)
-      .innerJoin(
-        orders,
-        and(eq(orders.restaurantId, orderItems.restaurantId), eq(orders.id, orderItems.orderId)),
-      )
-      .where(this.billableIn(tenant, [sessionId]));
-    const [paidRow] = await executor
-      .select({ paid: sql<string>`coalesce(sum(${bills.amountVnd}), 0)` })
-      .from(bills)
-      .where(
-        and(
-          eq(bills.restaurantId, tenant),
-          eq(bills.sessionId, sessionId),
-          eq(bills.status, 'paid'),
-        ),
-      );
-    const totalVnd = Number(totalRow?.total ?? 0);
-    const paidVnd = Number(paidRow?.paid ?? 0);
-    return { totalVnd, paidVnd, dueVnd: amountDue(totalVnd, paidVnd) };
-  }
-
-  /** Inserts an open bill with a fresh code; a code clash in the restaurant draws another. */
-  private async issue(
-    tx: Executor,
-    tenant: TenantId,
-    sessionId: string,
-    amountVnd: number,
-  ): Promise<BillRow> {
-    for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt += 1) {
-      const [row] = await tx
-        .insert(bills)
-        .values({
-          restaurantId: tenant,
-          sessionId,
-          code: newBillCode(),
-          amountVnd,
-          createdAt: this.clock.now(),
-        })
-        .onConflictDoNothing({ target: [bills.restaurantId, bills.code] })
-        .returning();
-      if (row) return row;
-    }
-    throw new DomainError(ErrorCode.Internal, 500);
-  }
-
-  private async publishBill(tx: Executor, tenant: TenantId, sessionId: string, bill: BillRow) {
-    const data = {
-      billId: bill.id,
-      sessionId,
-      code: bill.code,
-      status: bill.status,
-      amountVnd: bill.amountVnd,
-    };
-    for (const topic of [`session:${sessionId}`, 'floor']) {
-      await publish(tx, { restaurantId: tenant, topic, type: 'bill.status', data });
-    }
   }
 
   private async buildView(
@@ -645,7 +579,7 @@ export class BillingService {
       .where(and(eq(tableSessions.restaurantId, tenant), eq(tableSessions.id, sessionId)))
       .limit(1);
     if (!head) throw notFound();
-    const { totalVnd, paidVnd, dueVnd } = await this.amounts(executor, tenant, sessionId);
+    const { totalVnd, paidVnd, dueVnd } = await sessionAmounts(executor, tenant, sessionId);
     const lines = await this.lines(executor, tenant, sessionId);
     const [latest] = await executor
       .select()

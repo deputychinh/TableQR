@@ -65,7 +65,11 @@ const load = async () => {
     table.value = data;
     document.title = `${data.table.name} · ${data.restaurant.name}`;
     partySize.value = Math.min(2, data.table.seats + EXTRA_CHAIRS);
-    await enter();
+    // Ask first, so the expected "party size" / "wait" answers are never an error (TQR-011).
+    const { next } = await guestApi.checkInNext(token.value);
+    if (next === 'party_size') state.value = { kind: 'party-size' };
+    else if (next === 'wait_for_staff') state.value = { kind: 'wait' };
+    else await enter();
   } catch (error: unknown) {
     state.value = fail(error);
   }
