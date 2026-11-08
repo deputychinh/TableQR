@@ -48,6 +48,7 @@ Details: [docs/architecture/README.md](docs/architecture/README.md) · decisions
 ```
 services/api/  API — NestJS, Drizzle, PostgreSQL, ESLint, Vitest
 web/           web app — Vue 3 (TS strict, ESLint, Stylelint, Vitest, Playwright)
+deploy/        production header set and an nginx example (SPA + /api proxy; see docs/security.md)
 docs/          plan, ADRs, architecture, conventions, testing, screenshots
 ```
 

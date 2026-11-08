@@ -22,4 +22,39 @@ describe('loadSettings', () => {
   it('rejects a missing database url', () => {
     expect(() => loadSettings({ TQR_SESSION_SECRET: 'x'.repeat(32) })).toThrow('TQR_DATABASE_URL');
   });
+
+  it('trusts no proxy and sends no HSTS by default', () => {
+    const settings = loadSettings({ ...validEnv, TQR_TRUSTED_PROXIES: '' });
+    expect(settings.TQR_TRUSTED_PROXIES).toEqual([]);
+    expect(settings.TQR_HSTS).toBe(false);
+  });
+
+  it('reads trusted proxies as addresses, CIDR blocks or named ranges', () => {
+    const settings = loadSettings({
+      ...validEnv,
+      TQR_TRUSTED_PROXIES: '127.0.0.1, 10.0.0.0/8 ,::1,fd00::/8,loopback',
+      TQR_HSTS: 'true',
+    });
+    expect(settings.TQR_TRUSTED_PROXIES).toEqual([
+      '127.0.0.1',
+      '10.0.0.0/8',
+      '::1',
+      'fd00::/8',
+      'loopback',
+    ]);
+    expect(settings.TQR_HSTS).toBe(true);
+  });
+
+  it.each(['true', 'proxy.local', '10.0.0.0/33', '::1/129', '/8'])(
+    'rejects the trusted proxy entry %s at boot',
+    (entry) => {
+      expect(() => loadSettings({ ...validEnv, TQR_TRUSTED_PROXIES: entry })).toThrow(
+        'TQR_TRUSTED_PROXIES',
+      );
+    },
+  );
+
+  it('rejects an HSTS value other than true or false', () => {
+    expect(() => loadSettings({ ...validEnv, TQR_HSTS: 'yes' })).toThrow('TQR_HSTS');
+  });
 });

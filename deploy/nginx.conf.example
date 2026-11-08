@@ -1,0 +1,69 @@
+# TableQR behind nginx (example; no production host is chosen yet, see docs/security.md).
+# Serves the built SPA (`make budget` or `cd web && npm run build-only` → web/dist) and proxies
+# /api to the API on the same origin (ADR 0002). Copy into /etc/nginx/conf.d/ and adjust the
+# server name, certificate paths, dist root and API port.
+#
+# The SPA's headers below must match deploy/security-headers.json (checked by `make test-scripts`);
+# `vite preview` sends the same set, so the browser e2e journeys run under this CSP.
+# The API sets its own headers (stricter CSP, HSTS with TQR_HSTS=true), so /api adds none here.
+#
+# API settings for this setup:
+#   TQR_TRUSTED_PROXIES=127.0.0.1   nginx is the only proxy; the rate limits then key on the
+#                                   real client address from X-Forwarded-For
+#   TQR_HSTS=true                   HTTPS is terminated here
+#   TQR_WEB_ORIGINS=https://tableqr.example.vn
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name tableqr.example.vn;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name tableqr.example.vn;
+
+    ssl_certificate     /etc/letsencrypt/live/tableqr.example.vn/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/tableqr.example.vn/privkey.pem;
+
+    server_tokens off;
+    # Same limit as the API's JSON body limit (32 kB).
+    client_max_body_size 32k;
+
+    root /srv/tableqr/web/dist;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3310;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # Replaces any X-Forwarded-For the client sent, so the API sees exactly one, true address.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Server-sent events (/api/stream/*, /api/g/stream, /api/g/bill/stream): no buffering,
+        # long reads; the API sends a heartbeat every 15 s.
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+    }
+
+    location / {
+        add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "same-origin" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+
+        # Client-side routes (/t/:qrToken, /quan-ly/...) all load index.html.
+        try_files $uri /index.html;
+
+        # Hashed file names: cache for good. No add_header here, so the headers above still apply.
+        location /assets/ {
+            expires max;
+        }
+    }
+}

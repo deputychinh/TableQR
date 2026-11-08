@@ -7,6 +7,7 @@ import { configureApp } from '../../src/bootstrap.js';
 import type { LogSink } from '../../src/common/logging/log-sink.js';
 import { LOG_SINK } from '../../src/common/logging/log-sink.js';
 import { CLOCK, type Clock } from '../../src/common/clock.js';
+import { SETTINGS, loadSettings } from '../../src/config/settings.js';
 
 export interface TestApp {
   app: INestApplication<App>;
@@ -25,8 +26,14 @@ export class MovableClock implements Clock {
   }
 }
 
-/** Builds the real app (same configuration as main.ts) with logs captured in memory. */
-export const createTestApp = async (extra: ModuleMetadata = {}): Promise<TestApp> => {
+/**
+ * Builds the real app (same configuration as main.ts) with logs captured in memory. `env` sets
+ * settings for this app only, on top of the process environment (e.g. `TQR_TRUSTED_PROXIES`).
+ */
+export const createTestApp = async (
+  extra: ModuleMetadata = {},
+  env: Record<string, string> = {},
+): Promise<TestApp> => {
   const logs: Record<string, unknown>[] = [];
   const sink: LogSink = { write: (entry) => logs.push(entry) };
   const clock = new MovableClock();
@@ -38,6 +45,8 @@ export const createTestApp = async (extra: ModuleMetadata = {}): Promise<TestApp
     .useValue(sink)
     .overrideProvider(CLOCK)
     .useValue(clock)
+    .overrideProvider(SETTINGS)
+    .useValue(loadSettings({ ...process.env, ...env }))
     .compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
   configureApp(app);

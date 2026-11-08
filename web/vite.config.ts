@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import process from 'node:process';
 import { defineConfig } from 'vite';
@@ -6,6 +7,13 @@ import vue from '@vitejs/plugin-vue';
 // The SPA and the API share one origin (ADR 0002): `/api` is proxied to the API process.
 const apiTarget = `http://127.0.0.1:${process.env.TQR_API_PORT ?? '3310'}`;
 const proxy = { '/api': { target: apiTarget, changeOrigin: false } };
+
+// Production headers of the SPA (CSP and friends, TQR-022), shared with deploy/nginx.conf.example.
+// `vite preview` sends them so the browser e2e journeys run under the production CSP; the dev
+// server does not (its HMR client needs inline code and a websocket).
+const securityHeaders = JSON.parse(
+  readFileSync(new URL('../deploy/security-headers.json', import.meta.url), 'utf8'),
+) as Record<string, string>;
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -35,7 +43,7 @@ export default defineConfig({
   },
   // Loopback only; both localhost and 127.0.0.1 reach it.
   server: { host: '127.0.0.1', proxy },
-  preview: { host: '127.0.0.1', proxy },
+  preview: { host: '127.0.0.1', proxy, headers: securityHeaders },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

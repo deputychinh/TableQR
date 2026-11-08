@@ -1,4 +1,10 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test';
 
 export { devices, expect } from '@playwright/test';
 export type { APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
@@ -62,11 +68,59 @@ export const expectNoHorizontalScroll = async (page: Page): Promise<void> => {
   expect(found, `horizontal scroll on ${new URL(page.url()).pathname}`).toEqual([]);
 };
 
+/** Prefix of the console line the page writes for each CSP violation (see `reportViolations`). */
+const CSP_MARK = '[csp-violation]';
+
+/** Runs in every page before its own scripts: a CSP violation becomes a console error. */
+const reportViolations = (mark: string): void => {
+  document.addEventListener('securitypolicyviolation', (event) => {
+    console.error(`${mark} ${event.effectiveDirective} blocked ${event.blockedURI || 'inline'}`);
+  });
+};
+
+/** A console message about a refused resource, from our listener or the browser itself. */
+const isCspMessage = (text: string): boolean =>
+  text.startsWith(CSP_MARK) || /Content[ -]Security[ -]Policy/i.test(text);
+
+type ContextFactory = Browser['newContext'];
+
 /**
  * The journeys' `test`: on the iPhone project every screen a journey shows is watched (each
  * route change and every half second) and the test fails if any of them scrolled sideways.
+ * On both projects every page — the test's own and the guest phones a journey opens with
+ * `browser.newContext()` / `browser.newPage()` — runs under the production CSP of `vite preview`
+ * (TQR-022), and the test fails on any CSP violation.
  */
-export const test = base.extend<{ noHorizontalScroll: undefined }>({
+export const test = base.extend<{ noHorizontalScroll: undefined; noCspViolations: undefined }>({
+  noCspViolations: [
+    async ({ browser, context }, use) => {
+      const violations: string[] = [];
+      const watch = async (watched: BrowserContext) => {
+        await watched.addInitScript(reportViolations, CSP_MARK);
+        watched.on('console', (message) => {
+          if (message.type() === 'error' && isCspMessage(message.text())) {
+            violations.push(`${message.page()?.url() ?? '?'}: ${message.text()}`);
+          }
+        });
+      };
+      await watch(context);
+      // `browser.newPage()` goes through `newContext()` too, so this covers both.
+      const original: ContextFactory = browser.newContext.bind(browser);
+      const patched: ContextFactory = async (options) => {
+        const created = await original(options);
+        await watch(created);
+        return created;
+      };
+      browser.newContext = patched;
+      try {
+        await use(undefined);
+      } finally {
+        browser.newContext = original;
+      }
+      expect(violations, 'no Content-Security-Policy violations').toEqual([]);
+    },
+    { auto: true },
+  ],
   noHorizontalScroll: [
     async ({ page }, use, info) => {
       if (info.project.name !== 'iphone') {
