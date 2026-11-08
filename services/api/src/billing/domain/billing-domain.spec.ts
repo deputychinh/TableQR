@@ -5,7 +5,12 @@ import {
   newBillCode,
   normalizeBillCode,
 } from './bill-code.js';
-import { BANK_CHANGE_WARNING_MS, closeNeedsReason, isBankChangeRecent } from './cashier-rules.js';
+import {
+  BANK_CHANGE_WARNING_MS,
+  closeNeedsReason,
+  isBankChangeRecent,
+  payerName,
+} from './cashier-rules.js';
 import { crc16CcittFalse, crc16Hex } from './crc16.js';
 import { amountDue, decideBill, isBillable, sessionTotal, type BillableLine } from './totals.js';
 import {
@@ -64,6 +69,23 @@ describe('CRC-16/CCITT-FALSE', () => {
   it('pads small values to 4 upper-case hex digits', () => {
     expect(crc16Hex('123456789')).toBe('29B1');
     expect(crc16Hex('A')).toMatch(/^[0-9A-F]{4}$/);
+  });
+
+  it('writes a CRC below 0x1000 with leading zeros: 0x00AF → "00AF" (a real bill payload)', () => {
+    // Found by search: 369 000 VND, memo "TQR 7F3K2" has CRC 0x00AF. A 3-digit pad would print
+    // "0AF" and banks would refuse the code.
+    const payload = buildVietQr({
+      bin: '970436',
+      accountNumber: '0123456789',
+      amountVnd: 369_000,
+      memo: billMemo('7F3K2'),
+    });
+    expect(crc16CcittFalse(payload.slice(0, -4))).toBe(0x00af);
+    expect(payload).toBe(
+      '00020101021238540010A00000072701240006970436011001234567890208QRIBFTTA530370454063690005802VN62130809TQR 7F3K2630400AF',
+    );
+    expect(payload.endsWith('630400AF')).toBe(true);
+    expect(decodeVietQr(payload)).toMatchObject({ crc: '00AF', crcValid: true });
   });
 });
 
@@ -273,6 +295,13 @@ describe('cashier rules', () => {
     );
     expect(isBankChangeRecent(new Date(now.getTime() - BANK_CHANGE_WARNING_MS), now)).toBe(false);
     expect(isBankChangeRecent(new Date(now.getTime() + 60_000), now)).toBe(false);
+  });
+
+  it('TQR-019: names the payer by display name, else "Chủ quán" for the owner, else the email local part', () => {
+    expect(payerName('Lan', 'lan@x.vn', 'cashier')).toBe('Lan');
+    expect(payerName('', 'chu@x.vn', 'owner')).toBe('Chủ quán');
+    expect(payerName('  ', 'thu.ngan@quan.vn', 'cashier')).toBe('thu.ngan');
+    expect(payerName(null, null, null)).toBeNull();
   });
 
   it('AC47: needs a close reason only while money is still due', () => {

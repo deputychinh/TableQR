@@ -140,4 +140,70 @@ describe('guest live status stream GET /api/g/stream (e2e, AC38–AC39)', () => 
     const response = await fetch(`${base}/api/g/stream`);
     expect(response.status).toBe(401);
   });
+
+  it('TQR-016 freshness: "Xong" in the kitchen reaches 30 tables × 3 phones and 2 floor screens, p95 ≤ 2 s', async () => {
+    const floor = await setupFloor(t, 8);
+    const post = (path: string, body: object) =>
+      request(t.app.getHttpServer())
+        .post(path)
+        .set('origin', ORIGIN)
+        .set('cookie', floor.ownerCookie)
+        .send(body);
+    const tables = [{ qrToken: floor.qrToken }];
+    for (let n = 2; n <= 30; n += 1) {
+      tables.push(
+        (await post('/api/tables', { name: `Bàn ${String(n)}`, seats: 8 }).expect(201)).body,
+      );
+    }
+    const guests: SseClient[] = [];
+    const items: { id: string; version: number }[] = [];
+    for (const table of tables) {
+      const first = await joinPhone(t, { ...floor, qrToken: table.qrToken }, 2);
+      const phones = [
+        first,
+        await joinPhone(t, { ...floor, qrToken: table.qrToken }),
+        await joinPhone(t, { ...floor, qrToken: table.qrToken }),
+      ];
+      for (const phone of phones) {
+        const client = await open(phone.cookie);
+        await client.waitFor((m) => m.event === 'snapshot');
+        guests.push(client);
+      }
+      const placed = await placeOrder(t, first, [line(floor.items.pho)]).expect(201);
+      items.push({ id: placed.body.items[0].id as string, version: 1 });
+    }
+    const screens: SseClient[] = [];
+    for (let n = 0; n < 2; n += 1) {
+      const client = await openSse(`${base}/api/stream/floor`, floor.ownerCookie);
+      clients.push(client);
+      await client.waitFor((m) => m.event === 'snapshot');
+      screens.push(client);
+    }
+    const sentAt = new Map<string, number>();
+    // The cook works the queue in order (no skips): start, then "Xong".
+    for (const item of items) {
+      await post(`/api/kitchen/items/${item.id}/start`, { version: 1 }).expect(200);
+      sentAt.set(item.id, performance.now());
+      await post(`/api/kitchen/items/${item.id}/done`, { version: 2 }).expect(200);
+    }
+    const isDone = (m: { event: string; data: Record<string, unknown> }) =>
+      m.event === 'delta' && m.data.type === 'item.status' && m.data.status === 'done';
+    const delays: number[] = [];
+    for (const client of [...guests, ...screens]) {
+      const expected = screens.includes(client) ? items.length : 1;
+      await expect
+        .poll(() => client.messages.filter(isDone).length, { timeout: 10_000 })
+        .toBeGreaterThanOrEqual(expected);
+      for (const m of client.messages.filter(isDone)) {
+        delays.push(m.at - (sentAt.get(m.data.itemId as string) ?? Infinity));
+      }
+    }
+    delays.sort((x, y) => x - y);
+    const p95 = delays[Math.floor(delays.length * 0.95)] ?? Infinity;
+    process.stdout.write(
+      `guest freshness: ${String(delays.length)} deliveries, p95 ${p95.toFixed(1)} ms\n`,
+    );
+    expect(delays).toHaveLength(30 * 3 + 2 * 30);
+    expect(p95).toBeLessThan(2000);
+  }, 60_000);
 });
