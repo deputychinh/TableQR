@@ -7,6 +7,8 @@ import { AppLogger } from '../common/logging/app-logger.js';
 import type { TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
 import { restaurants } from '../db/schema.js';
+import { AuthService } from '../identity/auth.service.js';
+import { reauthRequiredError } from '../identity/identity.errors.js';
 import { maskAccountNumber } from './domain/account-name.js';
 import { type Bank, VIETNAM_BANKS, bankByBin } from './domain/banks.js';
 import { type HouseRules, readStoredRules, sameRules } from './domain/house-rules.js';
@@ -57,6 +59,7 @@ export class SettingsService {
     @Inject(DB) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly logger: AppLogger,
+    private readonly auth: AuthService,
   ) {}
 
   async ownerSettings(tenantId: TenantId): Promise<OwnerSettings> {
@@ -77,18 +80,29 @@ export class SettingsService {
    * Replaces the rules and the bank account in one transaction (row locked). The rules version
    * (`rules_updated_at`, AC12) and `bank_changed_at` move only when the value really changed, so
    * saving an untouched form creates no new version and no false "bank changed" warning.
+   *
+   * Step-up (TQR-023): a new or removed bank account needs the owner's current password, checked
+   * before the transaction (scrypt is slow; no row lock is held meanwhile). Should the stored
+   * account change between that read and the lock, an unverified change is refused.
    */
   async update(
     tenantId: TenantId,
     userId: string,
-    input: { rules: HouseRules; bank: BankAccount | null },
+    input: { rules: HouseRules; bank: BankAccount | null; currentPassword?: string },
   ): Promise<OwnerSettings> {
     const now = this.clock.now();
+    let verified = false;
+    if (!sameBank(bankOf(await this.load(this.db, tenantId)), input.bank)) {
+      if (input.currentPassword === undefined) throw reauthRequiredError();
+      await this.auth.reauthenticate(userId, input.currentPassword);
+      verified = true;
+    }
     const { row, bankChanged, previous } = await this.db.transaction(async (tx) => {
       const current = await this.load(tx, tenantId, true);
       const rulesChanged = !sameRules(readStoredRules(current.rules), input.rules);
       const before = bankOf(current);
       const changed = !sameBank(before, input.bank);
+      if (changed && !verified) throw reauthRequiredError();
       if (!rulesChanged && !changed) return { row: current, bankChanged: false, previous: before };
       const [updated] = await tx
         .update(restaurants)

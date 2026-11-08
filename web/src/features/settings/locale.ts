@@ -104,6 +104,11 @@ export const settings = {
       confirm: 'Đúng, lưu tài khoản này',
       confirmRemove: 'Bỏ tài khoản',
       cancel: 'Huỷ',
+      password: 'Mật khẩu đăng nhập của bạn',
+      passwordHint: 'Để chắc chắn chính chủ quán đổi tài khoản nhận tiền.',
+      passwordRequired: 'Nhập mật khẩu để xác nhận.',
+      passwordWrong: 'Mật khẩu không đúng. Kiểm tra lại rồi thử lần nữa.',
+      passwordBlocked: 'Bạn nhập sai quá nhiều lần. Hãy thử lại sau 15 phút.',
     },
     leave: {
       title: 'Rời trang khi chưa lưu?',

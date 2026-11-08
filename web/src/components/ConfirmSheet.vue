@@ -23,8 +23,9 @@ const id = useId();
 const panel = ref<HTMLElement | null>(null);
 let returnFocus: HTMLElement | null = null;
 
+const FIELDS = 'input:not(:disabled), select:not(:disabled), textarea:not(:disabled)';
 const focusables = (): HTMLElement[] =>
-  Array.from(panel.value?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? []);
+  Array.from(panel.value?.querySelectorAll<HTMLElement>(`button:not(:disabled), ${FIELDS}`) ?? []);
 
 watch(
   () => props.open,
@@ -32,7 +33,9 @@ watch(
     if (open) {
       returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       await nextTick();
-      focusables()[0]?.focus();
+      // A sheet that asks for something (a password, a reason) starts in that field;
+      // otherwise on the first button, the safe choice.
+      (panel.value?.querySelector<HTMLElement>(FIELDS) ?? focusables()[0])?.focus();
     } else {
       returnFocus?.focus();
       returnFocus = null;

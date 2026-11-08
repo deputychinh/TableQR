@@ -72,9 +72,11 @@ const seed = async (api: APIRequestContext, stamp: string) => {
   const restaurantId = ((await signUp.json()) as { restaurant: { id: string } }).restaurant.id;
   const rules = ((await (await api.get('/api/restaurant/settings')).json()) as { rules: unknown })
     .rules;
-  expect((await api.put('/api/restaurant/settings', { data: { rules, bank: BANK } })).ok()).toBe(
-    true,
-  );
+  // A new bank account re-sends the owner's password (step-up, TQR-023).
+  const saved = await api.put('/api/restaurant/settings', {
+    data: { rules, bank: BANK, currentPassword: PASSWORD },
+  });
+  expect(saved.ok()).toBe(true);
   const cashierEmail = `bill-cashier-${stamp}@example.com`;
   const staff = await api.post('/api/staff', {
     data: { displayName: 'Lan', email: cashierEmail, password: STAFF_PASSWORD, role: 'cashier' },

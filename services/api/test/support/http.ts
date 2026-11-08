@@ -2,6 +2,8 @@ import request from 'supertest';
 import type { TestApp } from './app.js';
 
 export const ORIGIN = 'http://localhost:5310';
+/** The password of every owner `newOwner()` / `signUp()` creates (step-up calls re-send it). */
+export const OWNER_PASSWORD = 'mat-khau-dai-123';
 let counter = 0;
 
 /** A unique, valid sign-up body. */
@@ -10,7 +12,7 @@ export const newOwner = (name = 'Quán Thử') => {
   return {
     restaurantName: `${name} ${counter}`,
     email: `owner${counter}-${Date.now()}@example.com`,
-    password: 'mat-khau-dai-123',
+    password: OWNER_PASSWORD,
   };
 };
 

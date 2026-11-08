@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { test, expect, type Page } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -40,9 +41,22 @@ test('owner sets house rules and a bank account; a reload shows them (AC12 setti
   await page.getByRole('button', { name: 'Lưu thay đổi' }).click();
   const sheet = page.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' });
   await expect(sheet).toContainText('0123456789');
+  // Step-up (TQR-023): the sheet starts in the password field; a wrong one is said inline.
+  const password = sheet.getByLabel('Mật khẩu đăng nhập của bạn', { exact: true });
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute('type', 'password');
+  await expect(password).toHaveAttribute('autocomplete', 'current-password');
   await expectNoSeriousA11yIssues(page);
+  await password.fill('mat-khau-sai-1');
   await sheet.getByRole('button', { name: 'Đúng, lưu tài khoản này' }).click();
+  await expect(sheet.getByText('Mật khẩu không đúng. Kiểm tra lại rồi thử lần nữa.')).toBeVisible();
+  await expect(password).toHaveValue('');
+  await expect(password).toBeFocused();
+  await expectNoSeriousA11yIssues(page);
+  await password.fill('mat-khau-dai-123');
+  await password.press('Enter');
   await expect(page.getByText(/Đã lưu/)).toBeVisible();
+  await expect(sheet).toBeHidden();
 
   await page.reload();
   await expect(page.getByRole('radio', { name: /Thanh toán trước khi bếp làm/ })).toBeChecked();
@@ -111,3 +125,36 @@ test('the field to fix is focused in view, never under the sticky save bar (r2 r
     })
     .toBe(true);
 });
+
+// Evidence for review, not part of CI: E2E_SCREENSHOTS=1 npx playwright test settings --project=iphone
+// Writes docs/delivery/001-qr-table-ordering/evidence/settings-reauth-390-<light|dark>.png (TQR-023).
+if (process.env.E2E_SCREENSHOTS) {
+  test('screenshots of the bank sheet with the password step', async ({ page }, info) => {
+    await page.goto('/dang-ky');
+    await page.getByLabel('Tên nhà hàng').fill('Phở Xác Nhận');
+    await page
+      .getByLabel('Email', { exact: true })
+      .fill(`reauth-shots-${info.project.name}-${Date.now()}@example.com`);
+    await page.getByLabel('Mật khẩu', { exact: true }).fill('mat-khau-dai-123');
+    await page.getByRole('button', { name: 'Tạo nhà hàng' }).click();
+    await expect(page).toHaveURL(/\/quan-ly$/);
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto('/quan-ly/cai-dat');
+      await page.getByLabel('Ngân hàng').selectOption({ label: 'Vietcombank' });
+      await page.getByLabel('Số tài khoản').fill('0123456789');
+      await page.getByLabel('Tên chủ tài khoản').fill('Nguyễn Văn Ánh');
+      await page.getByRole('button', { name: 'Lưu thay đổi' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Đổi tài khoản nhận tiền?' });
+      const password = sheet.getByLabel('Mật khẩu đăng nhập của bạn', { exact: true });
+      await password.fill('mat-khau-sai-1');
+      await sheet.getByRole('button', { name: 'Đúng, lưu tài khoản này' }).click();
+      await expect(sheet.getByText(/Mật khẩu không đúng/)).toBeVisible();
+      await page.screenshot({
+        path: `../docs/delivery/001-qr-table-ordering/evidence/settings-reauth-390-${scheme}.png`,
+      });
+      await sheet.getByRole('button', { name: 'Huỷ' }).click();
+    }
+  });
+}

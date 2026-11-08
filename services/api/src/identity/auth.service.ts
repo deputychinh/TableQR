@@ -116,6 +116,35 @@ export class AuthService {
     return this.issueSession(this.db, user.id, user.restaurantId);
   }
 
+  /**
+   * Step-up check before a sensitive change (TQR-023): the signed-in person re-enters their
+   * password. Counted by the same per-email throttle as sign-in (AC4, D1), so it cannot be used to
+   * guess the password either: 10 failures in 15 minutes → 429 `LOGIN_BLOCKED` here and at
+   * sign-in. Wrong password → 403 `REAUTH_FAILED` (not 401: the session itself stays valid).
+   */
+  async reauthenticate(userId: string, password: string): Promise<void> {
+    const [user] = await this.db
+      .select({
+        email: users.email,
+        passwordHash: users.passwordHash,
+        disabledAt: users.disabledAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!user) throw new DomainError(ErrorCode.Unauthorized, 401);
+    const attemptId = await this.reserveAttempt(user.email);
+    if (!(await checkCredentials(user, password))) {
+      throw new DomainError(IdentityErrorCode.ReauthFailed, 403, {
+        detail: 'Mật khẩu hiện tại không đúng',
+      });
+    }
+    await this.db
+      .update(loginAttempts)
+      .set({ succeeded: true })
+      .where(eq(loginAttempts.id, attemptId));
+  }
+
   /** Counts failures and records this attempt as a failure in one short, per-email serialised step. */
   private async reserveAttempt(email: string): Promise<string> {
     const now = this.clock.now();

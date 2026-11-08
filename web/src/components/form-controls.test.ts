@@ -184,6 +184,21 @@ describe('ConfirmSheet', () => {
     expect(document.activeElement).toBe(confirm);
   });
 
+  it('starts in the field when the sheet asks for something, and Tab reaches it', async () => {
+    const { rerender } = render(ConfirmSheet, {
+      props: { open: false, title: 'Xác nhận', confirmLabel: 'Đồng ý', cancelLabel: 'Xem lại' },
+      slots: { default: '<label>Mật khẩu <input type="password" /></label>' },
+    });
+    await rerender({ open: true });
+    await nextTick();
+    const field = screen.getByLabelText('Mật khẩu');
+    expect(document.activeElement).toBe(field);
+    const confirm = screen.getByRole('button', { name: 'Đồng ý' });
+    confirm.focus();
+    await fireEvent.keyDown(confirm, { key: 'Tab' });
+    expect(document.activeElement).toBe(field);
+  });
+
   it('cannot be dismissed while busy', async () => {
     const { onCancel } = renderSheet(true, true);
     await fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });

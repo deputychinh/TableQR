@@ -8,6 +8,7 @@
  * A `stream` row (SSE) is checked by status only: the stream is opened and closed at once.
  */
 import { DEFAULT_RULES } from '../../src/settings/domain/house-rules.js';
+import { OWNER_PASSWORD } from './http.js';
 
 export type MatrixRole = 'owner' | 'cashier' | 'waiter' | 'kitchen' | 'platform_admin';
 
@@ -106,7 +107,8 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     method: 'put',
     path: () => '/api/restaurant/settings',
     allowed: OWNER,
-    body: () => ({ rules: DEFAULT_RULES, bank: BANK }),
+    // The owner signed up through `signUp()`; a bank change re-sends the password (TQR-023).
+    body: () => ({ rules: DEFAULT_RULES, bank: BANK, currentPassword: OWNER_PASSWORD }),
   },
   { method: 'get', path: () => '/api/restaurant/rules', allowed: RESTAURANT },
   // menu (TQR-006); the public GET /api/g/r/:slug/menu needs no session and is not a staff row
