@@ -16,6 +16,8 @@ import {
   type Ticket,
 } from '../services/kitchen.service';
 import { useStationQueue } from '../useStationQueue';
+import StreamBanner from '@/components/StreamBanner.vue';
+import { useConnectionVoice } from '../voice/useConnectionVoice';
 import { useVoiceAnnouncements } from '../voice/useVoiceAnnouncements';
 import SkipReasonSheet from './SkipReasonSheet.vue';
 import TicketCard from './TicketCard.vue';
@@ -46,6 +48,16 @@ useVoiceAnnouncements({
   say: (text) => {
     emit('say', text);
   },
+});
+// TQR-031: the cook hears it when the screen stops receiving orders, and when it is back.
+useConnectionVoice({
+  status,
+  enabled: toRef(props, 'voice'),
+  say: (text) => {
+    emit('say', text);
+  },
+  lost: t('kitchen.voice.lost'),
+  back: t('kitchen.voice.back'),
 });
 
 const waiting = computed(() => items.value.filter((i) => i.status === 'waiting'));
@@ -123,10 +135,8 @@ const confirmSkip = async (reason: string) => {
 
 <template>
   <div class="station-queue">
-    <p class="station-queue__message" role="status">
-      <template v-if="status === 'reconnecting'">{{ t('kitchen.live.reconnecting') }}</template>
-      <template v-else>{{ message }}</template>
-    </p>
+    <StreamBanner :status="status" />
+    <p class="station-queue__message" role="status">{{ message }}</p>
     <LoadingState v-if="!loaded && !failed" :label="t('kitchen.loading')" :rows="3" />
     <ErrorState
       v-else-if="failed"

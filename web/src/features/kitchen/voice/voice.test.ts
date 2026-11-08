@@ -21,6 +21,8 @@ import {
 } from './settings';
 import { createSpeechQueue, type SpeechEngine } from './speech-queue';
 import { useVoiceAnnouncements } from './useVoiceAnnouncements';
+import { LOST_GRACE_MS, useConnectionVoice } from './useConnectionVoice';
+import type { StreamStatus } from '@/composables/useStream';
 
 const NOW = Date.parse('2026-11-08T12:00:00.000Z');
 const MIN = 60_000;
@@ -136,6 +138,26 @@ describe('reminder phrases (TQR-028)', () => {
     expect(reminderPhrase([line('Bàn 5', 'Phở bò', 14), line('Bàn 2', 'Trà đá', 11)])).toBe(
       'Bàn 5 gọi phở bò đã 14 phút, Bàn 2 gọi trà đá đã 11 phút, chưa ra món',
     );
+  });
+
+  it('says one table once: its dishes together, on the wait of its oldest dish', () => {
+    expect(reminderPhrase([line('Bàn 5', 'Phở bò tái', 6, 2), line('Bàn 5', 'Trà đá', 5)])).toBe(
+      'Bàn 5 gọi hai phở bò tái và trà đá đã 6 phút, chưa ra món',
+    );
+    expect(
+      reminderPhrase([
+        line('Bàn 5', 'Phở bò', 14),
+        line('Bàn 2', 'Trà đá', 12),
+        line('Bàn 5', 'Nem rán', 11),
+      ]),
+    ).toBe('Bàn 5 gọi phở bò và nem rán đã 14 phút, Bàn 2 gọi trà đá đã 12 phút, chưa ra món');
+    expect(
+      reminderPhrase([
+        line('Bàn 1', 'Phở bò', 9),
+        line('Bàn 1', 'Bún chả', 9),
+        line('Bàn 1', 'Trà đá', 9, 3),
+      ]),
+    ).toBe('Bàn 1 gọi phở bò, bún chả và ba trà đá đã 9 phút, chưa ra món');
   });
 
   it(`names at most ${String(MAX_PER_REMINDER)} dishes and counts the rest`, () => {
@@ -485,5 +507,75 @@ describe('useVoiceAnnouncements (stream → sentences)', () => {
     await nextTick();
     expect(s.said).toEqual(['Bàn 5 gọi phở bò đã 12 phút, chưa ra món']);
     s.scope.stop();
+  });
+});
+
+describe('useConnectionVoice (TQR-031: a cook who does not look still hears it)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const setUp = (on = true) => {
+    vi.useFakeTimers();
+    const status = ref<StreamStatus>('connecting');
+    const enabled = ref(on);
+    const said: string[] = [];
+    const scope = effectScope();
+    scope.run(() => {
+      useConnectionVoice({
+        status,
+        enabled,
+        say: (text) => said.push(text),
+        lost: 'Mất kết nối máy chủ',
+        back: 'Đã kết nối lại',
+      });
+    });
+    return { status, enabled, said, scope };
+  };
+
+  it('says the stream is lost once when it stays down, and that it is back when it returns', async () => {
+    const { status, said } = setUp();
+    status.value = 'live';
+    await nextTick();
+    status.value = 'reconnecting';
+    await nextTick();
+    vi.advanceTimersByTime(LOST_GRACE_MS - 1);
+    expect(said).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(said).toEqual(['Mất kết nối máy chủ']);
+    vi.advanceTimersByTime(10 * LOST_GRACE_MS);
+    expect(said).toEqual(['Mất kết nối máy chủ']);
+    status.value = 'live';
+    await nextTick();
+    expect(said).toEqual(['Mất kết nối máy chủ', 'Đã kết nối lại']);
+  });
+
+  it('stays quiet about a blip shorter than the grace time and while the voice is off', async () => {
+    const { status, enabled, said } = setUp();
+    status.value = 'live';
+    await nextTick();
+    status.value = 'reconnecting';
+    await nextTick();
+    vi.advanceTimersByTime(LOST_GRACE_MS / 2);
+    status.value = 'live';
+    await nextTick();
+    vi.advanceTimersByTime(LOST_GRACE_MS);
+    enabled.value = false;
+    status.value = 'reconnecting';
+    await nextTick();
+    vi.advanceTimersByTime(LOST_GRACE_MS);
+    status.value = 'live';
+    await nextTick();
+    expect(said).toEqual([]);
+  });
+
+  it('never announces the first connection and stops its timer with the screen', async () => {
+    const { status, said, scope } = setUp();
+    vi.advanceTimersByTime(LOST_GRACE_MS * 3);
+    status.value = 'live';
+    await nextTick();
+    status.value = 'reconnecting';
+    await nextTick();
+    scope.stop();
+    vi.advanceTimersByTime(LOST_GRACE_MS);
+    expect(said).toEqual([]);
   });
 });
