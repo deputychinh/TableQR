@@ -22,5 +22,7 @@ Full numbers: `benchmarks/baseline.json`. Lighthouse stays out of `make ci` (20 
 
 ## Changes to the baseline
 
+- 2026-11-08 guest menu LCP 2 601 → ~1 960 ms (3 runs) by grouping chunks (`manualChunks`: vendor, icons, qr, ui, guest) — initial JS 74.0 → 98.1 kB gzip, still under 150 kB; landing LCP ~760 → ~900 ms. Deliberate trade: guests open one QR page on a phone, owners load the app once.
+
 - 2026-11-08 (TQR-012/016 review fixes): `api-health` is retired — `make bench` now runs the real `guest-order-submit` workload; the guest menu Lighthouse run exists (`LH_GUEST_MENU=1`) and is over budget (see above); the realtime-freshness row is measured in `make ci`. The landing page LCP re-measured at 754 ms on this machine (was 1 650–1 869 ms with the earlier Lighthouse run; same budget).
 - 2026-11-08 (review of TQR-003): the Lighthouse workload was named `guest-menu-cold-load` but measured the landing page `/`; it is renamed `landing-cold-load` (same numbers). The guest menu page measurement moves to TQR-016, when the guest menu page exists with real data.
