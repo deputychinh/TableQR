@@ -244,6 +244,12 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     allowed: COOKS,
     body: () => ({ version: 1, skipReason: 'ma trận' }),
   },
+  {
+    method: 'post',
+    path: (f) => `/api/kitchen/items/${f.waitingItemId()}/cancel`,
+    allowed: COOKS,
+    body: () => ({ version: 1 }),
+  },
   // serving (TQR-015): a cook cannot mark a dish served, a waiter cannot cook
   { method: 'get', path: () => '/api/serve/ready', allowed: FLOOR },
   {

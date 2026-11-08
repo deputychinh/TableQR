@@ -42,7 +42,7 @@ export interface ItemChange {
 
 export const SKIP_REASON_MAX = 140;
 
-const item = (id: string, action: 'start' | 'done') =>
+const item = (id: string, action: 'start' | 'done' | 'cancel') =>
   `/kitchen/items/${encodeURIComponent(id)}/${action}`;
 
 export const listStations = async (): Promise<KitchenStation[]> =>
@@ -62,3 +62,7 @@ export const finishItem = (
   skipReason?: string,
 ): Promise<ItemChange> =>
   sendJson<ItemChange>('POST', item(ticket.id, 'done'), { version: ticket.version, skipReason });
+
+/** TQR-025 "Bỏ món": the kitchen cannot make it; the guest sees "Đã huỷ" and the bill follows. */
+export const cancelItem = (ticket: Pick<Ticket, 'id' | 'version'>): Promise<ItemChange> =>
+  sendJson<ItemChange>('POST', item(ticket.id, 'cancel'), { version: ticket.version });

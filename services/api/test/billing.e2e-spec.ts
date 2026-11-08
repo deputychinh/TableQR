@@ -407,6 +407,123 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
       const [row] = await db.select().from(bills).where(eq(bills.sessionId, session.sessionId));
       expect(row).toBeUndefined();
     });
+
+    describe('TQR-025 the kitchen cancels an item ("Huỷ món")', () => {
+      const cancel = (r: Restaurant, itemId: string, version = 1) =>
+        post(`/api/kitchen/items/${itemId}/cancel`, r.kitchen, { version });
+      const billsOf = (sessionId: string) =>
+        db
+          .select({ status: bills.status, amountVnd: bills.amountVnd })
+          .from(bills)
+          .where(eq(bills.sessionId, sessionId));
+
+      it('supersedes the open bill with one for the new amount in the same transaction; the open bill page and the item hear it live', async () => {
+        const session = await openSession(db, a.floor);
+        const { itemIds } = await addOrder(db, a.floor, session, 'released', [
+          { name: 'Phở bò', priceVnd: 50_000, quantity: 1 },
+          { name: 'Nem rán', priceVnd: 40_000, quantity: 1 },
+        ]);
+        const first = (await guestBill(session)).body.bill as { id: string; code: string };
+        const stream = await openBillStream(session);
+        const captured = captureEvents(a.id, [`session:${session.sessionId}`]);
+
+        const response = await cancel(a, itemIds[1] ?? '').expect(200);
+        expect(response.body).toMatchObject({ status: 'cancelled', version: 2 });
+
+        const superseded = await billEvent(stream, 'superseded', first.id);
+        expect(superseded.data).toMatchObject({ code: first.code, amountVnd: 90_000 });
+        const issued = await billEvent(stream, 'open');
+        expect(issued.data.amountVnd).toBe(50_000);
+        expect(issued.data.code).not.toBe(first.code);
+        const view = (
+          await http().get('/api/g/bill').set('cookie', session.guestCookie).expect(200)
+        ).body;
+        expect(view).toMatchObject({ totalVnd: 50_000, dueVnd: 50_000 });
+        expect(view.bill).toMatchObject({ id: issued.data.billId, amountVnd: 50_000 });
+        expect(decodeVietQr(view.transfer.payload as string).amountVnd).toBe(50_000);
+        expect(view.lines.map((l: { name: string }) => l.name)).toEqual(['Phở bò']);
+        await vi.waitFor(() =>
+          expect(captured.events).toContainEqual(
+            expect.objectContaining({
+              type: 'item.status',
+              data: expect.objectContaining({ itemId: itemIds[1], status: 'cancelled' }),
+            }),
+          ),
+        );
+        captured.stop();
+        expect(await billsOf(session.sessionId)).toEqual(
+          expect.arrayContaining([
+            { status: 'superseded', amountVnd: 90_000 },
+            { status: 'open', amountVnd: 50_000 },
+          ]),
+        );
+      });
+
+      it('when nothing is due any more the open bill is superseded and no new bill is issued', async () => {
+        const session = await openSession(db, a.floor);
+        const { itemIds } = await addOrder(db, a.floor, session, 'released', [
+          { priceVnd: 30_000, quantity: 1 },
+        ]);
+        const first = (await guestBill(session)).body.bill as { id: string };
+        const stream = await openBillStream(session);
+
+        await cancel(a, itemIds[0] ?? '').expect(200);
+
+        await billEvent(stream, 'superseded', first.id);
+        expect(await billsOf(session.sessionId)).toEqual([
+          { status: 'superseded', amountVnd: 30_000 },
+        ]);
+        const view = (
+          await http().get('/api/g/bill').set('cookie', session.guestCookie).expect(200)
+        ).body;
+        expect(view).toMatchObject({ dueVnd: 0, transfer: null });
+        expect(view.bill).toMatchObject({ id: first.id, status: 'superseded' });
+      });
+
+      it('issues no bill when the table never asked for one, and cancels a dish already cooking', async () => {
+        const session = await openSession(db, a.floor);
+        const { itemIds } = await addOrder(db, a.floor, session, 'released', [
+          { priceVnd: 30_000, quantity: 1, status: 'cooking' },
+          { priceVnd: 20_000, quantity: 1 },
+        ]);
+        await cancel(a, itemIds[0] ?? '').expect(200);
+        expect(await billsOf(session.sessionId)).toEqual([]);
+      });
+
+      it('refuses a dish that left the kitchen (409 INVALID_TRANSITION) or a stale screen (409 STALE_VERSION); the bill stays', async () => {
+        const session = await openSession(db, a.floor);
+        const { itemIds } = await addOrder(db, a.floor, session, 'released', [
+          { priceVnd: 30_000, quantity: 1, status: 'done' },
+          { priceVnd: 20_000, quantity: 1 },
+        ]);
+        const first = (await guestBill(session)).body.bill as { id: string };
+        const done = await cancel(a, itemIds[0] ?? '').expect(409);
+        expect(done.body.code).toBe('INVALID_TRANSITION');
+        const stale = await cancel(a, itemIds[1] ?? '', 5).expect(409);
+        expect(stale.body.code).toBe('STALE_VERSION');
+        expect(await billsOf(session.sessionId)).toEqual([{ status: 'open', amountVnd: 50_000 }]);
+        const view = (
+          await http().get('/api/g/bill').set('cookie', session.guestCookie).expect(200)
+        ).body;
+        expect(view.bill.id).toBe(first.id);
+      });
+
+      it('a waiter or cashier cannot cancel (403); another restaurant’s cook gets 404 and nothing changes', async () => {
+        const session = await openSession(db, a.floor);
+        const { itemIds } = await addOrder(db, a.floor, session, 'released', [
+          { priceVnd: 30_000, quantity: 1 },
+        ]);
+        const id = itemIds[0] ?? '';
+        await post(`/api/kitchen/items/${id}/cancel`, a.waiter, { version: 1 }).expect(403);
+        await post(`/api/kitchen/items/${id}/cancel`, a.cashier, { version: 1 }).expect(403);
+        await post(`/api/kitchen/items/${id}/cancel`, b.kitchen, { version: 1 }).expect(404);
+        const [item] = await db
+          .select({ status: orderItems.status })
+          .from(orderItems)
+          .where(eq(orderItems.id, id));
+        expect(item?.status).toBe('waiting');
+      });
+    });
   });
 
   describe('S13 cashier confirms, closes, pay before cooking', () => {

@@ -4,6 +4,14 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ## [Unreleased]
 
+### Added
+
+- Kitchen "Bỏ món": `POST /api/kitchen/items/:id/cancel` (waiting or cooking → cancelled, owner and kitchen) with a confirm sheet on `/bep`; the guest sees "Đã huỷ" (TQR-025).
+
+### Fixed
+
+- A cancelled dish now re-syncs the table's open bill in the same transaction: the bill is superseded with the new amount (or no new bill when nothing is due) and the guest bill page updates live (TQR-025).
+
 ## [0.5.0] - 2026-11-08
 
 Release 1 (local only): QR table ordering for many restaurants — sign-up and house rules, menu, tables and printable QR codes, staff roles, guest ordering with anomaly holds, fair kitchen queue, serving, live dish status, VietQR bills with cashier confirmation, online table booking, platform admin.

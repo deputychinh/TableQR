@@ -121,10 +121,12 @@ describe('late threshold (AC33)', () => {
 });
 
 describe('item status transitions (ADR 0005 §4)', () => {
-  const legal: [ItemStatus, 'start' | 'done' | 'serve', ItemStatus][] = [
+  const legal: [ItemStatus, 'start' | 'done' | 'serve' | 'cancel', ItemStatus][] = [
     ['waiting', 'start', 'cooking'],
     ['cooking', 'done', 'done'],
     ['done', 'serve', 'served'],
+    ['waiting', 'cancel', 'cancelled'],
+    ['cooking', 'cancel', 'cancelled'],
   ];
 
   it.each(legal)('%s --%s--> %s', (from, action, to) => {
@@ -133,7 +135,7 @@ describe('item status transitions (ADR 0005 §4)', () => {
 
   it('refuses every other move, including cooking a cancelled or pending item', () => {
     for (const status of ITEM_STATUSES) {
-      for (const action of ['start', 'done', 'serve'] as const) {
+      for (const action of ['start', 'done', 'serve', 'cancel'] as const) {
         const allowed = legal.some(([from, a]) => from === status && a === action);
         expect(nextStatus(status, action) !== undefined).toBe(allowed);
       }
@@ -141,6 +143,9 @@ describe('item status transitions (ADR 0005 §4)', () => {
     expect(nextStatus('cancelled', 'start')).toBeUndefined();
     expect(nextStatus('waiting', 'done')).toBeUndefined();
     expect(nextStatus('served', 'serve')).toBeUndefined();
+    // A dish that left the kitchen (done, served) or was never released (pending) is not cancelled here.
+    expect(nextStatus('done', 'cancel')).toBeUndefined();
+    expect(nextStatus('pending', 'cancel')).toBeUndefined();
   });
 });
 

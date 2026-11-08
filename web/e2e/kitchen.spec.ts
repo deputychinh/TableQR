@@ -213,6 +213,32 @@ test('S9/S10 the kitchen cooks in arrival order, the waiter serves and sees "Đ�
   await waiter.context().close();
 });
 
+test('TQR-025 the kitchen drops a dish it cannot make ("Bỏ món") after a confirmation', async ({
+  page,
+}, info) => {
+  const r = await setUpRestaurant(page, `drop-${info.project.name}`);
+  releaseOrder({
+    restaurantId: r.id,
+    tableName: 'Bàn 3',
+    items: [{ menuItemName: 'Phở bò tái' }],
+  });
+  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await signIn(page, r.kitchenEmail, STAFF_PASSWORD);
+  const ticket = page
+    .getByRole('region', { name: /^Đang chờ/ })
+    .getByRole('article', { name: 'Bàn 3 · 2 khách' });
+  await expect(ticket).toBeVisible();
+  await ticket.getByRole('button', { name: 'Bỏ món' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Bỏ Phở bò tái của Bàn 3?' });
+  await expect(sheet).toContainText('Khách sẽ thấy món “Đã huỷ”');
+  await expectNoSeriousA11yIssues(page);
+  await sheet.getByRole('button', { name: 'Bỏ món' }).click();
+  await expect(page.getByRole('status').first()).toContainText(
+    'Đã bỏ Phở bò tái của Bàn 3. Hoá đơn của bàn đã được cập nhật.',
+  );
+  await expect(page.getByRole('article', { name: 'Bàn 3 · 2 khách' })).toHaveCount(0);
+});
+
 // Evidence for review, not part of CI: E2E_SCREENSHOTS=1 npx playwright test kitchen --project=ipad
 if (process.env.E2E_SCREENSHOTS) {
   test('screenshots of the kitchen and waiter screens', async ({ page, browser }) => {
@@ -237,6 +263,20 @@ if (process.env.E2E_SCREENSHOTS) {
       await settle(page); // let button colour transitions finish
       await page.screenshot({ path: `${EVIDENCE}/kitchen-1180-${scheme}.png`, fullPage: true });
     }
+    // TQR-025 "Bỏ món" sheet, then back out of it.
+    await page
+      .getByRole('article', { name: 'Bàn 2 · 4 khách' })
+      .first()
+      .getByRole('button', { name: 'Bỏ món' })
+      .click();
+    const drop = page.getByRole('dialog', { name: 'Bỏ Phở bò tái của Bàn 2?' });
+    await expect(drop).toBeVisible();
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await settle(page);
+      await page.screenshot({ path: `${EVIDENCE}/kitchen-drop-1180-${scheme}.png` });
+    }
+    await drop.getByRole('button', { name: 'Huỷ' }).click();
     // Skip sheet: start Bàn 2's phở and try to finish it before Bàn 1's.
     await page
       .getByRole('article', { name: 'Bàn 2 · 4 khách' })

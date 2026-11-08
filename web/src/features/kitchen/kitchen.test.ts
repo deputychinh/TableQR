@@ -267,6 +267,35 @@ describe('KitchenPage (S9)', () => {
     await screen.findByRole('region', { name: 'Đang nấu (1)' });
   });
 
+  it('TQR-025 "Bỏ món" asks first, then sends the version and the ticket leaves the queue', async () => {
+    const calls = stubApi({
+      'GET /api/kitchen/stations': () => jsonResponse({ stations }),
+      'GET /api/kitchen/stations/hot/queue': () =>
+        jsonResponse(queue([ticket('1'), ticket('2', { status: 'cooking', version: 2 })])),
+      'POST /api/kitchen/items/2/cancel': () =>
+        jsonResponse({ id: '2', status: 'cancelled', version: 3, skipReason: null }),
+    });
+    await renderWithApp(KitchenPage, { paths: ['/bep'], at: '/bep' });
+    const cooking = await screen.findByRole('region', { name: 'Đang nấu (1)' });
+    await userEvent.click(within(cooking).getByRole('button', { name: 'Bỏ món' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Bỏ Phở bò tái của Bàn 2?' });
+    expect(sheet.textContent).toContain('không phải trả tiền món này');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Huỷ' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(calls.some((c) => c.key.endsWith('/cancel'))).toBe(false);
+
+    await userEvent.click(within(cooking).getByRole('button', { name: 'Bỏ món' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Bỏ món' }),
+    );
+    expect(
+      await screen.findByText('Đã bỏ Phở bò tái của Bàn 2. Hoá đơn của bàn đã được cập nhật.'),
+    ).toBeTruthy();
+    expect(calls.at(-1)).toEqual({ key: 'POST /api/kitchen/items/2/cancel', body: { version: 2 } });
+    expect(screen.getByRole('region', { name: 'Đang nấu (0)' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Đang chờ (1)' })).toBeTruthy();
+  });
+
   it('says "món này gọi trước" when the older order of the dish is the same table', async () => {
     const older = ticket('1', { tableName: 'Bàn 1' });
     const younger = ticket('2', { tableName: 'Bàn 1', status: 'cooking', version: 2 });

@@ -1,5 +1,6 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, asc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import { syncOpenBill } from '../billing/bill-sync.js';
 import { CLOCK, type Clock } from '../common/clock.js';
 import type { TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
@@ -191,6 +192,32 @@ export class KitchenService implements OnModuleInit {
     });
   }
 
+  /**
+   * TQR-025 "Huỷ món": waiting or cooking → cancelled (the kitchen cannot make it). The guest sees
+   * "Đã huỷ" live, and an open bill of the table is re-synced in the same transaction, so the
+   * guest's bill page shows the new amount (or no bill when nothing is due any more).
+   */
+  cancel(tenant: TenantId, itemId: string, version: number): Promise<ItemChange> {
+    return this.transition(
+      tenant,
+      itemId,
+      'cancel',
+      version,
+      () => ({}),
+      async (now, tx, item) => {
+        // Same lock as bill requests and payments, so the bill cannot change under the sync.
+        const [session] = await tx
+          .select({ status: tableSessions.status })
+          .from(tableSessions)
+          .where(and(eq(tableSessions.restaurantId, tenant), eq(tableSessions.id, item.sessionId)))
+          .for('update');
+        // A closed session has no open bill to follow (closing superseded it).
+        if (session?.status !== 'open') return;
+        await syncOpenBill(tx, tenant, item.sessionId, now, { issueWhenNone: false });
+      },
+    );
+  }
+
   /** "Đã ra bàn": done → served, recording who and when (AC36). */
   serve(tenant: TenantId, itemId: string, version: number, userId: string): Promise<ItemChange> {
     return this.transition(tenant, itemId, 'serve', version, (now) => ({
@@ -288,7 +315,8 @@ export class KitchenService implements OnModuleInit {
 
   /**
    * Compare-and-set on status + version under a row lock, then one `item.status` event per
-   * audience (station, floor, the guest's session) in the same transaction (ADR 0004).
+   * audience (station, floor, the guest's session) in the same transaction (ADR 0004); `after`
+   * runs last in that transaction (e.g. the bill re-sync of a cancel).
    */
   private transition(
     tenant: TenantId,
@@ -300,6 +328,7 @@ export class KitchenService implements OnModuleInit {
       tx: Tx,
       item: { id: string; stationId: string; menuItemId: string },
     ) => Partial<typeof orderItems.$inferInsert> | Promise<Partial<typeof orderItems.$inferInsert>>,
+    after?: (now: Date, tx: Tx, item: { sessionId: string }) => Promise<void>,
   ): Promise<ItemChange> {
     return this.db.transaction(async (tx) => {
       const [item] = await tx
@@ -318,7 +347,8 @@ export class KitchenService implements OnModuleInit {
       if (item.version !== version) throw staleVersion(item.status, item.version);
       const to = nextStatus(item.status, action);
       if (to === undefined) throw invalidTransition(item.status, item.version);
-      const extra = await changes(this.clock.now(), tx, item);
+      const now = this.clock.now();
+      const extra = await changes(now, tx, item);
       const [updated] = await tx
         .update(orderItems)
         .set({ ...extra, status: to, version: sql`${orderItems.version} + 1` })
@@ -341,6 +371,7 @@ export class KitchenService implements OnModuleInit {
       for (const topic of [`station:${item.stationId}`, 'floor', `session:${item.sessionId}`]) {
         await publish(tx, { restaurantId: tenant, topic, type: 'item.status', data });
       }
+      if (after) await after(now, tx, item);
       return updated;
     });
   }

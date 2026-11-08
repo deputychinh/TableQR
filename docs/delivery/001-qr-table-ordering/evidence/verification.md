@@ -49,7 +49,6 @@ Date: 2026-11-08 · Commit: 0088268 · Target: local (`make dev`, http://localho
 
 - `make bench` setup can hit the per-IP sign-up/check-in limits when run right after other local traffic; rerun after a minute (first run today hit it, second passed).
 - "Ẩn bàn" (archive a table) not built — tables with history can only be renamed.
-- A kitchen cancel does not re-sync an open bill (rare; cashier sees the total).
 - Rate limits and stream caps are in memory per process; behind a proxy set `trust proxy` (docs/security.md, before first deploy).
 - Production security headers (TQR-022) and step-up auth for bank changes (TQR-023) are backlog items before the first deploy.
 - A success toast can linger over the last list row on phones until it times out.
