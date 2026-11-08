@@ -52,3 +52,6 @@ data/
 benchmarks/results/
 coverage-e2e/
 .claude/worktrees/
+
+# demo videos are shared files, never committed (make demo-video writes them)
+docs/delivery/**/video/*.mp4
