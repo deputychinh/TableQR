@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Ban, CircleCheck, RotateCcw, Store } from 'lucide-vue-next';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -80,7 +80,7 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
 </script>
 
 <template>
-  <StaffShell :title="t('admin.shellTitle')">
+  <RoleShell :title="t('admin.shellTitle')">
     <h1 class="admin-page__title">{{ t('admin.title') }}</h1>
     <p class="admin-page__lead">{{ t('admin.lead') }}</p>
 
@@ -153,7 +153,7 @@ const dateOf = (iso: string): string => new Date(iso).toLocaleDateString('vi-VN'
       </p>
       <FormAlert v-if="actionError" :message="actionError" />
     </ConfirmSheet>
-  </StaffShell>
+  </RoleShell>
 </template>
 
 <style scoped>

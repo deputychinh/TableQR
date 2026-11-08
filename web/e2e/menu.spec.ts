@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const expectNoSeriousA11yIssues = async (page: Page) => {

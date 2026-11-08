@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
 
 const expectNoSeriousA11yIssues = async (page: import('@playwright/test').Page) => {

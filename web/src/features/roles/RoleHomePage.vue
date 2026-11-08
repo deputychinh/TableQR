@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CalendarDays, Hourglass } from 'lucide-vue-next';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import type { StaffRole } from '@/stores/session';
 
 /** Placeholder home for cashier, waiter and kitchen until their screens arrive (AC14). */
@@ -12,7 +12,7 @@ const roleName = computed(() => t(`roles.names.${props.role}`));
 </script>
 
 <template>
-  <StaffShell :title="roleName">
+  <RoleShell :title="roleName">
     <section class="role-home" :aria-labelledby="`role-home-${role}`">
       <span class="role-home__icon"><Hourglass :size="32" aria-hidden="true" /></span>
       <h1 :id="`role-home-${role}`" class="role-home__title">{{ t('roles.soon.title') }}</h1>
@@ -22,7 +22,7 @@ const roleName = computed(() => t(`roles.names.${props.role}`));
         {{ t('booking.nav') }}
       </RouterLink>
     </section>
-  </StaffShell>
+  </RoleShell>
 </template>
 
 <style scoped>

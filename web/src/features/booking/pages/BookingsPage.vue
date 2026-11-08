@@ -3,8 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, Link } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
-import OwnerShell from '@/app/layouts/OwnerShell.vue';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import ConfirmSheet from '@/components/ConfirmSheet.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -176,12 +175,10 @@ const copyLink = async () => {
     actionError.value = t('booking.staff.share.copyFailed');
   }
 };
-
-const shell = computed(() => (isOwner.value ? OwnerShell : StaffShell));
 </script>
 
 <template>
-  <component :is="shell" :title="t('booking.staff.title')">
+  <RoleShell :title="t('booking.staff.title')">
     <div class="bookings-page">
       <header class="bookings-page__header">
         <h1 class="bookings-page__title">{{ t('booking.staff.title') }}</h1>
@@ -318,7 +315,7 @@ const shell = computed(() => (isOwner.value ? OwnerShell : StaffShell));
         }}
       </p>
     </ConfirmSheet>
-  </component>
+  </RoleShell>
 </template>
 
 <style scoped>

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { RouterLink } from 'vue-router';
 import { CheckCheck, ClipboardCheck, CookingPot, Soup } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
-import StaffShell from '@/app/layouts/StaffShell.vue';
+import RoleShell from '@/app/layouts/RoleShell.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import LoadingState from '@/components/LoadingState.vue';
@@ -41,7 +41,7 @@ const serve = async (table: FloorTable, item: ReadyItem) => {
 </script>
 
 <template>
-  <StaffShell :title="t('serving.title')">
+  <RoleShell :title="t('serving.title')">
     <div class="serving-page">
       <div class="serving-page__top">
         <h1 class="serving-page__title">{{ t('serving.ready.title') }}</h1>
@@ -103,7 +103,7 @@ const serve = async (table: FloorTable, item: ReadyItem) => {
         </section>
       </template>
     </div>
-  </StaffShell>
+  </RoleShell>
 </template>
 
 <style scoped>

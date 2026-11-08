@@ -111,9 +111,17 @@ const message = (path: string): string | undefined => {
   return key ? t(key) : undefined;
 };
 
+/**
+ * Focus the first field to fix and bring it to the middle of the window, so neither the header nor
+ * the sticky save bar covers it (WCAG 2.4.11; r2 review).
+ */
 const focusFirstInvalid = async () => {
   await nextTick();
-  document.querySelector<HTMLElement>('.settings-page [aria-invalid="true"]')?.focus();
+  const field = document.querySelector<HTMLElement>('.settings-page [aria-invalid="true"]');
+  if (!field) return;
+  field.focus({ preventScroll: true });
+  // jsdom has no scrollIntoView; every browser does.
+  if (typeof field.scrollIntoView === 'function') field.scrollIntoView({ block: 'center' });
 };
 
 const save = async () => {
@@ -420,12 +428,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
 }
 
 /*
- * Sticky above the shell's bottom navigation on phones (its height is one --target-large row plus
- * its 1 px top border); at the bottom of the window once the navigation moves to the side rail.
+ * Sticky at the bottom of the shell's scrolling content (which ends above the bottom navigation
+ * on phones); the negative offset cancels the content's bottom padding so nothing shows below it.
  */
 .settings-page__bar {
   position: sticky;
-  inset-block-end: calc(var(--target-large) + 1px);
+  inset-block-end: calc(-1 * var(--space-4));
   display: grid;
   gap: var(--space-2);
   margin-inline: calc(-1 * var(--space-3));
@@ -473,7 +481,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
 
 @media (width >= 840px) {
   .settings-page__bar {
-    inset-block-end: 0;
+    inset-block-end: calc(-1 * var(--space-5));
     margin-inline: 0;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-3) var(--radius-3) 0 0;
