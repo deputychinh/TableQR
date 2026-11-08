@@ -25,12 +25,12 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 | --------- | ------ | --------------------------------------------------------------------------------------- |
 | Discover  | done   | [brief](brief.md), [benchmark](benchmark.md)                                            |
 | Specify   | done   | [spec](spec.md) (16 stories, 54 ACs), [benchmarks/plan.md](../../../benchmarks/plan.md) |
-| Set up    | doing  |                                                                                         |
-| Architect | todo   |                                                                                         |
-| Plan      | todo   |                                                                                         |
-| Build     | todo   |                                                                                         |
-| Verify    | todo   |                                                                                         |
-| Demo      | todo   |                                                                                         |
+| Set up    | done   | node-vue preset, `make ci` green, README quick start proven                             |
+| Architect | done   | [design](design.md), ADRs 0002–0007, `docs/security.md`                                 |
+| Plan      | done   | [plan](plan.md), backlog TQR-001…021 (+022–026 follow-ups)                              |
+| Build     | done   | 21 items, merged on main; final review scores in "Review scores"                        |
+| Verify    | done   | [evidence/verification.md](evidence/verification.md), make ci at 0088268                |
+| Demo      | doing  |                                                                                         |
 | Release   | todo   | local only                                                                              |
 | Operate   | n.a.   | no deploy target yet                                                                    |
 | Learn     | todo   |                                                                                         |
