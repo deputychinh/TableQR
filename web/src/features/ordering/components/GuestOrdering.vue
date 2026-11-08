@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { DoorClosed, ShoppingBasket, Wifi, WifiOff } from 'lucide-vue-next';
+import { DoorClosed, ReceiptText, ShoppingBasket, Wifi, WifiOff } from 'lucide-vue-next';
 import BaseButton from '@/components/BaseButton.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
@@ -40,6 +40,15 @@ const orderCount = computed(() => session.value.orders.length);
 const showView = (next: 'menu' | 'orders') =>
   router.replace({ query: next === 'orders' ? { xem: 'da-goi' } : {} });
 
+/** TQR-018: the bill page of this table (`/t/:qrToken/hoa-don`), reached by tapping, never by URL. */
+const billTo = computed(
+  () =>
+    `/t/${encodeURIComponent(typeof route.params.qrToken === 'string' ? route.params.qrToken : '')}/hoa-don`,
+);
+const openBill = () => router.push(billTo.value);
+/** With an empty cart and something ordered, the bottom bar's one action is the bill. */
+const showBillBar = computed(() => count.value === 0 && orderCount.value > 0 && !closed.value);
+
 const submit = async () => {
   if (await ordering.submit()) {
     cartOpen.value = false;
@@ -54,6 +63,7 @@ const alert = computed((): string | undefined => {
   const current = notice.value;
   if (current?.kind === 'network') return t('ordering.cart.network');
   if (current?.kind === 'error') return t('ordering.cart.error');
+  if (current?.kind === 'too-many') return t('ordering.cart.tooManyOrders');
   if (current?.kind !== 'changed') return undefined;
   const changes = current.changes.map((change) =>
     change.kind === 'removed'
@@ -70,7 +80,13 @@ onMounted(ordering.loadMenu);
 </script>
 
 <template>
-  <div class="guest-ordering" :class="{ 'guest-ordering--with-bar': count > 0 && !closed }">
+  <div
+    class="guest-ordering"
+    :class="{
+      'guest-ordering--with-bar': count > 0 && !closed,
+      'guest-ordering--with-bill': showBillBar,
+    }"
+  >
     <EmptyState
       v-if="closed"
       :heading-level="1"
@@ -157,7 +173,12 @@ onMounted(ordering.loadMenu);
           </BaseButton>
         </template>
       </EmptyState>
-      <OrderList v-else :orders="session.orders" :party-size="session.session.partySize" />
+      <OrderList
+        v-else
+        :orders="session.orders"
+        :party-size="session.session.partySize"
+        :bill-to="billTo"
+      />
     </template>
 
     <div v-if="count > 0 && !closed" class="guest-ordering__bar">
@@ -173,6 +194,13 @@ onMounted(ordering.loadMenu);
           {{ t('ordering.cart.submit') }}
         </BaseButton>
       </div>
+    </div>
+
+    <div v-else-if="showBillBar" class="guest-ordering__bar">
+      <BaseButton size="lg" block @click="openBill">
+        <ReceiptText :size="20" aria-hidden="true" />
+        {{ t('ordering.orders.bill') }}
+      </BaseButton>
     </div>
 
     <CartSheet
@@ -198,6 +226,10 @@ onMounted(ordering.loadMenu);
 
 .guest-ordering--with-bar {
   padding-block-end: calc(var(--target-large) * 2 + var(--space-5));
+}
+
+.guest-ordering--with-bill {
+  padding-block-end: calc(var(--target-large) + var(--space-5));
 }
 
 .guest-ordering__tabs {

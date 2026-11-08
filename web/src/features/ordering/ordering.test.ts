@@ -131,6 +131,7 @@ describe('guest dish state (AC38)', () => {
         id: 'o',
         status: 'released',
         holdReason: null,
+        maxMainPerPerson: 2,
         requestedAt: '2026-11-08T12:00:00.000Z',
         totalVnd: 45000,
         items: [

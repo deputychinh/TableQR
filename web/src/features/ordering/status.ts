@@ -60,3 +60,26 @@ export const applyItemDelta = (
 const timeFormat = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' });
 /** "19:05" in the device's time zone. */
 export const formatTime = (iso: string): string => timeFormat.format(new Date(iso));
+
+/**
+ * Main-dish portions the session has ordered that still count for the anomaly limit (AC26): every
+ * main item not cancelled, in orders not rejected or cancelled.
+ */
+export const sessionMainPortions = (orders: readonly Order[]): number =>
+  orders
+    .filter((order) => order.status !== 'rejected' && order.status !== 'cancelled')
+    .flatMap((order) => order.items)
+    .filter((item) => item.isMain && item.status !== 'cancelled')
+    .reduce((sum, item) => sum + item.quantity, 0);
+
+/** Applies an `order.status` delta to the order it names; undefined when nothing changes. */
+export const applyOrderDelta = (
+  orders: readonly Order[],
+  delta: { orderId: string; status: OrderStatus },
+): Order[] | undefined => {
+  const target = orders.find((order) => order.id === delta.orderId);
+  if (!target || target.status === delta.status) return undefined;
+  return orders.map((order) =>
+    order.id === delta.orderId ? { ...order, status: delta.status } : order,
+  );
+};

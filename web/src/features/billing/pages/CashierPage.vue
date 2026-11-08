@@ -108,6 +108,9 @@ const confirmPay = async () => {
     paying.value = undefined;
   } catch (error: unknown) {
     actionError.value = describe(error);
+    // 409: someone else confirmed, the bill changed or the table closed. The sheet's amount and
+    // code are stale, so it closes and the list shows the current state with the reason above.
+    if (error instanceof ApiError && error.status === 409) paying.value = undefined;
   } finally {
     busy.value = false;
   }

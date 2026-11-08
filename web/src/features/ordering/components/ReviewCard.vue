@@ -13,10 +13,15 @@ const emit = defineEmits<{ confirm: []; reject: []; seen: [] }>();
 const { t } = useI18n();
 
 const held = computed(() => props.order.status === 'held');
+/** One reason per hold reason (TQR-013); the anomaly one shows the session total vs the limit. */
 const reason = computed(() =>
   props.order.holdReason === 'every_order'
     ? t('review.heldEvery')
-    : t('review.heldOver', { n: props.order.session.partySize }),
+    : t('review.heldOver', {
+        n: props.order.session.partySize,
+        total: props.order.sessionMainPortions,
+        limit: props.order.session.partySize * props.order.maxMainPerPerson,
+      }),
 );
 </script>
 

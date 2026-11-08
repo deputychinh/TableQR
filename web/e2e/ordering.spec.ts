@@ -69,10 +69,16 @@ test('guest checks in, orders 3 main dishes for 1, waits for the waiter, then se
 
   // S6: the guest scans and says how many they are (AC17)
   const guest = await guestPhone(browser, page);
+  // TQR-011: the expected "party size" step is asked with a GET, so loading logs no error (409).
+  const consoleErrors: string[] = [];
+  guest.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
   await guest.goto(`/t/${qrToken}`);
   await expect(
     guest.getByRole('heading', { level: 1, name: 'Chào mừng bạn đến Quán Gọi Món E2E' }),
   ).toBeVisible();
+  expect(consoleErrors).toEqual([]);
   await expectNoSeriousA11yIssues(guest);
   await guest.getByRole('button', { name: 'Bớt một người' }).click();
   await expect(guest.getByRole('spinbutton', { name: 'Bàn mình có mấy người?' })).toHaveValue('1');
@@ -95,7 +101,9 @@ test('guest checks in, orders 3 main dishes for 1, waits for the waiter, then se
   // S8: held as "Chờ xác nhận" with the reason (AC26)
   await expect(guest.getByRole('heading', { level: 1, name: 'Món đã gọi' })).toBeVisible();
   await expect(guest.getByText('Đã gửi món. Bạn theo dõi từng món ở đây.')).toBeVisible();
-  await expect(guest.getByText(/nhiều hơn thường lệ cho 1 người/)).toBeVisible();
+  await expect(
+    guest.getByText(/bàn 1 người đã gọi 3 phần món chính, quá mức thường lệ 2 phần/),
+  ).toBeVisible();
   await expect(guest.getByText('Chờ xác nhận', { exact: true })).toHaveCount(3);
   await expect(guest.getByText('Đang cập nhật trực tiếp')).toBeVisible();
   await expectNoSeriousA11yIssues(guest);
@@ -103,8 +111,10 @@ test('guest checks in, orders 3 main dishes for 1, waits for the waiter, then se
   // The waiter (here the owner) confirms on /phuc-vu/duyet (AC28)
   await page.goto('/phuc-vu/duyet');
   const card = page.getByRole('article').filter({ hasText: 'Bàn 1' });
-  await expect(card.getByText('Nhiều món chính hơn thường lệ cho 1 người')).toBeVisible();
-  await expect(card.getByText('3 phần món chính')).toBeVisible();
+  await expect(
+    card.getByText('Bàn đã gọi 3 phần món chính, quá mức 2 phần cho 1 người'),
+  ).toBeVisible();
+  await expect(card.getByText('3 phần món chính', { exact: true })).toBeVisible();
   await expectNoSeriousA11yIssues(page);
   await card.getByRole('button', { name: 'Xác nhận đơn của Bàn 1' }).click();
   await expect(page.getByText('Đã xác nhận đơn của Bàn 1. Món đã vào bếp.')).toBeVisible();
@@ -211,7 +221,7 @@ if (process.env.E2E_SCREENSHOTS) {
         await expect(page.getByRole('dialog')).toBeVisible();
       },
     });
-    await page.getByRole('button', { name: 'Quay lại' }).click();
+    await page.getByRole('button', { name: 'Huỷ' }).click();
     await page.getByRole('button', { name: 'Xác nhận đơn của Bàn 1' }).click();
     await expect(guest.getByText('Đang chờ', { exact: true })).toHaveCount(2);
     await snap('orders-live', guest, {

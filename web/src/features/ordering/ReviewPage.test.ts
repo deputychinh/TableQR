@@ -25,7 +25,9 @@ const held = (over: Partial<ReviewOrder> = {}): ReviewOrder => ({
   flag: null,
   requestedAt: '2026-11-08T12:05:00.000Z',
   totalVnd: 135000,
+  maxMainPerPerson: 2,
   mainPortions: 3,
+  sessionMainPortions: 3,
   session: { id: 's1', partySize: 1, openedAt: '2026-11-08T12:00:00.000Z' },
   table: { id: 't1', name: 'Bàn 1' },
   items: [
@@ -79,13 +81,28 @@ describe('waiter review page (S8)', () => {
     expect(first.getByRole('heading', { name: 'Bàn 1' })).toBeTruthy();
     expect(first.getByText(/1 người · Gửi lúc/)).toBeTruthy();
     expect(first.getByText('Chờ xác nhận')).toBeTruthy();
-    expect(first.getByText('Nhiều món chính hơn thường lệ cho 1 người')).toBeTruthy();
+    expect(first.getByText('Bàn đã gọi 3 phần món chính, quá mức 2 phần cho 1 người')).toBeTruthy();
     expect(first.getByText('ít hành')).toBeTruthy();
     expect(first.getByText('3 phần món chính')).toBeTruthy();
     const second = within(cards[1]!);
     expect(second.getByText('Có thể thiếu món')).toBeTruthy();
     expect(second.getByText(/Bàn 4 người mới gọi 1 phần món chính/)).toBeTruthy();
     expect(second.queryByRole('button', { name: /Xác nhận/ })).toBeNull();
+  });
+
+  it('TQR-013 a drinks-only order held because the rule is "every order" says so, not "too many mains"', async () => {
+    const drinks = held({
+      holdReason: 'every_order',
+      mainPortions: 0,
+      sessionMainPortions: 5,
+      items: [{ ...held().items[0]!, name: 'Trà đá', isMain: false, note: null }],
+    });
+    fakeApi({ 'GET /api/orders/review': { body: { items: [drinks] } } });
+    await renderReview();
+    const card = within(await screen.findByRole('article'));
+    expect(card.getByText('Quán xác nhận mọi đơn')).toBeTruthy();
+    expect(card.queryByText(/món chính, quá mức/)).toBeNull();
+    expect(card.queryByText(/Nhiều món chính/)).toBeNull();
   });
 
   it('AC28 confirms an order and says so', async () => {
@@ -110,7 +127,7 @@ describe('waiter review page (S8)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Từ chối đơn của Bàn 1' }));
     const sheet = await screen.findByRole('dialog', { name: 'Từ chối đơn của Bàn 1?' });
     expect(within(sheet).getByText(/Khách sẽ thấy đơn đã bị huỷ/)).toBeTruthy();
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Quay lại' }));
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Huỷ' }));
     expect(calls.some((c) => c.path.endsWith('/reject'))).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Từ chối đơn của Bàn 1' }));
     await userEvent.click(
