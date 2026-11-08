@@ -4,6 +4,10 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Simultaneous guest bookings no longer answer 500: booking creation is serialised per restaurant and deadlocks are retried up to 3 times (found by the AC50 concurrency test failing about one run in three) (TQR-020).
+
 ### Security
 
 - Production security headers (TQR-022): every API response — problem details and event streams included — sends a deny-all CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `Cross-Origin-Opener-Policy: same-origin` and a `Permissions-Policy` denying camera, microphone and location; `X-Powered-By` is gone; `Strict-Transport-Security` with `TQR_HSTS=true`. The SPA's CSP and headers live in `deploy/security-headers.json`, are sent by `vite preview` and by the new `deploy/nginx.conf.example` (serves `web/dist`, proxies `/api`, SSE-ready), and every browser journey now fails on a CSP violation. New setting `TQR_TRUSTED_PROXIES` (Express `trust proxy`, default none): a client's own `X-Forwarded-For` no longer moves its rate-limit key, while a listed proxy's does.

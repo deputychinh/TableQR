@@ -330,8 +330,15 @@ describe('table booking (e2e, spec S14–S15, ADR 0007)', () => {
         Array.from({ length: 10 }, () => book(o.slug, { date, time: '19:00' })),
       );
       const statuses = results.map((r) => r.status);
-      expect(statuses.filter((s) => s === 201)).toHaveLength(1);
-      expect(statuses.filter((s) => s === 409)).toHaveLength(9);
+      const seen = JSON.stringify(results.map((r) => [r.status, r.body.code]));
+      expect(
+        statuses.filter((s) => s === 201),
+        seen,
+      ).toHaveLength(1);
+      expect(
+        statuses.filter((s) => s === 409),
+        seen,
+      ).toHaveLength(9);
       for (const r of results.filter((x) => x.status === 409)) {
         expect(r.body.code).toBe('NO_TABLE_FREE');
       }
@@ -347,7 +354,10 @@ describe('table booking (e2e, spec S14–S15, ADR 0007)', () => {
       const results = await Promise.all(
         Array.from({ length: 6 }, () => book(o.slug, { date, time: '12:00' })),
       );
-      expect(results.filter((r) => r.status === 201)).toHaveLength(3);
+      expect(
+        results.filter((r) => r.status === 201),
+        JSON.stringify(results.map((r) => [r.status, r.body.code])),
+      ).toHaveLength(3);
       const rows = await list(o, date);
       expect(new Set(rows.map((r) => r.tableId)).size).toBe(3);
     });

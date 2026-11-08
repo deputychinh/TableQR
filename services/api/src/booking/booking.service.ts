@@ -43,6 +43,7 @@ import {
 const EXCLUSION_VIOLATION = '23P01';
 const UNIQUE_VIOLATION = '23505';
 const DEADLOCK = '40P01';
+const DEADLOCK_ATTEMPTS = 3;
 const NO_OVERLAP = 'bookings_no_overlap';
 const IDEMPOTENCY_KEY = 'bookings_tenant_idempotency_key';
 const ONE_OPEN_SESSION = 'table_sessions_one_open_per_table';
@@ -222,6 +223,13 @@ export class BookingService {
     try {
       const created = await this.withDeadlockRetry(() =>
         this.db.transaction(async (tx) => {
+          // One booking at a time per restaurant: concurrent inserts checked by the GiST
+          // exclusion constraint can deadlock repeatedly (AC50 under load answered 500). Bookings
+          // per restaurant are a few per minute, so serialising costs nothing; the constraint stays
+          // the guarantee. Taken before the per-phone lock, always in this order.
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`booking-create:${restaurant.id}`}))`,
+          );
           await this.assertPhoneUnderLimit(tx, restaurant.id, input.phone, now);
           const { candidates, held } = await this.availability(
             tx,
@@ -405,14 +413,15 @@ export class BookingService {
 
   /**
    * Candidates are tried in one global order, so two guests should never lock tables crosswise;
-   * should Postgres still report a deadlock (40P01), the loser retries once instead of a 500.
+   * should Postgres still report a deadlock (40P01), the loser retries (up to 3 attempts) instead of a 500.
    */
   private async withDeadlockRetry<T>(work: () => Promise<T>): Promise<T> {
-    try {
-      return await work();
-    } catch (error: unknown) {
-      if (pgCode(error) !== DEADLOCK) throw error;
-      return work();
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await work();
+      } catch (error: unknown) {
+        if (pgCode(error) !== DEADLOCK || attempt >= DEADLOCK_ATTEMPTS) throw error;
+      }
     }
   }
 
