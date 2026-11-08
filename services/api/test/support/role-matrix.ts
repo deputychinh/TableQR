@@ -6,9 +6,12 @@
  * `path` and `body` receive the ids of a fixture restaurant (see `MatrixFixture`) so allowed
  * calls reach real rows. Calls must be safe to repeat: they run once per allowed role.
  * A `stream` row (SSE) is checked by status only: the stream is opened and closed at once.
+ * Every staff route of the app must be a row here or in `MATRIX_EXCLUSIONS` with a reason
+ * (TQR-017 route-coverage guard); one-shot actions take a fresh fixture row per call.
  */
 import { DEFAULT_RULES } from '../../src/settings/domain/house-rules.js';
 import { OWNER_PASSWORD } from './http.js';
+import { routeKey, type AppRoute } from './routes.js';
 
 export type MatrixRole = 'owner' | 'cashier' | 'waiter' | 'kitchen' | 'platform_admin';
 
@@ -32,6 +35,14 @@ export interface MatrixFixture {
   closableSessionId: () => string;
   /** A pending booking of the fixture restaurant (confirm is safe to repeat). */
   bookingId: string;
+  /** A fresh booking per call that already started, on its own free table (seat/cancel/no-show). */
+  freshBookingId: () => string;
+  /** A fresh table without a session per call (opening a session twice would answer 409). */
+  freeTableId: () => string;
+  /** A fresh held order per call (confirm/reject are one-shot, TQR-013). */
+  heldOrderId: () => string;
+  /** An order whose AC27 flag the waiter marks seen (safe to repeat). */
+  flaggedOrderId: string;
   /** A kitchen station of the fixture restaurant (TQR-014). */
   stationId: string;
   /** A fresh item per call in the status the action needs (each call consumes one). */
@@ -56,6 +67,34 @@ export interface MatrixRow {
   /** Server-sent events: only the status of the opening response is checked. */
   stream?: boolean;
 }
+
+/** The fixture as `:name` placeholders: test titles and the route-coverage guard read paths with it. */
+export const PLACEHOLDERS: MatrixFixture = {
+  staffId: ':staffId',
+  spareRestaurantId: ':restaurantId',
+  email: () => 'new@example.com',
+  tableId: ':tableId',
+  spareTableId: ':spareTableId',
+  sessionId: ':sessionId',
+  billId: ':billId',
+  payableBillId: () => ':billId',
+  closableSessionId: () => ':sessionId',
+  bookingId: ':bookingId',
+  freshBookingId: () => ':bookingId',
+  freeTableId: () => ':tableId',
+  heldOrderId: () => ':orderId',
+  flaggedOrderId: ':orderId',
+  stationId: ':stationId',
+  waitingItemId: () => ':itemId',
+  cookingItemId: () => ':itemId',
+  doneItemId: () => ':itemId',
+  spareStationId: ':spareStationId',
+  categoryId: ':categoryId',
+  spareCategoryId: ':spareCategoryId',
+  itemId: ':itemId',
+  spareItemId: ':spareItemId',
+  name: (prefix) => prefix,
+};
 
 export const ALL_ROLES: readonly MatrixRole[] = [
   'owner',
@@ -212,7 +251,7 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     path: (f) => `/api/sessions/${f.closableSessionId()}/close`,
     allowed: CASHIER,
   },
-  // bookings (TQR-021); seat / cancel / no-show are one-way, covered in booking.e2e-spec.ts
+  // bookings (TQR-021); seat / cancel / no-show are one-way: a fresh booking per call
   { method: 'get', path: () => '/api/bookings', allowed: FLOOR },
   {
     method: 'post',
@@ -220,7 +259,16 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     allowed: FLOOR,
     body: () => ({}),
   },
-  // service floor (TQR-011, TQR-013); confirm/reject are one-shot, covered in ordering.e2e-spec.ts
+  { method: 'post', path: (f) => `/api/bookings/${f.freshBookingId()}/seat`, allowed: FLOOR },
+  { method: 'post', path: (f) => `/api/bookings/${f.freshBookingId()}/cancel`, allowed: FLOOR },
+  { method: 'post', path: (f) => `/api/bookings/${f.freshBookingId()}/no-show`, allowed: FLOOR },
+  // service floor (TQR-011, TQR-013); confirm/reject are one-shot: a fresh held order per call
+  {
+    method: 'post',
+    path: () => '/api/sessions',
+    allowed: FLOOR,
+    body: (f) => ({ tableId: f.freeTableId(), partySize: 2 }),
+  },
   {
     method: 'patch',
     path: (f) => `/api/sessions/${f.sessionId}`,
@@ -228,6 +276,9 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     body: () => ({ partySize: 2 }),
   },
   { method: 'get', path: () => '/api/orders/review', allowed: FLOOR },
+  { method: 'post', path: (f) => `/api/orders/${f.heldOrderId()}/confirm`, allowed: FLOOR },
+  { method: 'post', path: (f) => `/api/orders/${f.heldOrderId()}/reject`, allowed: FLOOR },
+  { method: 'post', path: (f) => `/api/orders/${f.flaggedOrderId}/flag-seen`, allowed: FLOOR },
   // kitchen queue (TQR-014)
   {
     method: 'get',
@@ -276,3 +327,55 @@ export const ROLE_MATRIX: readonly MatrixRow[] = [
     allowed: ADMIN,
   },
 ];
+
+/**
+ * Routes that are deliberately not matrix rows (TQR-017 route-coverage guard), each with the reason
+ * and the spec that covers it. Keys are `METHOD /path` with parameter names dropped (`routeKey`).
+ */
+export const MATRIX_EXCLUSIONS: readonly { route: string; reason: string }[] = [
+  {
+    route: 'POST /api/auth/signup',
+    reason: 'public: creates a restaurant and its owner (auth.e2e-spec.ts)',
+  },
+  { route: 'POST /api/auth/login', reason: 'public: signs a person in (auth.e2e-spec.ts)' },
+  {
+    route: 'POST /api/auth/logout',
+    reason: 'any caller, with or without a session; ends only its own (auth.e2e-spec.ts)',
+  },
+  { route: 'GET /api/health', reason: 'public liveness/readiness probe (health.e2e-spec.ts)' },
+  {
+    route: 'GET /api/test-roles/forgotten',
+    reason: 'test-only route of roles.e2e-spec.ts: "deny by default" checks it for every role',
+  },
+];
+
+/** Path prefixes outside the staff surface. */
+export const EXCLUDED_PREFIXES: readonly { prefix: string; reason: string }[] = [
+  {
+    prefix: '/api/g/',
+    reason:
+      'guest and public routes: no staff session, the table token or public slug decides the tenant (ordering, billing, booking, guest-stream e2e specs)',
+  },
+];
+
+/**
+ * Routes of the running app that are neither a `ROLE_MATRIX` row nor excluded with a reason:
+ * a new staff endpoint without a matrix row fails the guard in `roles.e2e-spec.ts`.
+ */
+export const uncoveredRoutes = (
+  routes: readonly AppRoute[],
+  matrix: readonly MatrixRow[],
+): string[] => {
+  const covered = new Set(matrix.map((row) => routeKey(row.method, row.path(PLACEHOLDERS))));
+  const excluded = new Set(MATRIX_EXCLUSIONS.map((e) => e.route));
+  const isExcluded = (key: string) =>
+    excluded.has(key) ||
+    EXCLUDED_PREFIXES.some((e) => (key.split(' ')[1] ?? '').startsWith(e.prefix));
+  return [
+    ...new Set(
+      routes
+        .map((r) => routeKey(r.method, r.path))
+        .filter((k) => !covered.has(k) && !isExcluded(k)),
+    ),
+  ].sort();
+};

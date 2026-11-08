@@ -117,9 +117,37 @@ describe('GuestBill', () => {
 
   it('AC42: says so when the old code is gone and nothing is left to pay', async () => {
     await renderWithApp(GuestBill, {
-      props: { bill: view({ bill: bill({ status: 'superseded' }), dueVnd: 0 }), changed: true },
+      props: {
+        bill: view({ bill: bill({ status: 'superseded' }), lines: [], totalVnd: 0, dueVnd: 0 }),
+        changed: true,
+        tableUrl: '/t/abc',
+      },
     });
-    expect(screen.getByRole('status').textContent).toContain('không còn món cần thanh toán');
+    expect(screen.getByRole('status').textContent).toContain('đừng dùng mã cũ');
+  });
+
+  it('TQR-025: with the bill superseded and nothing due it shows an empty state with a way back to the table', async () => {
+    // A reload after the kitchen dropped the last dish: no change notice, the superseded bill only.
+    await renderWithApp(GuestBill, {
+      props: {
+        bill: view({ bill: bill({ status: 'superseded' }), lines: [], totalVnd: 0, dueVnd: 0 }),
+        tableUrl: '/t/abc',
+      },
+      paths: ['/t/:qrToken'],
+    });
+    expect(screen.getByRole('heading', { name: 'Bàn không còn món cần thanh toán' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Quay lại bàn' }).getAttribute('href')).toBe('/t/abc');
+    expect(screen.queryByText('Cần thanh toán')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('TQR-025: the change notice does not claim more food when the amount went down', async () => {
+    await renderWithApp(GuestBill, {
+      props: { bill: view({ bill: bill({ id: 'b2', amountVnd: 50_000 }) }), changed: true },
+    });
+    const notice = screen.getByRole('status').textContent ?? '';
+    expect(notice).toContain('Hoá đơn đã thay đổi. Hãy quét mã mới bên dưới, đừng dùng mã cũ.');
+    expect(notice).not.toContain('thêm món');
   });
 
   it('AC42: after a payment, new items with no open bill yet show what is due and a way to get a new bill', async () => {
@@ -199,7 +227,7 @@ describe('GuestBillPage', () => {
       view({ bill: bill({ id: 'b2', code: 'ABCDE', memo: 'TQR ABCDE', amountVnd: 145_000 }) }),
     );
     expect(await screen.findByText('TQR ABCDE')).toBeTruthy();
-    expect(screen.getByText(/Hoá đơn đã thay đổi vì có thêm món/)).toBeTruthy();
+    expect(screen.getByText(/Hoá đơn đã thay đổi\. Hãy quét mã mới/)).toBeTruthy();
   });
 
   it('asks a phone without a table session to scan the QR', async () => {
@@ -223,6 +251,59 @@ describe('GuestBillPage', () => {
     await screen.findByText('TQR 7F3K2');
     FakeEventSource.last?.emit('delta', { type: 'session.status', status: 'closed' });
     expect(await screen.findByRole('heading', { name: 'Bàn đã đóng' })).toBeTruthy();
+  });
+
+  it('TQR-025: after a reload with the last dish dropped it shows the empty state, not just the title', async () => {
+    fakeApi({
+      'POST /api/g/bill': {
+        body: view({
+          lines: [],
+          bill: bill({ status: 'superseded' }),
+          totalVnd: 0,
+          dueVnd: 0,
+          transfer: null,
+        }),
+      },
+    });
+    await renderWithApp(GuestBillPage, {
+      paths: ['/t/:qrToken/hoa-don', '/t/:qrToken'],
+      at: '/t/abc/hoa-don',
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Bàn không còn món cần thanh toán' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Quay lại bàn' }).getAttribute('href')).toBe('/t/abc');
+  });
+
+  it('TQR-025: live, the kitchen dropping the last dish turns the open bill into the empty state', async () => {
+    let dropped = false;
+    fakeApi({
+      'POST /api/g/bill': { body: view() },
+      'GET /api/g/bill': () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              dropped
+                ? view({ lines: [], bill: bill({ status: 'superseded' }), totalVnd: 0, dueVnd: 0 })
+                : view(),
+            ),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+    });
+    await renderWithApp(GuestBillPage, {
+      paths: ['/t/:qrToken/hoa-don', '/t/:qrToken'],
+      at: '/t/abc/hoa-don',
+    });
+    await screen.findByText('TQR 7F3K2');
+    dropped = true;
+    FakeEventSource.last?.emit('delta', { type: 'bill.status', status: 'superseded' });
+    expect(
+      await screen.findByRole('heading', { name: 'Bàn không còn món cần thanh toán' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('đừng dùng mã cũ');
+    expect(screen.queryByText('TQR 7F3K2')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Quay lại bàn' }).getAttribute('href')).toBe('/t/abc');
   });
 
   it('shows an empty state with nothing ordered, and an error with retry', async () => {

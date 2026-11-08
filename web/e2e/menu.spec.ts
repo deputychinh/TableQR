@@ -68,8 +68,20 @@ test('owner builds a menu, marks a dish "hết món" and previews it as a guest'
   await expectNoSeriousA11yIssues(page);
 
   const toggle = page.getByRole('switch', { name: 'Còn món: Trà đá' });
+  // The switch flips at once (optimistic); the reload must wait for the saved PUT, or it races
+  // the request (flaky before review round 1). A slow network is simulated to keep the race open.
+  await page.route('**/api/menu/items/*/availability', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.continue();
+  });
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PUT' &&
+      /\/api\/menu\/items\/[^/]+\/availability$/.test(new URL(response.url()).pathname),
+  );
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  expect((await saved).ok()).toBe(true);
   await page.reload();
   await expect(page.getByRole('switch', { name: 'Còn món: Trà đá' })).toHaveAttribute(
     'aria-checked',

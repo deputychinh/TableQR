@@ -175,6 +175,42 @@ describe('table booking (e2e, spec S14–S15, ADR 0007)', () => {
       expect(refused.body.code).toBe('NO_TABLE_FREE');
     });
 
+    it('TQR-024 seating a booking whose table was hidden afterwards answers 404 like staff open; moved to a shown table it seats', async () => {
+      const o = await owner();
+      const table = await addTable(o, 'Bàn 2', 2);
+      const other = await addTable(o, 'Bàn 4', 4);
+      const date = day(2);
+      const created = await book(o.slug, { date, time: '12:00', partySize: 2 }).expect(201);
+      const id = created.body.id as string;
+      expect((await list(o, date))[0]).toMatchObject({ id, tableId: table });
+      // The owner hides the table after the booking was made (nobody sits there yet).
+      await http()
+        .post(`/api/tables/${table}/archive`)
+        .set('origin', ORIGIN)
+        .set('cookie', o.cookie)
+        .expect(200);
+      // Staff open on a hidden table answers 404 NOT_FOUND; seating its booking must match.
+      const opened = await http()
+        .post('/api/sessions')
+        .set('origin', ORIGIN)
+        .set('cookie', o.cookie)
+        .send({ tableId: table, partySize: 2 })
+        .expect(404);
+      expect(opened.body.code).toBe('NOT_FOUND');
+      const seated = await act(o, id, 'seat').expect(404);
+      expect(seated.body.code).toBe('NOT_FOUND');
+      const db = t.app.get(DB);
+      const sessions = await db
+        .select({ id: tableSessions.id })
+        .from(tableSessions)
+        .where(eq(tableSessions.tableId, table));
+      expect(sessions).toEqual([]);
+      expect((await list(o, date))[0]).toMatchObject({ id, status: 'pending', tableId: table });
+      // The way out: move the booking to a shown table, then seat it.
+      await act(o, id, 'confirm', { tableId: other }).expect(200);
+      expect((await act(o, id, 'seat').expect(200)).body).toMatchObject({ status: 'seated' });
+    });
+
     it('AC48 offers the nearest free start times when no table is free, and back-to-back slots fit', async () => {
       const o = await owner();
       await addTable(o, 'Bàn 1', 4);

@@ -5,6 +5,7 @@ import http from 'k6/http';
 import exec from 'k6/execution';
 import { Counter } from 'k6/metrics';
 import { check, fail, sleep } from 'k6';
+import { createSetupRetry } from './lib/retry.mjs';
 
 const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:3310';
 // Non-GET requests need an allowed Origin (docs/security.md, CSRF); the dev web origin is allowed.
@@ -22,7 +23,17 @@ const WORKLOAD = 'guest-order-submit';
 const SETUP_RETRY_BUDGET_S = Number(__ENV.SETUP_RETRY_BUDGET_S || 150);
 const setupRetries = new Counter('setup_429_retries');
 const setupWaited = new Counter('setup_429_wait_s');
-let retryWaitedS = 0;
+// The retry loop itself is pure and unit-tested (bench/lib/retry.test.mjs, `make test-scripts`).
+const { withRetry } = createSetupRetry({
+  budgetS: SETUP_RETRY_BUDGET_S,
+  sleep,
+  fail,
+  onRetry: (waitS) => {
+    setupRetries.add(1);
+    setupWaited.add(waitS);
+  },
+  warn: (message, res) => console.warn(`${message} (${res.json('code')})`),
+});
 
 export const options = {
   // Setup makes ~120 calls; it may also wait out a per-address limit window (TQR-026).
@@ -60,27 +71,6 @@ const json = (body) => ({
 const must = (res, status, what) => {
   if (res.status !== status) fail(`${what}: expected ${status}, got ${res.status} ${res.body}`);
   return res.json();
-};
-
-/**
- * Sends a setup request; on 429 (a per-address limit used up by earlier local traffic) it waits
- * with backoff and sends it again, counting retries and seconds waited for the summary.
- */
-const withRetry = (send, what) => {
-  let res = send();
-  for (let attempt = 0; res.status === 429; attempt += 1) {
-    const wait = Math.min(2 ** (attempt + 1), 16);
-    if (retryWaitedS + wait > SETUP_RETRY_BUDGET_S) {
-      fail(`${what}: still 429 after waiting ${retryWaitedS} s (SETUP_RETRY_BUDGET_S)`);
-    }
-    console.warn(`${what}: 429 ${res.json('code')}, retrying in ${wait} s`);
-    setupRetries.add(1);
-    setupWaited.add(wait);
-    retryWaitedS += wait;
-    sleep(wait);
-    res = send();
-  }
-  return res;
 };
 
 const post = (path, body, status, what) => {

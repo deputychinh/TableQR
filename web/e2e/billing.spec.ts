@@ -60,7 +60,11 @@ const sql = (statement: string): string => {
  * phone (database). Guest check-in and ordering (TQR-011/012) are not on main yet, so the session
  * and the `tqr_guest` cookie are written straight into the tables they will use.
  */
-const seed = async (api: APIRequestContext, stamp: string) => {
+const seed = async (
+  api: APIRequestContext,
+  stamp: string,
+  itemStatus: 'served' | 'waiting' = 'served',
+) => {
   const signUp = await api.post('/api/auth/signup', {
     data: {
       restaurantName: 'Bún Chả Thu Ngân',
@@ -115,11 +119,11 @@ const seed = async (api: APIRequestContext, stamp: string) => {
         name_snapshot, price_vnd, is_main, quantity, status, queue_at, session_opened_at)
       values
         (${r}, '${ids.order}', '${ids.session}', '${ids.item}', '${ids.station}', 'Bún chả',
-          55000, 'yes', 2, 'served', now(), now()),
+          55000, 'yes', 2, '${itemStatus}', now(), now()),
         (${r}, '${ids.order}', '${ids.session}', '${ids.item}', '${ids.station}', 'Trà đá',
-          5000, 'no', 3, 'served', now(), now());
+          5000, 'no', 3, '${itemStatus}', now(), now());
   `);
-  return { qrToken, guestToken, cashierEmail, itemId: ids.item };
+  return { qrToken, guestToken, cashierEmail, itemId: ids.item, stationId: ids.station };
 };
 
 /** A second device of the same kind with its own cookies (the guest's phone, the cashier's iPad). */
@@ -204,6 +208,65 @@ test('AC42 live: with the bill open, a newly released dish changes the code, amo
   await expect(guest.getByText(/^TQR [0-9A-Z]{5}$/)).not.toHaveText(oldMemo);
   await evidence(guest, info, 'guest-bill-superseded-live');
   await expectNoSeriousA11yIssues(guest);
+  await guest.context().close();
+});
+
+test('TQR-025 live: the kitchen drops dishes while the guest has the bill open; the last one leaves an empty state, also after a reload', async ({
+  page,
+  browser,
+  baseURL,
+}, info) => {
+  const stamp = `drop-${info.project.name}-${String(Date.now())}`;
+  // Bún chả ×2 (110 000) + Trà đá ×3 (15 000), both still waiting in the kitchen.
+  const { qrToken, guestToken, stationId } = await seed(page.request, stamp, 'waiting');
+  const guest = await withGuestCookie(browser, info, baseURL ?? '', guestToken);
+  await openBillByTapping(guest, qrToken);
+  await expect(guest.getByRole('img', { name: /Mã VietQR thanh toán 125\.000/ })).toBeVisible();
+  const oldMemo = (await guest.getByText(/^TQR [0-9A-Z]{5}$/).textContent()) ?? '';
+
+  // The owner (signed up in `page` during the seed) runs the kitchen screen and drops the tea.
+  await page.goto(`/bep?khu=${stationId}`);
+  const drop = async (dish: string) => {
+    await page
+      .getByRole('article', { name: 'Bàn 7 · 2 khách' })
+      .filter({ hasText: dish })
+      .getByRole('button', { name: 'Bỏ món' })
+      .click();
+    await page
+      .getByRole('dialog', { name: `Bỏ ${dish} của Bàn 7?` })
+      .getByRole('button', { name: 'Bỏ món' })
+      .click();
+    await expect(page.getByRole('status').first()).toContainText(`Đã bỏ ${dish} của Bàn 7.`);
+  };
+  await drop('Trà đá');
+
+  // The amount went down: new code, amount and QR, live; the notice does not claim more food.
+  const notice = guest.getByText(/^\s*Hoá đơn đã thay đổi/);
+  await expect(notice).toHaveText(
+    'Hoá đơn đã thay đổi. Hãy quét mã mới bên dưới, đừng dùng mã cũ.',
+  );
+  await expect(guest.getByRole('img', { name: /Mã VietQR thanh toán 110\.000/ })).toBeVisible();
+  await expect(guest.getByRole('img', { name: /Mã VietQR thanh toán 125\.000/ })).toHaveCount(0);
+  await expect(guest.getByText(/^TQR [0-9A-Z]{5}$/)).not.toHaveText(oldMemo);
+  await expect(guest.getByText(/thêm món/)).toHaveCount(0);
+
+  // The last dish goes too: nothing is due, a proper empty state with the way back to the table.
+  await drop('Bún chả');
+  const empty = guest.getByRole('heading', { name: 'Bàn không còn món cần thanh toán' });
+  const back = guest.getByRole('link', { name: 'Quay lại bàn' });
+  await expect(empty).toBeVisible();
+  await expect(back).toHaveAttribute('href', `/t/${qrToken}`);
+  await expect(guest.getByRole('img', { name: /Mã VietQR/ })).toHaveCount(0);
+  await evidence(guest, info, 'guest-bill-nothing-due-live');
+  await expectNoSeriousA11yIssues(guest);
+
+  // A reload asks for the bill again: still the empty state, never a bare title.
+  await guest.reload();
+  await expect(empty).toBeVisible();
+  await expect(guest.getByRole('img', { name: /Mã VietQR/ })).toHaveCount(0);
+  await evidence(guest, info, 'guest-bill-nothing-due-reload');
+  await back.click();
+  await expect(guest).toHaveURL(new RegExp(`/t/${qrToken}$`));
   await guest.context().close();
 });
 
