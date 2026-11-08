@@ -241,36 +241,9 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
     }
     return { status: response.status, code: ((await response.json()) as { code: string }).code };
   };
-  const cases = ROLE_MATRIX.flatMap((row) =>
-    ALL_ROLES.map((role) => ({ row, role, allowed: row.allowed.includes(role) })),
-  );
-
-  it.each(cases.map((c) => [c.row.method.toUpperCase(), c.row.path(PLACEHOLDERS), c.role, c]))(
-    '%s %s as %s',
-    async (_method, _path, _role, { row, role, allowed }) => {
-      const cookie = cookies.get(role) ?? '';
-      if (row.stream) {
-        const { status, code } = await streamStatus(row.path(fixture), cookie);
-        if (allowed) expect(status).toBe(200);
-        else expect({ status, code }).toEqual({ status: 403, code: 'FORBIDDEN' });
-        return;
-      }
-      let call = request(t.app.getHttpServer())
-        [row.method](row.path(fixture))
-        .set('origin', ORIGIN)
-        .set('cookie', cookie);
-      if (row.body) call = call.send(row.body(fixture) as object);
-      const response = await call;
-      if (allowed) {
-        expect([401, 403]).not.toContain(response.status);
-        expect(response.status).toBeLessThan(400);
-      } else {
-        expect(response.status).toBe(403);
-        expect(response.body.code).toBe('FORBIDDEN');
-      }
-    },
-  );
-
+  // The isolation sweep runs BEFORE the role matrix: the matrix's owner rows delete the spare
+  // rows (one-shot), so a later intruder DELETE would hit an id that no longer exists and prove
+  // nothing. Swept first, every intruder call targets a live row of the fixture restaurant.
   /** Rows that name a row of the fixture restaurant, in the path or in the body (ids are ':…'). */
   const referencesFixtureRow = (row: (typeof ROLE_MATRIX)[number]): boolean =>
     row.path(PLACEHOLDERS).includes('/:') ||
@@ -312,6 +285,36 @@ describe('AC15 role matrix (e2e): deny by default for every staff endpoint', () 
   it('TQR-017 route coverage: every staff route is in ROLE_MATRIX or excluded with a reason', () => {
     expect(uncoveredRoutes(listRoutes(t.app), ROLE_MATRIX)).toEqual([]);
   });
+
+  const cases = ROLE_MATRIX.flatMap((row) =>
+    ALL_ROLES.map((role) => ({ row, role, allowed: row.allowed.includes(role) })),
+  );
+
+  it.each(cases.map((c) => [c.row.method.toUpperCase(), c.row.path(PLACEHOLDERS), c.role, c]))(
+    '%s %s as %s',
+    async (_method, _path, _role, { row, role, allowed }) => {
+      const cookie = cookies.get(role) ?? '';
+      if (row.stream) {
+        const { status, code } = await streamStatus(row.path(fixture), cookie);
+        if (allowed) expect(status).toBe(200);
+        else expect({ status, code }).toEqual({ status: 403, code: 'FORBIDDEN' });
+        return;
+      }
+      let call = request(t.app.getHttpServer())
+        [row.method](row.path(fixture))
+        .set('origin', ORIGIN)
+        .set('cookie', cookie);
+      if (row.body) call = call.send(row.body(fixture) as object);
+      const response = await call;
+      if (allowed) {
+        expect([401, 403]).not.toContain(response.status);
+        expect(response.status).toBeLessThan(400);
+      } else {
+        expect(response.status).toBe(403);
+        expect(response.body.code).toBe('FORBIDDEN');
+      }
+    },
+  );
 
   it('answers 401 (not 403) to every matrix endpoint without a session', async () => {
     for (const row of ROLE_MATRIX) {
