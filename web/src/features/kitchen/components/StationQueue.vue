@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ChefHat } from 'lucide-vue-next';
 import { ApiError } from '@/api/client';
@@ -14,6 +14,8 @@ import TicketCard from './TicketCard.vue';
 
 /** One station's live queue in two columns, oldest first (the server's order, AC30). */
 const props = defineProps<{ stationId: string }>();
+/** The live number of waiting dishes, for the station tab's count. */
+const emit = defineEmits<{ waiting: [count: number] }>();
 const { t } = useI18n();
 const { items, loaded, failed, now, status, refetch, applyLocal } = useStationQueue(
   props.stationId,
@@ -21,10 +23,16 @@ const { items, loaded, failed, now, status, refetch, applyLocal } = useStationQu
 
 const waiting = computed(() => items.value.filter((i) => i.status === 'waiting'));
 const cooking = computed(() => items.value.filter((i) => i.status === 'cooking'));
+watch(
+  () => (loaded.value ? waiting.value.length : undefined),
+  (count) => {
+    if (count !== undefined) emit('waiting', count);
+  },
+);
 
 const busyId = ref<string | undefined>();
 const message = ref('');
-const skipping = ref<{ ticket: Ticket; tables: string[] } | undefined>();
+const skipping = ref<{ ticket: Ticket; tables: string[]; sameTable: boolean } | undefined>();
 
 type Outcome = 'ok' | 'skip' | 'failed';
 
@@ -57,8 +65,10 @@ const done = async (ticket: Ticket) => {
   if (outcome === 'ok') announceDone(ticket);
   if (outcome === 'skip') {
     // AC32: an older same-dish order is ahead; ask the cook why this one goes first.
-    const tables = [...new Set(olderSameDish(items.value, ticket).map((i) => i.tableName))];
-    skipping.value = { ticket, tables };
+    // Name the other tables; an earlier order of the same table is "món này gọi trước" (r2 review).
+    const names = new Set(olderSameDish(items.value, ticket).map((i) => i.tableName));
+    const sameTable = names.delete(ticket.tableName);
+    skipping.value = { ticket, tables: [...names], sameTable };
   }
 };
 
@@ -133,6 +143,7 @@ const confirmSkip = async (reason: string) => {
       :open="skipping !== undefined"
       :dish="skipping?.ticket.name ?? ''"
       :tables="skipping?.tables ?? []"
+      :same-table="skipping?.sameTable ?? false"
       :busy="busyId !== undefined"
       @confirm="confirmSkip"
       @cancel="skipping = undefined"

@@ -10,7 +10,18 @@ import { SKIP_REASON_MAX } from '../services/kitchen.service';
  * AC32: an older table ordered the same dish and is still waiting. The cook may still finish this
  * one first, but only with a reason, which is recorded on the item.
  */
-const props = defineProps<{ open: boolean; dish: string; tables: string[]; busy: boolean }>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    dish: string;
+    /** Other tables with an older order of this dish. */
+    tables: string[];
+    /** This same table has an older order of this dish (no other table to name). */
+    sameTable?: boolean;
+    busy: boolean;
+  }>(),
+  { sameTable: false },
+);
 const emit = defineEmits<{ confirm: [reason: string]; cancel: [] }>();
 const { t } = useI18n();
 
@@ -43,7 +54,9 @@ const submit = () => {
       {{
         tables.length > 0
           ? t('kitchen.skip.body', { tables: tables.join(', '), dish })
-          : t('kitchen.skip.bodyOther', { dish })
+          : sameTable
+            ? t('kitchen.skip.bodySameTable', { dish })
+            : t('kitchen.skip.bodyOther', { dish })
       }}
     </p>
     <TextAreaField

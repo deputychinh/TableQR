@@ -1,4 +1,5 @@
 import { ApiError, getJson, sendJson } from '@/api/client';
+import { i18n } from '@/locales';
 
 export type RestaurantRole = 'owner' | 'cashier' | 'waiter' | 'kitchen';
 export type NewStaffRole = Exclude<RestaurantRole, 'owner'>;
@@ -45,9 +46,17 @@ export const updateStaff = (
 export const resetStaffPassword = (id: string, password: string): Promise<void> =>
   sendJson<void>('PUT', `/staff/${encodeURIComponent(id)}/password`, { password });
 
-/** Name to show for a person: their display name, else their email. */
-export const nameOf = (member: Pick<StaffMember, 'displayName' | 'email'>): string =>
-  member.displayName.trim() || member.email;
+/**
+ * Name to show for a person (TQR-005/009 review): their display name; without one the owner is
+ * "Chủ quán" and anyone else the part of their email before "@", so a list never shows the same
+ * email twice (once as the name, once as the email).
+ */
+export const nameOf = (member: Pick<StaffMember, 'displayName' | 'email' | 'role'>): string => {
+  const name = member.displayName.trim();
+  if (name !== '') return name;
+  if (member.role === 'owner') return i18n.global.t('roles.names.owner');
+  return member.email.split('@')[0] || member.email;
+};
 
 /** Maps an API error of a staff action to a locale key (form-level message). */
 export const describeStaffError = (error: unknown): string => {

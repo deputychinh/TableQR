@@ -30,7 +30,7 @@ export const staffLocale = {
       passwordHint: 'Ít nhất 10 ký tự. Bạn có thể đặt lại sau.',
       role: 'Vai trò',
       submit: 'Thêm nhân viên',
-      cancel: 'Quay lại',
+      cancel: 'Huỷ',
     },
     detail: {
       roleSection: 'Vai trò',
