@@ -3,6 +3,7 @@ import { and, asc, count, eq, sql } from 'drizzle-orm';
 import { asTenantId, type TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
 import { restaurants } from '../db/schema.js';
+import { RestaurantStatusService } from '../identity/restaurant-status.service.js';
 import type {
   CreateCategoryInput,
   CreateItemInput,
@@ -95,7 +96,10 @@ const withoutUndefined = <T extends object>(value: T): Partial<T> =>
 /** Stations, categories and items of one restaurant; every query is scoped by the TenantId (ADR 0003). */
 @Injectable()
 export class MenuService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly restaurantStatus: RestaurantStatusService,
+  ) {}
 
   /** The whole menu for staff; the first open gives a new restaurant its default station. */
   async getMenu(tenant: TenantId): Promise<StaffMenu> {
@@ -335,15 +339,19 @@ export class MenuService {
 
   // --- guest -----------------------------------------------------------------
 
-  /** Public menu by restaurant slug: available and "hết món" items, the latter not orderable. */
+  /**
+   * Public menu by restaurant slug: available and "hết món" items, the latter not orderable.
+   * A suspended restaurant answers 403 `RESTAURANT_SUSPENDED` (AC54).
+   */
   async guestMenu(slug: string): Promise<GuestMenu> {
     const [restaurant] = await this.db
       .select({ id: restaurants.id, name: restaurants.name, slug: restaurants.slug })
       .from(restaurants)
-      .where(and(eq(restaurants.slug, slug), eq(restaurants.status, 'active')))
+      .where(eq(restaurants.slug, slug))
       .limit(1);
     if (!restaurant) throw notFound();
     const tenant = asTenantId(restaurant.id);
+    await this.restaurantStatus.assertActive(tenant);
     const [categoryRows, itemRows] = await Promise.all([
       this.db.select(categoryColumns).from(categories).where(eq(categories.restaurantId, tenant)),
       this.db

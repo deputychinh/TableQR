@@ -424,7 +424,7 @@ describe('menu: stations, categories, items, availability (e2e)', () => {
   });
 
   describe('guest menu', () => {
-    it('answers 404 for an unknown, malformed or suspended restaurant', async () => {
+    it('answers 404 for an unknown or malformed slug and 403 RESTAURANT_SUSPENDED (AC54) for a suspended restaurant', async () => {
       await http().get('/api/g/r/khong-co-quan-nay/menu').expect(404);
       await http().get('/api/g/r/BAD%20SLUG/menu').expect(404);
       const r = await newRestaurant();
@@ -432,7 +432,8 @@ describe('menu: stations, categories, items, availability (e2e)', () => {
         .update(restaurants)
         .set({ status: 'suspended' })
         .where(eq(restaurants.id, r.restaurantId));
-      await http().get(`/api/g/r/${r.slug}/menu`).expect(404);
+      const response = await http().get(`/api/g/r/${r.slug}/menu`).expect(403);
+      expect(response.body.code).toBe('RESTAURANT_SUSPENDED');
     });
   });
 

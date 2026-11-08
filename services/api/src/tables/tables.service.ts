@@ -3,10 +3,11 @@ import { and, asc, count, eq } from 'drizzle-orm';
 import { CLOCK, type Clock } from '../common/clock.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { DomainError } from '../common/errors/domain.error.js';
-import type { TenantId } from '../common/tenant.js';
+import { asTenantId, type TenantId } from '../common/tenant.js';
 import { DB, type Database } from '../db/database.module.js';
 import { isUniqueViolation } from '../db/pg-error.js';
 import { restaurants } from '../db/schema.js';
+import { RestaurantStatusService } from '../identity/restaurant-status.service.js';
 import { isWellFormedQrToken, newQrToken } from './domain/qr-token.js';
 import { TableErrorCode } from './domain/table-error-code.js';
 import { TABLES_PER_RESTAURANT_MAX } from './domain/table-rules.js';
@@ -80,6 +81,7 @@ export class TablesService {
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(CLOCK) private readonly clock: Clock,
+    private readonly restaurantStatus: RestaurantStatusService,
   ) {}
 
   async list(tenant: TenantId): Promise<TableView[]> {
@@ -172,7 +174,8 @@ export class TablesService {
 
   /**
    * Guest entry (AC8, AC10, AC11): the token alone identifies restaurant and table.
-   * Unknown, malformed or suspended-restaurant tokens are all "not found".
+   * Unknown or malformed tokens are "not found"; any code of a suspended restaurant answers 403
+   * `RESTAURANT_SUSPENDED` (AC54), so the guest reads "Nhà hàng tạm ngưng".
    */
   async resolveGuestToken(token: string): Promise<GuestTableView> {
     if (!isWellFormedQrToken(token)) throw guestTableNotFound();
@@ -181,31 +184,29 @@ export class TablesService {
         tableId: diningTables.id,
         tableName: diningTables.name,
         seats: diningTables.seats,
+        restaurantId: restaurants.id,
         restaurantName: restaurants.name,
         slug: restaurants.slug,
-        status: restaurants.status,
       })
       .from(diningTables)
       .innerJoin(restaurants, eq(restaurants.id, diningTables.restaurantId))
       .where(eq(diningTables.qrToken, token))
       .limit(1);
     if (current) {
-      if (current.status !== 'active') throw guestTableNotFound();
+      await this.restaurantStatus.assertActive(asTenantId(current.restaurantId));
       return {
         restaurant: { name: current.restaurantName, slug: current.slug },
         table: { id: current.tableId, name: current.tableName, seats: current.seats },
       };
     }
     const [retired] = await this.db
-      .select({ status: restaurants.status })
+      .select({ restaurantId: retiredQrTokens.restaurantId })
       .from(retiredQrTokens)
-      .innerJoin(restaurants, eq(restaurants.id, retiredQrTokens.restaurantId))
       .where(eq(retiredQrTokens.qrToken, token))
       .limit(1);
-    if (retired?.status === 'active') {
-      throw new DomainError(TableErrorCode.QrExpired, 410, { detail: 'Mã QR đã hết hạn' });
-    }
-    throw guestTableNotFound();
+    if (!retired) throw guestTableNotFound();
+    await this.restaurantStatus.assertActive(asTenantId(retired.restaurantId));
+    throw new DomainError(TableErrorCode.QrExpired, 410, { detail: 'Mã QR đã hết hạn' });
   }
 
   private async findOwn(
