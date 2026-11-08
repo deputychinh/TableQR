@@ -3,6 +3,24 @@ import { groupMenu, toGuestMenu, type ItemRow } from './menu-tree.js';
 import { normalizeName } from './names.js';
 import { nextSortOrder, swapForMove } from './ordering.js';
 import { MAX_PRICE_VND, MIN_PRICE_VND } from './price.js';
+import {
+  MAX_CATEGORIES_PER_RESTAURANT,
+  MAX_ITEMS_PER_RESTAURANT,
+  MAX_STATIONS_PER_RESTAURANT,
+  isAtLimit,
+} from './limits.js';
+
+describe('menu caps', () => {
+  it('keeps the caps the review set and is at the limit only once the count reaches it', () => {
+    expect([
+      MAX_STATIONS_PER_RESTAURANT,
+      MAX_CATEGORIES_PER_RESTAURANT,
+      MAX_ITEMS_PER_RESTAURANT,
+    ]).toEqual([20, 50, 500]);
+    expect(isAtLimit(499, MAX_ITEMS_PER_RESTAURANT)).toBe(false);
+    expect(isAtLimit(500, MAX_ITEMS_PER_RESTAURANT)).toBe(true);
+  });
+});
 
 describe('price rule (AC7)', () => {
   it('keeps the limits the spec names', () => {

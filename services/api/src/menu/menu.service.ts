@@ -29,8 +29,16 @@ import {
 import { DEFAULT_LATE_MINUTES, DEFAULT_STATION_NAME } from './domain/station.js';
 import { FOREIGN_KEY_VIOLATION, UNIQUE_VIOLATION, pgCode, pgConstraint } from '../db/pg-error.js';
 import {
+  MAX_CATEGORIES_PER_RESTAURANT,
+  MAX_ITEMS_PER_RESTAURANT,
+  MAX_STATIONS_PER_RESTAURANT,
+  isAtLimit,
+} from './domain/limits.js';
+import {
+  MenuErrorCode,
   categoryNotEmpty,
   lastStation,
+  limitReached,
   nameTaken,
   notFound,
   stationNotEmpty,
@@ -90,6 +98,20 @@ const translate = (error: unknown, onForeignKey: () => Error): never => {
   throw error;
 };
 
+type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
+ * Serialises creations per restaurant (row lock on the restaurant), so a cap cannot be overshot
+ * by parallel requests and two appends never share a sort order.
+ */
+const lockRestaurant = async (tx: Tx, tenant: TenantId): Promise<void> => {
+  await tx
+    .select({ id: restaurants.id })
+    .from(restaurants)
+    .where(eq(restaurants.id, tenant))
+    .for('update');
+};
+
 const withoutUndefined = <T extends object>(value: T): Partial<T> =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as Partial<T>;
 
@@ -141,16 +163,26 @@ export class MenuService {
 
   async createStation(tenant: TenantId, input: CreateStationInput): Promise<Station> {
     try {
-      const [row] = await this.db
-        .insert(stations)
-        .values({
-          restaurantId: tenant,
-          name: input.name,
-          lateAfterMinutes: input.lateAfterMinutes ?? DEFAULT_LATE_MINUTES,
-        })
-        .returning(stationColumns);
-      if (!row) throw new Error('insert returned no station');
-      return row;
+      return await this.db.transaction(async (tx) => {
+        await lockRestaurant(tx, tenant);
+        const [existing] = await tx
+          .select({ n: count() })
+          .from(stations)
+          .where(eq(stations.restaurantId, tenant));
+        if (isAtLimit(existing?.n ?? 0, MAX_STATIONS_PER_RESTAURANT)) {
+          throw limitReached(MenuErrorCode.StationLimitReached, MAX_STATIONS_PER_RESTAURANT);
+        }
+        const [row] = await tx
+          .insert(stations)
+          .values({
+            restaurantId: tenant,
+            name: input.name,
+            lateAfterMinutes: input.lateAfterMinutes ?? DEFAULT_LATE_MINUTES,
+          })
+          .returning(stationColumns);
+        if (!row) throw new Error('insert returned no station');
+        return row;
+      });
     } catch (error: unknown) {
       return translate(error, notFound);
     }
@@ -196,16 +228,14 @@ export class MenuService {
   async createCategory(tenant: TenantId, input: CreateCategoryInput): Promise<Category> {
     try {
       return await this.db.transaction(async (tx) => {
-        // Lock the restaurant row so two concurrent appends never share a sort order.
-        await tx
-          .select({ id: restaurants.id })
-          .from(restaurants)
-          .where(eq(restaurants.id, tenant))
-          .for('update');
+        await lockRestaurant(tx, tenant);
         const existing = await tx
           .select({ id: categories.id, sortOrder: categories.sortOrder })
           .from(categories)
           .where(eq(categories.restaurantId, tenant));
+        if (isAtLimit(existing.length, MAX_CATEGORIES_PER_RESTAURANT)) {
+          throw limitReached(MenuErrorCode.CategoryLimitReached, MAX_CATEGORIES_PER_RESTAURANT);
+        }
         const [row] = await tx
           .insert(categories)
           .values({
@@ -291,20 +321,30 @@ export class MenuService {
   /** AC5: a saved item belongs to one of this restaurant's categories and stations, else 404. */
   async createItem(tenant: TenantId, input: CreateItemInput): Promise<MenuItem> {
     try {
-      const [row] = await this.db
-        .insert(menuItems)
-        .values({
-          restaurantId: tenant,
-          categoryId: input.categoryId,
-          stationId: input.stationId,
-          name: input.name,
-          priceVnd: input.priceVnd,
-          description: input.description ?? null,
-          available: input.available ?? true,
-        })
-        .returning(itemColumns);
-      if (!row) throw new Error('insert returned no item');
-      return row;
+      return await this.db.transaction(async (tx) => {
+        await lockRestaurant(tx, tenant);
+        const [existing] = await tx
+          .select({ n: count() })
+          .from(menuItems)
+          .where(eq(menuItems.restaurantId, tenant));
+        if (isAtLimit(existing?.n ?? 0, MAX_ITEMS_PER_RESTAURANT)) {
+          throw limitReached(MenuErrorCode.ItemLimitReached, MAX_ITEMS_PER_RESTAURANT);
+        }
+        const [row] = await tx
+          .insert(menuItems)
+          .values({
+            restaurantId: tenant,
+            categoryId: input.categoryId,
+            stationId: input.stationId,
+            name: input.name,
+            priceVnd: input.priceVnd,
+            description: input.description ?? null,
+            available: input.available ?? true,
+          })
+          .returning(itemColumns);
+        if (!row) throw new Error('insert returned no item');
+        return row;
+      });
     } catch (error: unknown) {
       return translate(error, notFound);
     }

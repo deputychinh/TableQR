@@ -53,7 +53,7 @@ flowchart LR
 - Headers in production: CSP `default-src 'self'; img-src 'self' data:; frame-ancestors 'none'`, HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
 - Memory: at most 4 scrypt computations (≈128 MB each) run at once per process, the rest queue (`MAX_CONCURRENT_SCRYPT` in `identity/domain/password-slots.ts`).
 - The per-address rate limit and the SSE stream caps are in memory and per process: with several API instances the effective limit is the limit × instances. Behind a reverse proxy, Express must trust it (`trust proxy`) so the client address is the real one.
-- Input validated with zod at the boundary; unknown keys rejected; list endpoints capped at 200.
+- Input validated with zod at the boundary; unknown keys rejected; list endpoints capped at 200; menus capped per restaurant at 20 stations, 50 categories and 500 items (which bounds the staff and guest menu reads), tables at 200.
 - `npm audit --omit=dev` in CI (added with the first feature item); lockfiles committed; install scripts not allowed unless reviewed.
 - Personal data: booking name and phone deleted 30 days after the booking slot; no guest accounts; no analytics trackers.
 

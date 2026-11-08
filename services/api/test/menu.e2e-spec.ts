@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { eq } from 'drizzle-orm';
 import { DB, type Database } from '../src/db/database.module.js';
-import { restaurants, users } from '../src/db/schema.js';
+import { categories, menuItems, restaurants, stations, users } from '../src/db/schema.js';
 import { hashPassword } from '../src/identity/domain/password.js';
 import { createTestApp, type TestApp } from './support/app.js';
 import { ORIGIN, cookieOf, newOwner, signUp } from './support/http.js';
@@ -420,6 +420,83 @@ describe('menu: stations, categories, items, availability (e2e)', () => {
       await expect(
         db().update(menuItems).set({ priceVnd: 0 }).where(eq(menuItems.id, item.id)),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('caps per restaurant (20 stations, 50 categories, 500 items)', () => {
+    const fill = async (
+      r: { restaurantId: string; stationId: string },
+      kind: string,
+      n: number,
+    ) => {
+      const rows = Array.from({ length: n }, (_, i) => `${kind} ${String(i)}`);
+      if (kind === 'station') {
+        await db()
+          .insert(stations)
+          .values(
+            rows.map((name) => ({ restaurantId: r.restaurantId, name, lateAfterMinutes: 15 })),
+          );
+      } else if (kind === 'category') {
+        await db()
+          .insert(categories)
+          .values(
+            rows.map((name, i) => ({ restaurantId: r.restaurantId, name, sortOrder: i + 1 })),
+          );
+      } else {
+        const [category] = await db()
+          .insert(categories)
+          .values({ restaurantId: r.restaurantId, name: 'Nhóm đầy', sortOrder: 999 })
+          .returning({ id: categories.id });
+        await db()
+          .insert(menuItems)
+          .values(
+            rows.map((name) => ({
+              restaurantId: r.restaurantId,
+              categoryId: category?.id ?? '',
+              stationId: r.stationId,
+              name,
+              priceVnd: 10000,
+            })),
+          );
+        return category?.id ?? '';
+      }
+      return '';
+    };
+
+    it('refuses the 21st station with 409 STATION_LIMIT_REACHED', async () => {
+      const r = await newRestaurant();
+      await fill(r, 'station', 18); // + the default station = 19
+      await post('/api/menu/stations', r.cookie, { name: 'Khu 20' }).expect(201);
+      const refused = await post('/api/menu/stations', r.cookie, { name: 'Khu 21' }).expect(409);
+      expect(refused.body.code).toBe('STATION_LIMIT_REACHED');
+    });
+
+    it('lets exactly one of two parallel creations take the last category slot', async () => {
+      const r = await newRestaurant();
+      await fill(r, 'category', 49);
+      const results = await Promise.all([
+        post('/api/menu/categories', r.cookie, { name: 'Cuối A' }),
+        post('/api/menu/categories', r.cookie, { name: 'Cuối B' }),
+      ]);
+      expect(results.map((x) => x.status).sort((a, b) => a - b)).toEqual([201, 409]);
+      expect(results.find((x) => x.status === 409)?.body.code).toBe('CATEGORY_LIMIT_REACHED');
+    });
+
+    it('refuses the 501st item with 409 ITEM_LIMIT_REACHED', async () => {
+      const r = await newRestaurant();
+      const categoryId = await fill(r, 'item', 499);
+      const item = (name: string) =>
+        post('/api/menu/items', r.cookie, {
+          name,
+          priceVnd: 20000,
+          categoryId,
+          stationId: r.stationId,
+        });
+      await item('Món 500').expect(201);
+      const refused = await item('Món 501').expect(409);
+      expect(refused.body.code).toBe('ITEM_LIMIT_REACHED');
+      const menu = await http().get('/api/menu').set('cookie', r.cookie).expect(200);
+      expect(menu.body.categories[0].items).toHaveLength(500);
     });
   });
 

@@ -20,6 +20,7 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ### Fixed
 
+- Menu caps per restaurant: 20 stations, 50 categories, 500 items → 409 `STATION_LIMIT_REACHED` / `CATEGORY_LIMIT_REACHED` / `ITEM_LIMIT_REACHED`, creation serialised per restaurant; the staff and guest menu reads stay bounded by them (TQR-006).
 - AC54 guest half: `GET /api/g/t/:token` and `GET /api/g/r/:slug/menu` answer 403 `RESTAURANT_SUSPENDED` for a suspended restaurant (was 404) and the guest table page now really shows "Nhà hàng tạm ngưng" (TQR-009).
 - The AC15 role matrix now covers the 12 staff menu endpoints and the floor stream (status only), and a test proves a guarded route without `@Roles` refuses every role (TQR-005, TQR-006, TQR-010).
 - Open live streams end when the person is disabled, gets a new password or role, or the restaurant is suspended (`tqr_revoke` NOTIFY in the same transaction, plus a session re-check on every heartbeat); streams are capped at 10 per person and 300 per restaurant per process (429 `TOO_MANY_STREAMS`); snapshot failures and dropped malformed NOTIFY payloads are logged without content (TQR-010).
