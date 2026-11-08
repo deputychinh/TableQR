@@ -291,6 +291,7 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
     perRestaurant: process.env.TQR_STREAMS_PER_RESTAURANT,
     heartbeat: process.env.TQR_SSE_HEARTBEAT_MS,
     perGuestSession: process.env.TQR_STREAMS_PER_GUEST_SESSION,
+    guestPool: process.env.TQR_GUEST_STREAMS_PER_RESTAURANT,
   };
 
   beforeAll(async () => {
@@ -298,6 +299,7 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
     process.env.TQR_STREAMS_PER_RESTAURANT = '3';
     process.env.TQR_SSE_HEARTBEAT_MS = '200';
     process.env.TQR_STREAMS_PER_GUEST_SESSION = '2';
+    process.env.TQR_GUEST_STREAMS_PER_RESTAURANT = '3';
     t = await createTestApp();
     await t.app.listen(0, '127.0.0.1');
     const server = t.app.getHttpServer() as unknown as { address: () => AddressInfo };
@@ -313,6 +315,7 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
     process.env.TQR_STREAMS_PER_RESTAURANT = saved.perRestaurant;
     process.env.TQR_SSE_HEARTBEAT_MS = saved.heartbeat;
     process.env.TQR_STREAMS_PER_GUEST_SESSION = saved.perGuestSession;
+    process.env.TQR_GUEST_STREAMS_PER_RESTAURANT = saved.guestPool;
     await t.app.close();
   });
 
@@ -376,5 +379,66 @@ describe('stream caps and the heartbeat session check (e2e)', () => {
     });
     expect(response.status).toBe(429);
     expect(((await response.json()) as { code: string }).code).toBe('TOO_MANY_STREAMS');
+  });
+
+  it('guests and staff draw from separate per-restaurant pools: a full guest pool never blocks the staff screens', async () => {
+    const owner = await signUp(t);
+    const restaurantId = (
+      await request(t.app.getHttpServer()).get('/api/me').set('cookie', owner.cookie)
+    ).body.restaurant.id as string;
+    const waiter = await addStaff(t, owner.cookie, 'waiter');
+    const cashier = await addStaff(t, owner.cookie, 'cashier');
+    const waiterCookie = await loginCookie(t, waiter.body.email, STAFF_PASSWORD);
+    const cashierCookie2 = await loginCookie(t, cashier.body.email, STAFF_PASSWORD);
+    const floor = await seedMenu(t.app.get(DB), restaurantId);
+    const guests = [
+      await openSession(t.app.get(DB), floor),
+      await openSession(t.app.get(DB), floor),
+    ];
+    // Guest pool (3) filled by two tables' phones.
+    for (const path of ['/api/g/stream', '/api/g/bill/stream']) {
+      const client = await openSse(`${base}${path}`, guests[0]?.guestCookie ?? '');
+      clients.push(client);
+      await client.waitFor((m) => m.event === 'snapshot');
+    }
+    const third = await openSse(`${base}/api/g/stream`, guests[1]?.guestCookie ?? '');
+    clients.push(third);
+    await third.waitFor((m) => m.event === 'snapshot');
+    const refused = await fetch(`${base}/api/g/bill/stream`, {
+      headers: { cookie: guests[1]?.guestCookie ?? '' },
+    });
+    expect(refused.status).toBe(429);
+    expect(((await refused.json()) as { code: string }).code).toBe('TOO_MANY_STREAMS');
+    // Staff still get their whole pool (3): owner, waiter and cashier screens all open.
+    await open(owner.cookie);
+    await open(waiterCookie);
+    await open(cashierCookie2);
+    expect(await statusOf(owner.cookie)).toBe(429);
+  });
+
+  it('ends the guest order stream and the guest bill stream once the cashier closes the table', async () => {
+    const owner = await signUp(t);
+    const restaurantId = (
+      await request(t.app.getHttpServer()).get('/api/me').set('cookie', owner.cookie)
+    ).body.restaurant.id as string;
+    const floor = await seedMenu(t.app.get(DB), restaurantId);
+    const session = await openSession(t.app.get(DB), floor);
+    const streams: SseClient[] = [];
+    for (const path of ['/api/g/stream', '/api/g/bill/stream']) {
+      const client = await openSse(`${base}${path}`, session.guestCookie);
+      clients.push(client);
+      streams.push(client);
+      await client.waitFor((m) => m.event === 'snapshot');
+    }
+    await request(t.app.getHttpServer())
+      .post(`/api/sessions/${session.sessionId}/close`)
+      .set('origin', ORIGIN)
+      .set('cookie', owner.cookie)
+      .send({})
+      .expect(200);
+    for (const client of streams) {
+      await endsWithin(client, 2000);
+      expect(client.messages.some((m) => m.event === 'revoked')).toBe(true);
+    }
   });
 });
