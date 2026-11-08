@@ -40,6 +40,8 @@ export const billingLocale = {
         'Quán chưa nhận chuyển khoản qua mã QR. Mời bạn thanh toán tại quầy, đọc mã hoá đơn cho thu ngân.',
       changed: 'Hoá đơn đã thay đổi vì có thêm món. Hãy quét mã mới bên dưới, đừng dùng mã cũ.',
       changedNoDue: 'Hoá đơn đã thay đổi. Hiện bàn không còn món cần thanh toán.',
+      newBill: 'Lấy hoá đơn mới',
+      newBillHint: 'Bàn vừa gọi thêm món sau lần thanh toán trước. Lấy hoá đơn mới để quét mã.',
       paidTitle: 'Đã thanh toán',
       paidBody: 'Cảm ơn bạn! Quán đã nhận {amount}.',
       closedTitle: 'Bàn đã đóng',

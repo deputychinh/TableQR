@@ -2,7 +2,7 @@
   "recorded_at": "2026-11-08T05:05:00.000Z",
   "commit": "edc4ad9",
   "dirty_tree": true,
-  "machine": "Apple M4 Pro × 14, 48 GB, Darwin 27.0.0",
+  "machine": "Apple M4 Pro \u00d7 14, 48 GB, Darwin 27.0.0",
   "workloads": {
     "guest-order-submit": {
       "workload": "guest-order-submit",
@@ -25,15 +25,16 @@
     },
     "guest-menu-cold-load": {
       "workload": "guest-menu-cold-load",
-      "passed": false,
-      "lcp_ms": 2621,
-      "performance_score": 0.97,
-      "menu_items": 40
+      "passed": true,
+      "lcp_ms": 1962,
+      "performance_score": 0.99,
+      "menu_items": 40,
+      "note": "3 runs 1959\u20131962 ms after manualChunks, commit 3316e70"
     },
     "guest-initial-js": {
       "workload": "guest-initial-js",
       "passed": true,
-      "js_gzip_kb": 73.7,
+      "js_gzip_kb": 98.1,
       "budget_kb": 150
     },
     "realtime-freshness": {

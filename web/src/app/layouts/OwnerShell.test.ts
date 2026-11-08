@@ -12,9 +12,9 @@ const meAs = (role: StaffRole): Me => ({
   restaurant: { id: 'r', name: 'Quán Ngon', slug: 'quan-ngon' },
 });
 
-const nav = () => screen.queryByRole('navigation', { name: 'Quản lý nhà hàng' });
+const nav = () => screen.queryByRole('navigation', { name: 'Điều hướng chính' });
 const navLinks = () =>
-  within(screen.getByRole('navigation', { name: 'Quản lý nhà hàng' }))
+  within(screen.getByRole('navigation', { name: 'Điều hướng chính' }))
     .getAllByRole('link')
     .map((link) => [link.textContent.trim(), link.getAttribute('href')]);
 

@@ -82,7 +82,7 @@ onMounted(load);
     <main class="guest-bill-page__main">
       <LoadingState v-if="state.kind === 'loading'" :label="t('billing.guest.loading')" :rows="3" />
       <template v-else-if="state.kind === 'ready'">
-        <GuestBill :bill="state.bill" :changed="changed" />
+        <GuestBill :bill="state.bill" :changed="changed" @request="load" />
         <EmptyState
           v-if="state.bill.lines.length === 0 && state.bill.bill === null"
           :title="t('billing.guest.emptyTitle')"

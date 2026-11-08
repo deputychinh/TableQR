@@ -383,6 +383,30 @@ describe('billing (e2e, real Postgres): S12 bill + VietQR, S13 cashier', () => {
       const [o2] = await db.select().from(orders).where(eq(orders.id, later.orderId));
       expect([o1?.status, o2?.status]).toEqual(['released', 'awaiting_payment']);
     });
+
+    it('after a bill is paid in full, a new order issues a bill for the new amount, live on the open page (no dead end)', async () => {
+      const session = await openSession(db, a.floor);
+      await addOrder(db, a.floor, session, 'released', [{ priceVnd: 50_000, quantity: 1 }]);
+      const first = (await guestBill(session)).body.bill as { id: string };
+      await post(`/api/bills/${first.id}/pay`, a.cashier, { method: 'cash' }).expect(200);
+      const stream = await openBillStream(session);
+
+      await guestOrder(a, session).expect(201);
+
+      const issued = await billEvent(stream, 'open');
+      expect(issued.data.amountVnd).toBe(50_000);
+      const after = await guestBill(session);
+      expect(after.body).toMatchObject({ paidVnd: 50_000, dueVnd: 50_000 });
+      expect(after.body.bill).toMatchObject({ status: 'open', amountVnd: 50_000 });
+      expect(after.body.bill.id).not.toBe(first.id);
+    });
+
+    it('a session that never asked for a bill gets none issued by new orders', async () => {
+      const session = await openSession(db, a.floor);
+      await guestOrder(a, session).expect(201);
+      const [row] = await db.select().from(bills).where(eq(bills.sessionId, session.sessionId));
+      expect(row).toBeUndefined();
+    });
   });
 
   describe('S13 cashier confirms, closes, pay before cooking', () => {

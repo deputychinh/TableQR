@@ -122,6 +122,25 @@ describe('GuestBill', () => {
     expect(screen.getByRole('status').textContent).toContain('không còn món cần thanh toán');
   });
 
+  it('AC42: after a payment, new items with no open bill yet show what is due and a way to get a new bill', async () => {
+    const onRequest = vi.fn<() => void>();
+    await renderWithApp(GuestBill, {
+      props: {
+        bill: view({
+          bill: bill({ status: 'paid', method: 'cash', paidAt: '2026-11-08T06:00:00Z' }),
+          totalVnd: 165_000,
+          paidVnd: 115_000,
+          dueVnd: 50_000,
+        }),
+        onRequest,
+      },
+    });
+    expect(screen.queryByRole('heading', { name: 'Đã thanh toán' })).toBeNull();
+    expect(screen.getByText('50.000 ₫')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Lấy hoá đơn mới' }));
+    expect(onRequest).toHaveBeenCalledOnce();
+  });
+
   it('AC44: shows "Đã thanh toán" once paid, with the amount and earlier payments', async () => {
     await renderWithApp(GuestBill, {
       props: {

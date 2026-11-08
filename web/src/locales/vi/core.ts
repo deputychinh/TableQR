@@ -48,7 +48,7 @@ export const core = {
     close: 'Đóng thông báo',
   },
   nav: {
-    label: 'Quản lý nhà hàng',
+    label: 'Điều hướng chính',
     overview: 'Tổng quan',
     menu: 'Thực đơn',
     tables: 'Bàn & QR',

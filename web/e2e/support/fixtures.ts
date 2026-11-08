@@ -8,7 +8,7 @@ export type { APIRequestContext, Browser, Page, TestInfo } from '@playwright/tes
  * otherwise from the "Thêm" sheet (phones keep at most five items in the bottom bar).
  */
 export const openSection = async (page: Page, name: string): Promise<void> => {
-  const nav = page.getByRole('navigation', { name: 'Quản lý nhà hàng' });
+  const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
   const link = nav.getByRole('link', { name, exact: true });
   if (await link.isVisible()) {
     await link.click();

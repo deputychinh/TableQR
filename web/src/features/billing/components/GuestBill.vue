@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CircleCheck, Landmark, RefreshCw, Store } from 'lucide-vue-next';
+import BaseButton from '@/components/BaseButton.vue';
 import StatusChip from '@/components/StatusChip.vue';
 import QrImage from '@/features/tables/components/QrImage.vue';
 import { formatVnd } from '@/features/menu/price';
@@ -13,11 +14,14 @@ import type { SessionBill } from '../api';
  * once the cashier confirms (AC44). Presentational: the page loads and refreshes `bill`.
  */
 const props = defineProps<{ bill: SessionBill; changed?: boolean }>();
+const emit = defineEmits<{ request: [] }>();
 const { t } = useI18n();
 
 const current = computed(() => props.bill.bill);
 const isPaid = computed(() => current.value?.status === 'paid' && props.bill.dueVnd === 0);
 const isOpen = computed(() => current.value?.status === 'open');
+/** Something is due but no open bill exists yet (e.g. new items after a payment): never a dead end. */
+const needsNewBill = computed(() => !isPaid.value && !isOpen.value && props.bill.dueVnd > 0);
 </script>
 
 <template>
@@ -91,6 +95,14 @@ const isOpen = computed(() => current.value?.status === 'open');
       <p class="guest-bill__hint">{{ t('billing.guest.live') }}</p>
     </section>
 
+    <section v-else-if="needsNewBill" class="guest-bill__pay">
+      <p class="guest-bill__due-label">{{ t('billing.guest.due') }}</p>
+      <p class="guest-bill__amount">{{ formatVnd(bill.dueVnd) }}</p>
+      <p class="guest-bill__hint">{{ t('billing.guest.newBillHint') }}</p>
+      <BaseButton size="lg" block @click="emit('request')">
+        {{ t('billing.guest.newBill') }}
+      </BaseButton>
+    </section>
     <section v-if="bill.lines.length > 0" class="guest-bill__lines">
       <h2 class="guest-bill__section-title">{{ t('billing.guest.items') }}</h2>
       <ul class="guest-bill__list">

@@ -47,7 +47,7 @@ test('a waiter opens Bàn & QR from their home, sees only reachable pages and pr
   await expect(page.getByRole('heading', { name: 'Bàn 7' })).toBeVisible();
 
   // Navigation: their home and the pages open to floor staff — no owner-only sections.
-  const nav = page.getByRole('navigation', { name: 'Quản lý nhà hàng' });
+  const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
   await expect(nav.getByRole('link')).toHaveText(['Phục vụ', 'Duyệt đơn', 'Bàn & QR', 'Đặt bàn']);
   await expect(nav.getByRole('button', { name: 'Thêm' })).toHaveCount(0);
   // Duyệt đơn and back to Phục vụ from the same bar (one shell per role).

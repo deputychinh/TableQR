@@ -100,6 +100,17 @@ export interface SyncOptions {
  * Called wherever billable items change: a bill request, an order released or put to payment at
  * placement, a held order accepted (waiter or AC20), and after a payment released orders.
  */
+const hasPaidBill = async (tx: Executor, tenant: TenantId, sessionId: string): Promise<boolean> => {
+  const [row] = await tx
+    .select({ id: bills.id })
+    .from(bills)
+    .where(
+      and(eq(bills.restaurantId, tenant), eq(bills.sessionId, sessionId), eq(bills.status, 'paid')),
+    )
+    .limit(1);
+  return row !== undefined;
+};
+
 export const syncOpenBill = async (
   tx: Executor,
   tenant: TenantId,
@@ -114,7 +125,9 @@ export const syncOpenBill = async (
       and(eq(bills.restaurantId, tenant), eq(bills.sessionId, sessionId), eq(bills.status, 'open')),
     )
     .limit(1);
-  if (!open && !options.issueWhenNone) return;
+  // Without an open bill, issue one only when asked to — or when the table already paid a bill:
+  // the guest is in the billing flow, and a page left open must show what is now due (AC42).
+  if (!open && !options.issueWhenNone && !(await hasPaidBill(tx, tenant, sessionId))) return;
   const { dueVnd } = await sessionAmounts(tx, tenant, sessionId);
   const decision = decideBill(dueVnd, open?.amountVnd ?? null);
   if (decision.supersede && open) {
