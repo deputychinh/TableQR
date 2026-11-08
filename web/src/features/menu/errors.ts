@@ -30,6 +30,9 @@ const FORM_CODES: Record<string, string> = {
   LAST_STATION: 'menu.errors.lastStation',
   NOT_FOUND: 'menu.errors.notFound',
   FORBIDDEN: 'menu.errors.forbidden',
+  STATION_LIMIT_REACHED: 'menu.errors.stationLimit',
+  CATEGORY_LIMIT_REACHED: 'menu.errors.categoryLimit',
+  ITEM_LIMIT_REACHED: 'menu.errors.itemLimit',
   NETWORK: 'errors.network',
 };
 
