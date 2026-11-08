@@ -2,10 +2,10 @@
 
 Request (verbatim): "Tôi muốn làm 1 website chạy chủ yếu trên ipad và mobile mục đích chính là cung cấp QR để dán lên các bàn ăn trong quán ăn xong r khách hàng có thể nhanh chóng đặt bàn và thanh toán luôn khi thanh toán thì sẽ là hình thức quét mã QR ở ngay bàn thông qua hình thức chuyển khoản hoặc có thể thanh toán sau khi ăn tuỳ nhưng nhìn chung là như vậy có timeline ra đồ ăn và quy trình rõ ràng để tránh trường hợp khách vào sau mà lại nhận món trước khách vào hay quy trình ví dụ bàn đi 5 người mà ra đồ ăn sai hay bàn đi 1 ngừoi mà lại order nhiều kiểu vậy hiểu ý tôi rồi chứ" + "mỗi nhà hàng nên có 1 tài khoản riêng" + "và quy cách vận hành riêng nhé"
 Path: Full — because new product, several features (multi-tenant, ordering, kitchen queue, payment, booking)
-Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 4.5 of 6 days**
-Status: doing
+Appetite: 6 days of agent work · started 2026-11-08 · **Spent: 5.0 of 6 days**
+Status: done
 
-**Next action:** `demo` (results page artifact from evidence/verification.md), then `release` v0.5.0 local (tag, CHANGELOG section, smoke), retro + improve-skills.
+**Next action:** Wait for owner feedback on the demo; next slice candidates: deploy target (hosting + domain, then TQR-022/023 before first deploy), pilot in one restaurant, PayOS/SePay adapter, TQR-024–026.
 
 Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action.
 
@@ -30,10 +30,10 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 | Plan      | done   | [plan](plan.md), backlog TQR-001…021 (+022–026 follow-ups)                              |
 | Build     | done   | 21 items, merged on main; final review scores in "Review scores"                        |
 | Verify    | done   | [evidence/verification.md](evidence/verification.md), make ci at 0088268                |
-| Demo      | doing  |                                                                                         |
-| Release   | todo   | local only                                                                              |
+| Demo      | done   | [demo.md](demo.md), page https://claude.ai/artifact/2AEstK4nesnjzNeaa4vi52              |
+| Release   | done   | v0.5.0, local only; smoke: make ci + make dev journey (evidence/verify)                 |
 | Operate   | n.a.   | no deploy target yet                                                                    |
-| Learn     | todo   |                                                                                         |
+| Learn     | done   | Retro below; lessons in memory                                                          |
 
 ## Slices
 
@@ -111,8 +111,6 @@ Resume: re-invoke `ship`; "Where am I?" reads this file and does the Next action
 
 ## Retro
 
-- Caught late (2026-11-08): a `;` before `git commit` let a commit go out after `make ci` failed (744eac3) — always chain `make ci && git commit`.
-
-- Slowed us: …
-- Caught late: …
-- Change: …
+- Slowed us: parallel agents created duplicate shared components and colliding migration numbers — the lead re-merged by hand (fixed later with one-entry-per-line registries, `E2E_DB` per worktree and regenerating migrations at merge).
+- Caught late: a `;` let a commit out after a red gate (744eac3); the shared dev database got migrations from worktrees out of order (moved dev to `tableqr_dev`, e2e to a fresh DB per run); reviewers found money-path dead ends that per-agent tests missed (bill page after a paid bill) — only a real-browser walkthrough caught them.
+- Change: brief parallel agents with a shared schema and component contract up front; always chain `make ci && git commit`; run an end-to-end browser journey per money flow before review → skill lessons (deliver-loop gotchas) via improve-skills.

@@ -4,6 +4,10 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](ht
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-08
+
+Release 1 (local only): QR table ordering for many restaurants — sign-up and house rules, menu, tables and printable QR codes, staff roles, guest ordering with anomaly holds, fair kitchen queue, serving, live dish status, VietQR bills with cashier confirmation, online table booking, platform admin.
+
 ### Added
 
 - A table that already paid a bill gets a new bill automatically when it orders more, shown live on an open bill page; the guest page also offers "Lấy hoá đơn mới" whenever money is due without an open bill (TQR-018).
