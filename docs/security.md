@@ -59,7 +59,9 @@ flowchart LR
 
 ## Before first deploy
 
-- [ ] Security headers verified with a scan
+- [ ] Security headers verified with a scan — TQR-022: set the production headers (CSP, HSTS, `nosniff`, `Referrer-Policy`, `frame-ancestors`) and remove `X-Powered-By`
+- [ ] TQR-023: step-up authentication (re-enter the current password) before a bank account change
+- [ ] Express `trust proxy` set for the real reverse proxy, so the per-address sign-in limit sees client addresses
 - [ ] Backups + tested restore
 - [ ] Secret rotation procedure in the runbook
 - [ ] RLS hardening reconsidered (ADR 0003)
